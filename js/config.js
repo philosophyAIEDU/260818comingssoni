@@ -16,6 +16,11 @@ CS.CONFIG = {
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
   kickoutThreshold: 5,            // 누적 미인증 N회 → 킥아웃 대상
 
+  // 챌린지 기간(startDate~endDate) 밖에서도 인증 제출을 허용할지
+  //  true  : 시작 전·종료 후에도 제출 가능 (시연/테스트용, 집계에는 반영되지 않음)
+  //  false : 기간 안에서만 제출 가능 (실제 운영 시 권장)
+  allowSubmitOutsidePeriod: true,
+
   // 저장소 백엔드: 'local' | 'firebase'
   //  - local    : 브라우저 localStorage (현재 기본값)
   //  - firebase : js/store-firebase.js 의 Firestore 어댑터 사용

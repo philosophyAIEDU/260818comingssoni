@@ -15,6 +15,7 @@
  *   getSubmission(participantId, date)    → Promise<Submission|null>
  *   saveSubmission(data)                  → Promise<Submission>
  *   removeSubmission(id)                  → Promise<void>
+ *   upvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   getMeta() / setMeta(patch)            → Promise<object>
  *   exportAll() / importAll(obj)          → Promise<object|void>
  *   clearAll()                            → Promise<void>
@@ -22,7 +23,7 @@
  *  Participant { id, nickname, status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, chapter, sentence,
- *                reflection, createdAt, updatedAt }
+ *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
  * ───────────────────────────────────────────────────────────
  */
 window.CS = window.CS || {};
@@ -162,6 +163,8 @@ CS.LocalStore = (function () {
     }
     const row = Object.assign({
       id: CS.U.uid('s'),
+      upvotes: 0,
+      upvotedBy: [],
       createdAt: now,
       updatedAt: now
     }, data);
@@ -172,6 +175,20 @@ CS.LocalStore = (function () {
 
   async function removeSubmission(id) {
     write(S, read(S, []).filter((s) => s.id !== id));
+  }
+
+  async function upvoteSubmission(id, clientId) {
+    const all = read(S, []);
+    const i = all.findIndex((s) => s.id === id);
+    if (i < 0) return null;
+    const upvotedBy = all[i].upvotedBy || [];
+    if (upvotedBy.includes(clientId)) throw new Error('이미 이 글을 추천했습니다.');
+    all[i] = Object.assign({}, all[i], {
+      upvotes: (all[i].upvotes || 0) + 1,
+      upvotedBy: upvotedBy.concat(clientId)
+    });
+    write(S, all);
+    return all[i];
   }
 
   async function getMeta() { return read(M, {}); }
@@ -204,7 +221,7 @@ CS.LocalStore = (function () {
     name: 'local',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, getMeta, setMeta, exportAll, importAll, clearAll
+    removeSubmission, upvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll
   };
 })();
 
