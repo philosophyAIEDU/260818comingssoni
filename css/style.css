@@ -1,50 +1,54 @@
 /* 커밍쏜 독서챌린지 — 공통 스타일 */
 :root {
-  --bg: #f7f5f1;
-  --surface: #ffffff;
-  --surface-2: #fbfaf8;
-  --border: #e6e1d8;
-  --border-strong: #d5cec1;
-  --text: #23201b;
-  --text-dim: #6f675c;
-  --text-faint: #9b9285;
-  --accent: #8a5a2b;
-  --accent-soft: #f2e7d9;
-  --ok: #2f7d5a;
-  --ok-soft: #dff0e6;
-  --bad: #b23b3b;
-  --bad-soft: #fae2e2;
-  --warn: #a4761b;
-  --warn-soft: #f8ecd4;
-  --info: #3a6a9a;
-  --info-soft: #e2ecf6;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(35, 32, 27, .05), 0 8px 24px rgba(35, 32, 27, .05);
+  --bg: #0022a1;                /* 이미지 상단 블루 배경 테마 */
+  --surface: #ffffff;           /* 깔끔한 하얀 카드 면 */
+  --surface-2: #f4f6fd;         /* 보조 연블루 하이라이트 면 */
+  --border: #d2daeb;
+  --border-strong: #a1b2de;
+  --text: #0d1b40;              /* 딥 블루 텍스트 */
+  --text-dim: #455680;
+  --text-faint: #798cb3;
+  --accent: #0026c6;            /* 선명한 블루 버튼 및 강조 포인트 */
+  --accent-soft: #ffea00;       /* 포스터 하단의 시그니처 옐로우 */
+  --yellow-banner: #ffeb00;     /* 카운트다운 배너 옐로우 */
+  --yellow-banner-text: #00166d;
+  --ok: #058852;
+  --ok-soft: #e3f7ec;
+  --bad: #d92626;
+  --bad-soft: #fde8e8;
+  --warn: #c28800;
+  --warn-soft: #fff6d9;
+  --info: #0058cd;
+  --info-soft: #e5f0ff;
+  --radius: 14px;
+  --shadow: 0 4px 14px rgba(0, 28, 120, 0.12);
   --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
           'Segoe UI', Roboto, 'Noto Sans KR', 'Malgun Gothic', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #171614;
-    --surface: #201e1b;
-    --surface-2: #262421;
-    --border: #35322d;
-    --border-strong: #46423b;
-    --text: #ece7df;
-    --text-dim: #a89f92;
-    --text-faint: #7d7568;
-    --accent: #d9a86c;
-    --accent-soft: #33291d;
-    --ok: #6cc79a;
-    --ok-soft: #1e3329;
-    --bad: #e08a8a;
-    --bad-soft: #38221f;
-    --warn: #d9b46c;
-    --warn-soft: #332a19;
-    --info: #8ab4e0;
-    --info-soft: #1d2a38;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    --bg: #030b28;
+    --surface: #0a163a;
+    --surface-2: #10204d;
+    --border: #1d326a;
+    --border-strong: #2c4994;
+    --text: #ffffff;
+    --text-dim: #9cb2e6;
+    --text-faint: #637ab3;
+    --accent: #ffeb00;
+    --accent-soft: #172d6b;
+    --yellow-banner: #ffea00;
+    --yellow-banner-text: #00166d;
+    --ok: #4cd995;
+    --ok-soft: #0d3824;
+    --bad: #ff6b6b;
+    --bad-soft: #421616;
+    --warn: #ffd24c;
+    --warn-soft: #3d310d;
+    --info: #4da3ff;
+    --info-soft: #0f2b4c;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -66,9 +70,9 @@ a { color: var(--accent); }
 
 /* ── 헤더 ─────────────────────────────── */
 .top {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 18px 0;
+  background: #0022a1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 20px 0;
   margin-bottom: 24px;
 }
 .top-in {
@@ -76,17 +80,17 @@ a { color: var(--accent); }
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
 .brand { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
-.brand h1 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
-.brand p { margin: 0; font-size: 13px; color: var(--text-dim); }
+.brand h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: #ffffff; }
+.brand p { margin: 0; font-size: 13px; color: #ffeb00; font-weight: 600; }
 .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
 .navlinks a {
-  font-size: 13px; text-decoration: none; color: var(--text-dim);
-  border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px;
-  background: var(--surface-2);
+  font-size: 13.5px; text-decoration: none; color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 999px; padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.1); font-weight: 600;
 }
-.navlinks a:hover { border-color: var(--border-strong); color: var(--text); }
+.navlinks a:hover { border-color: #ffeb00; color: #ffeb00; }
 .navlinks a[aria-current="page"] {
-  background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600;
+  background: #ffeb00; border-color: #ffeb00; color: #00166d; font-weight: 700;
 }
 
 /* ── 카드 ─────────────────────────────── */
@@ -94,12 +98,12 @@ a { color: var(--accent); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 22px;
   margin-bottom: 18px;
   box-shadow: var(--shadow);
 }
 .card > h2 {
-  margin: 0 0 4px; font-size: 16px; letter-spacing: -.01em;
+  margin: 0 0 4px; font-size: 17px; letter-spacing: -.01em; color: var(--text); font-weight: 700;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .card > .hint { margin: 0 0 16px; font-size: 13px; color: var(--text-dim); }
@@ -108,15 +112,17 @@ a { color: var(--accent); }
 /* ── 카운트다운 배너 ───────────────────── */
 .banner {
   display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
-  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
-  border: 1px solid var(--border);
+  background: #ffeb00;
+  color: #00166d;
   border-radius: var(--radius);
-  padding: 18px 20px; margin-bottom: 18px;
+  padding: 18px 24px; margin-bottom: 22px;
+  box-shadow: 0 4px 16px rgba(255, 235, 0, 0.3);
 }
-.banner .big { font-size: 26px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.banner .lbl { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+.banner .big { font-size: 28px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #00166d; }
+.banner .lbl { font-size: 12px; color: #3d4f8f; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
 .banner .col { display: flex; flex-direction: column; }
-.banner .sep { width: 1px; align-self: stretch; background: var(--border); }
+.banner .sep { width: 2px; align-self: stretch; background: rgba(0, 22, 109, 0.15); }
+
 
 /* ── 폼 ───────────────────────────────── */
 .field { margin-bottom: 16px; }
@@ -146,14 +152,16 @@ button, .btn {
 }
 button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
 button.primary {
-  background: var(--accent); border-color: var(--accent); color: #fff;
+  background: #0022a1; border-color: #0022a1; color: #ffffff; font-weight: 700;
+  box-shadow: 0 3px 8px rgba(0, 34, 161, 0.25);
 }
-button.primary:hover { filter: brightness(1.08); color: #fff; }
+button.primary:hover { background: #00166d; border-color: #00166d; color: #ffeb00; }
 button.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
 button.danger:hover { background: var(--bad-soft); }
 button.small { font-size: 12.5px; padding: 5px 10px; font-weight: 500; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
 
 /* ── 알림 ─────────────────────────────── */
 .note {
