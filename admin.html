@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>커밍쏜 독서챌린지 · 운영진</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>운영진 대시보드</h1>
+      <p id="brandSub">커밍쏜 독서챌린지 · 프로세스 이코노미</p>
+    </div>
+    <nav class="navlinks">
+      <a href="index.html">인증하기</a>
+      <a href="admin.html" aria-current="page">운영진</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap wide">
+
+  <section class="banner">
+    <div class="col"><span class="lbl">오늘</span><span class="big" id="todayLabel">-</span></div>
+    <div class="sep"></div>
+    <div class="col"><span class="lbl">진행</span><span class="big" id="dayLabel">-</span></div>
+    <div class="sep"></div>
+    <div class="col"><span class="lbl">마감까지</span><span class="big" id="countdown">--:--:--</span></div>
+  </section>
+
+  <div class="stats" style="margin-bottom:18px">
+    <div class="stat"><div class="n" id="kTotal">0</div><div class="k">참여중</div></div>
+    <div class="stat ok"><div class="n" id="kToday">0</div><div class="k">오늘 인증</div></div>
+    <div class="stat warn"><div class="n" id="kTodayRate">0%</div><div class="k">오늘 인증률</div></div>
+    <div class="stat bad"><div class="n" id="kYesterday">0</div><div class="k">어제 미인증</div></div>
+    <div class="stat bad"><div class="n" id="kRisk">0</div><div class="k">킥아웃 대상</div></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-tab="status" class="on">일일현황</button>
+    <button data-tab="roster">명단 관리</button>
+    <button data-tab="report">리포트 · 공지문</button>
+    <button data-tab="entries">제출 기록</button>
+    <button data-tab="data">데이터</button>
+  </div>
+
+  <!-- ── 일일현황 ─────────────────────── -->
+  <section class="card panel" data-panel="status">
+    <h2>일일현황 <span class="tag" id="sortTag">누적 미인증 많은 순</span></h2>
+    <p class="hint">참가자 × 날짜 매트릭스입니다. 셀을 클릭하면 해당 날짜의 제출 내용 또는 면제 등록/해제를 할 수 있습니다.</p>
+    <div class="scroll">
+      <table class="matrix" id="matrix"></table>
+    </div>
+    <div class="legend">
+      <span><b class="cell cell-o">O</b> 인증</span>
+      <span><b class="cell cell-x">X</b> 미인증</span>
+      <span><b class="cell cell-p">P</b> 면제</span>
+      <span><b class="cell cell-none">·</b> 마감 전 / 예정</span>
+      <span><b class="cell cell-off">·</b> 참여 기간 밖</span>
+    </div>
+    <div id="cellDetail" style="margin-top:16px"></div>
+  </section>
+
+  <!-- ── 명단 관리 ─────────────────────── -->
+  <section class="card panel" data-panel="roster" hidden>
+    <h2>명단 등록</h2>
+    <p class="hint">신청 폼으로 모은 닉네임을 한 줄에 하나씩 붙여넣고 등록하세요. 이미 있는 닉네임은 건너뜁니다.</p>
+    <div id="rosterMsg"></div>
+    <div class="field">
+      <textarea id="bulkNames" placeholder="예시&#10;소니&#10;커밍쏜&#10;책읽는고래"></textarea>
+    </div>
+    <div class="actions">
+      <button class="primary" id="bulkAdd">명단 일괄 등록</button>
+      <span class="muted">쉼표(,)로 구분해도 됩니다.</span>
+    </div>
+
+    <h2 style="margin-top:26px">참가자 목록 <span class="tag" id="rosterCount"></span></h2>
+    <p class="hint">상태 변경, 면제일 등록, 닉네임 수정, 삭제를 할 수 있습니다.</p>
+    <div class="scroll">
+      <table id="rosterTable"></table>
+    </div>
+  </section>
+
+  <!-- ── 리포트 / 공지문 ───────────────── -->
+  <section class="card panel" data-panel="report" hidden>
+    <h2>미인증 리포트</h2>
+    <p class="hint">구글 스프레드시트가 매일 아침 07:30에 보내던 리포트와 같은 내용입니다. 날짜를 골라 생성하세요.</p>
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <label class="muted" for="reportDate">대상 날짜</label>
+        <input type="date" id="reportDate">
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="primary" id="genReport" style="width:100%">리포트 생성</button>
+      </div>
+    </div>
+    <pre class="report" id="reportOut">날짜를 선택하고 [리포트 생성]을 누르세요.</pre>
+    <div class="actions"><button id="copyReport">리포트 복사</button></div>
+
+    <h2 style="margin-top:26px">오늘 공지문 초안</h2>
+    <p class="hint">단톡방에 그대로 복사해 붙여 넣을 수 있는 공지문입니다.</p>
+    <pre class="report" id="noticeOut"></pre>
+    <div class="actions">
+      <button id="genNotice">공지문 다시 생성</button>
+      <button class="primary" id="copyNotice">공지문 복사</button>
+    </div>
+  </section>
+
+  <!-- ── 제출 기록 ─────────────────────── -->
+  <section class="card panel" data-panel="entries" hidden>
+    <h2>제출 기록</h2>
+    <p class="hint">날짜 또는 참가자로 필터링해 인증 내용을 확인합니다.</p>
+    <div class="row" style="margin-bottom:14px">
+      <div>
+        <label class="muted" for="fDate">날짜</label>
+        <input type="date" id="fDate">
+      </div>
+      <div>
+        <label class="muted" for="fParticipant">참가자</label>
+        <select id="fParticipant"><option value="">전체</option></select>
+      </div>
+      <div>
+        <label class="muted" for="fKeyword">검색어</label>
+        <input type="text" id="fKeyword" placeholder="챕터 · 문장 · 느낀 점">
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <button id="applyFilter" class="primary" style="flex:1">조회</button>
+        <button id="clearFilter" style="flex:1">초기화</button>
+      </div>
+    </div>
+    <div id="entryList"></div>
+  </section>
+
+  <!-- ── 데이터 ───────────────────────── -->
+  <section class="card panel" data-panel="data" hidden>
+    <h2>데이터 관리</h2>
+    <p class="hint">
+      현재 저장 위치: <span class="tag info" id="backendTag">localStorage</span>
+      — 이 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우면 사라지므로 정기적으로 백업하세요.
+    </p>
+    <div id="dataMsg"></div>
+    <div class="actions" style="margin-bottom:18px">
+      <button class="primary" id="exportJson">전체 백업(JSON) 내려받기</button>
+      <button id="exportCsvSub">인증 기록 CSV</button>
+      <button id="exportCsvMatrix">일일현황 CSV</button>
+    </div>
+
+    <h2>백업 복원</h2>
+    <p class="hint">내려받은 JSON 파일을 불러오면 현재 데이터를 <strong>덮어씁니다.</strong></p>
+    <div class="actions" style="margin-bottom:18px">
+      <input type="file" id="importFile" accept="application/json" style="max-width:320px">
+      <button id="importJson">복원하기</button>
+    </div>
+
+    <h2>Firebase 연결</h2>
+    <p class="hint">
+      나중에 여러 기기에서 함께 쓰려면 <code>js/config.js</code>의 <code>CS.FIREBASE_CONFIG</code>를 채우고
+      <code>backend</code>를 <code>'firebase'</code>로 바꾸면 됩니다. 저장 인터페이스가 동일해 화면 코드는 그대로 동작합니다.
+      전환 전에 위의 <strong>전체 백업</strong>을 받아두고, 전환 후 <strong>복원하기</strong>로 그대로 옮길 수 있습니다.
+    </p>
+
+    <h2 style="color:var(--bad)">위험 구역</h2>
+    <p class="hint">모든 참가자와 인증 기록을 삭제합니다. 되돌릴 수 없습니다.</p>
+    <div class="actions"><button class="danger" id="wipe">전체 데이터 삭제</button></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  커밍쏜 독서챌린지 운영진 화면 · <span id="footRange"></span>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/store-firebase.js"></script>
+<script src="js/store.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
