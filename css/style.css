@@ -294,18 +294,6 @@ footer.foot {
 /* 참여 아이디 검색 + 드롭다운 */
 .participant-picker { display: flex; flex-direction: column; gap: 6px; }
 
-/* 참여 아이디 기억 체크박스 */
-.checkbox-field {
-  display: flex; align-items: center; gap: 7px; margin-top: 8px;
-  font-size: 12.5px; font-weight: 400; color: var(--text-dim); cursor: pointer;
-  /* 라벨을 연달아 누를 때 글자가 드래그 선택되어 반전돼 보이지 않도록 */
-  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
-}
-.checkbox-field input {
-  width: 16px; height: 16px; margin: 0; flex: 0 0 auto;
-  accent-color: var(--accent); cursor: pointer;
-}
-
 /* ── 접이식 블록 ──────────────────────── */
 .fold { margin-top: 16px; }
 .fold > summary {

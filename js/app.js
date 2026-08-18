@@ -5,8 +5,6 @@
 
   const CELL_CLASS = { O: 'cell-o', X: 'cell-x', P: 'cell-p', '-': 'cell-none', '·': 'cell-off' };
   const DRAFT_KEY = `${CONFIG.storagePrefix}.draft`;
-  const LAST_KEY = `${CONFIG.storagePrefix}.lastParticipant`;
-  const REMEMBER_KEY = `${CONFIG.storagePrefix}.rememberMe`;
   const CLIENT_KEY = `${CONFIG.storagePrefix}.clientId`;
   const FEED_PAGE_SIZE = 20;
 
@@ -84,15 +82,6 @@
   }
 
 
-  /* ── 참여 아이디 기억하기 ─────────────── */
-  function getRememberPref() {
-    // 처음 여는 경우(값이 없음)는 기본적으로 기억하기를 켜 둔다
-    return localStorage.getItem(REMEMBER_KEY) !== '0';
-  }
-  function setRememberPref(on) {
-    localStorage.setItem(REMEMBER_KEY, on ? '1' : '0');
-  }
-
   /* ── 참가자 드롭다운 (이름·초성 검색으로 좁혀볼 수 있음) ── */
 
   const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
@@ -169,7 +158,6 @@
   async function loadParticipants() {
     participants = await Store.listParticipants();
     renderParticipantOptions();
-    $('rememberMe').checked = getRememberPref();
 
     if (!participants.length) {
       msg($('formMsg'),
@@ -179,12 +167,6 @@
       return;
     }
     if (canSubmitToday()) $('submitBtn').disabled = false;
-
-    const last = getRememberPref() ? localStorage.getItem(LAST_KEY) : null;
-    if (last && participants.some((p) => p.id === last)) {
-      $('participant').value = last;
-      await onSelect();
-    }
   }
 
   /* ── 선택 시: 오늘 제출분 불러오기 + 현황 ─ */
@@ -193,8 +175,6 @@
     const card = $('myCard');
     if (!pid) { card.hidden = true; msg($('formMsg'), ''); return; }
 
-    if ($('rememberMe').checked) localStorage.setItem(LAST_KEY, pid);
-    else localStorage.removeItem(LAST_KEY);
     const today = U.today();
     const existing = await Store.getSubmission(pid, today);
 
@@ -557,14 +537,6 @@
       $(k).addEventListener('input', saveDraft));
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', () => autoGrow($(k))));
-
-    $('rememberMe').addEventListener('change', () => {
-      const on = $('rememberMe').checked;
-      setRememberPref(on);
-      const pid = $('participant').value;
-      if (on && pid) localStorage.setItem(LAST_KEY, pid);
-      if (!on) localStorage.removeItem(LAST_KEY);
-    });
 
     // 피드 날짜 넘기기 (버튼 + 좌우 스와이프)
     $('feedPrevDate').addEventListener('click', () => shiftFeedDate(-1));
