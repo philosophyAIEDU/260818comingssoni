@@ -62,10 +62,13 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('인증 1건', (await page.textContent('#stVerified')) === '1');
   t('최근 기록에 문장 표시', (await page.textContent('#myEntries')).includes('과정을 팔면'));
 
-  // 재방문 시 기존 제출 복원
+  // 재방문 시 같은 아이디를 다시 고르면 기존 제출 내용이 복원되는지
+  // (아이디 자동 기억은 없앴으므로 매번 직접 선택한다)
   await page.reload();
   await page.waitForTimeout(500);
-  t('재방문 시 닉네임 기억', (await page.locator('#participant').inputValue()) !== '');
+  t('재방문 시 드롭다운은 비어 있음(자동 선택 없음)', (await page.locator('#participant').inputValue()) === '');
+  await page.selectOption('#participant', { label: '커밍쏜' });
+  await page.waitForTimeout(300);
   t('재방문 시 제출완료 안내', /제출 완료/.test(await page.textContent('#formMsg')));
   t('입력값 복원', (await page.inputValue('#chapter')).includes('2장'));
 
