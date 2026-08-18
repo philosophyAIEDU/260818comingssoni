@@ -66,7 +66,7 @@ body {
 
 a { color: var(--accent); }
 
-.wrap { max-width: 860px; margin: 0 auto; padding: 0 16px 72px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px 72px; }
 .wrap.wide { max-width: 1200px; }
 
 /* ── 헤더 ─────────────────────────────── */
