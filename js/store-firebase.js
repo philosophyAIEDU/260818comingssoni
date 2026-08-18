@@ -1,24 +1,23 @@
-/* Firebase(Firestore) 어댑터 — 아직 비활성 상태입니다.
+/* Firebase(Firestore) 어댑터 - 로그인 없이 공용 읽기/쓰기 모드 + 관리자 인증 기능 탑재
  *
- * 활성화 방법
- *  1) Firebase 콘솔에서 프로젝트 생성 → Firestore Database 활성화
- *  2) js/config.js 의 CS.FIREBASE_CONFIG 값을 채우기
- *  3) js/config.js 의 backend 를 'firebase' 로 변경
- *
- * 컬렉션 구조 (localStorage 스키마와 1:1 대응)
+ * 컬렉션 구조
  *   participants/{id}  { nickname, status, joinDate, outDate, exemptDates[], note, createdAt }
- *   submissions/{id}   { participantId, nickname, date, chapter, sentence, reflection, createdAt, updatedAt }
+ *   submissions/{id}   { participantId, nickname, date, chapter, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
  *   meta/app           { ... }
- *
- * 권장 인덱스: submissions(date), submissions(participantId, date)
  */
 window.CS = window.CS || {};
 
 CS.FirebaseStore = (function () {
   const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   const APP = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  const AUTH = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
   let db = null;
   let fs = null;
+  let authModule = null;
+  let auth = null;
+  let currentUser = null;
+  let authStateListeners = [];
 
   async function init() {
     if (db) return;
@@ -26,9 +25,52 @@ CS.FirebaseStore = (function () {
     if (!cfg.projectId) {
       throw new Error('CS.FIREBASE_CONFIG 가 비어 있습니다. js/config.js 를 먼저 채워 주세요.');
     }
-    const [{ initializeApp }, firestore] = await Promise.all([import(APP), import(SDK)]);
+    const [{ initializeApp }, firestore, authMod] = await Promise.all([
+      import(APP),
+      import(SDK),
+      import(AUTH)
+    ]);
     fs = firestore;
-    db = fs.getFirestore(initializeApp(cfg));
+    authModule = authMod;
+    
+    const app = initializeApp(cfg);
+    db = fs.getFirestore(app);
+    auth = authModule.getAuth(app);
+
+    // 로그인 상태 리스너 등록
+    authModule.onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      for (const cb of authStateListeners) {
+        try { cb(user); } catch (e) { console.error(e); }
+      }
+    });
+  }
+
+  // Auth Helper Methods
+  function onAuthStateChanged(callback) {
+    authStateListeners.push(callback);
+    // 이미 로그인 정보가 있으면 즉시 1회 호출
+    if (db) {
+      callback(currentUser);
+    }
+    return () => {
+      authStateListeners = authStateListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  async function signInWithGoogle() {
+    await init();
+    const provider = new authModule.GoogleAuthProvider();
+    return authModule.signInWithPopup(auth, provider);
+  }
+
+  async function signOut() {
+    await init();
+    return authModule.signOut(auth);
+  }
+
+  function getCurrentUser() {
+    return currentUser;
   }
 
   const col = (name) => fs.collection(db, name);
@@ -124,7 +166,12 @@ CS.FirebaseStore = (function () {
       await fs.updateDoc(fs.doc(db, 'submissions', found.id), body);
       return Object.assign({}, found, body);
     }
-    const body = Object.assign({ createdAt: now, updatedAt: now }, data);
+    const body = Object.assign({
+      upvotes: 0,
+      upvotedBy: [],
+      createdAt: now,
+      updatedAt: now
+    }, data);
     const ref = await fs.addDoc(col('submissions'), body);
     return Object.assign({ id: ref.id }, body);
   }
@@ -132,6 +179,22 @@ CS.FirebaseStore = (function () {
   async function removeSubmission(id) {
     await init();
     await fs.deleteDoc(fs.doc(db, 'submissions', id));
+  }
+
+  async function upvoteSubmission(id, clientId) {
+    await init();
+    const docRef = fs.doc(db, 'submissions', id);
+    const snap = await fs.getDoc(docRef);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const upvotedBy = data.upvotedBy || [];
+    if (upvotedBy.includes(clientId)) {
+      throw new Error('이미 이 글을 추천했습니다.');
+    }
+    upvotedBy.push(clientId);
+    const upvotes = (data.upvotes || 0) + 1;
+    await fs.updateDoc(docRef, { upvotes, upvotedBy });
+    return Object.assign({ id }, data, { upvotes, upvotedBy });
   }
 
   async function getMeta() {
@@ -161,7 +224,6 @@ CS.FirebaseStore = (function () {
     if (!obj || !Array.isArray(obj.participants) || !Array.isArray(obj.submissions)) {
       throw new Error('백업 파일 형식이 올바르지 않습니다.');
     }
-    // 로컬 백업 → Firestore 이관용. 기존 id 를 문서 id 로 그대로 사용합니다.
     for (const p of obj.participants) {
       const { id } = p; const body = Object.assign({}, p); delete body.id;
       await fs.setDoc(fs.doc(db, 'participants', id), body);
@@ -185,6 +247,7 @@ CS.FirebaseStore = (function () {
     name: 'firebase',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, getMeta, setMeta, exportAll, importAll, clearAll
+    removeSubmission, upvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
+    onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser
   };
 })();

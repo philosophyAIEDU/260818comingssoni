@@ -6,8 +6,16 @@
   const CELL_CLASS = { O: 'cell-o', X: 'cell-x', P: 'cell-p', '-': 'cell-none', '·': 'cell-off' };
   const DRAFT_KEY = `${CONFIG.storagePrefix}.draft`;
   const LAST_KEY = `${CONFIG.storagePrefix}.lastParticipant`;
+  const CLIENT_KEY = `${CONFIG.storagePrefix}.clientId`;
 
   let participants = [];
+
+  // 중복 추천 방지를 위해 로컬 고유 식별자 생성
+  let clientId = localStorage.getItem(CLIENT_KEY);
+  if (!clientId) {
+    clientId = U.uid('cli');
+    localStorage.setItem(CLIENT_KEY, clientId);
+  }
 
   function msg(el, text, kind) {
     el.innerHTML = text ? `<div class="note ${kind || 'info'}">${text}</div>` : '';
@@ -56,7 +64,6 @@
       msg(box, '');
     }
 
-    // 기간 밖에는 제출을 막는다 (기록해도 집계에 반영되지 않기 때문)
     if (!canSubmitToday()) {
       ['chapter', 'sentence', 'reflection'].forEach((k) => { $(k).disabled = true; });
       $('submitBtn').disabled = true;
@@ -223,10 +230,117 @@
       </h4>
       <dl>
         <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
-        <dt>좋았던 문장</dt><dd class="quote">“${esc(s.sentence)}”</dd>
+        <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
         <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
       </dl>
     </div>`;
+  }
+
+  /* ── 오늘의 피드 & 명예의 전당 ─────────────────────── */
+  async function refreshSocialFeed() {
+    const todayISO = U.today();
+    const allSubs = await Store.listSubmissions();
+    const todaySubs = allSubs.filter(s => s.date === todayISO);
+
+    // 엄지척 순 내림차순 정렬
+    todaySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+
+    // 1등(가장 많이 추천된 사람) 선정
+    let winner = null;
+    if (todaySubs.length > 0) {
+      const maxVotes = todaySubs[0].upvotes || 0;
+      if (maxVotes > 0) {
+        winner = todaySubs[0].nickname;
+      }
+    }
+
+    const badge = $('todayWinnerBadge');
+    if (winner) {
+      badge.textContent = `👑 오늘의 1등: ${esc(winner)}`;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    const feedList = $('socialFeedList');
+    if (todaySubs.length === 0) {
+      feedList.innerHTML = '<div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>';
+    } else {
+      feedList.innerHTML = todaySubs.map((s, idx) => {
+        const isWinner = winner && s.nickname === winner;
+        const hasUpvoted = (s.upvotedBy || []).includes(clientId);
+        return `
+          <div class="entry" style="${isWinner ? 'border-left: 4px solid gold; background: #fffdf0;' : ''}">
+            <h4 style="display:flex; justify-content:space-between; align-items:center;">
+              <span>
+                ${isWinner ? '👑 ' : ''}<strong>${esc(s.nickname)}</strong>
+                <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+              </span>
+              <button class="upvote-btn" data-id="${s.id}" ${hasUpvoted ? 'disabled style="opacity:0.6;"' : ''} style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;">
+                👍 ${s.upvotes || 0}
+              </button>
+            </h4>
+            <dl>
+              <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
+              <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
+              <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
+            </dl>
+          </div>
+        `;
+      }).join('');
+
+      feedList.querySelectorAll('.upvote-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const subId = btn.dataset.id;
+          try {
+            await Store.upvoteSubmission(subId, clientId);
+            await refreshSocialFeed();
+            await calculateRanksAndFame();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
+    }
+  }
+
+  // 매일의 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
+  async function calculateRanksAndFame() {
+    const allSubs = await Store.listSubmissions();
+    const dates = U.challengeDates();
+
+    // 일자별 1등 닉네임 구하기
+    const winsMap = {}; // 닉네임 -> 1등 횟수
+    for (const d of dates) {
+      const daySubs = allSubs.filter(s => s.date === d);
+      if (daySubs.length === 0) continue;
+      // 엄지척 수 정렬
+      daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+      const maxVotes = daySubs[0].upvotes || 0;
+      if (maxVotes > 0) {
+        // 공동 1등 인정
+        const winners = daySubs.filter(s => (s.upvotes || 0) === maxVotes).map(s => s.nickname);
+        for (const w of winners) {
+          winsMap[w] = (winsMap[w] || 0) + 1;
+        }
+      }
+    }
+
+    // Top 5 리스트 생성
+    const sortedFame = Object.entries(winsMap)
+      .map(([nickname, wins]) => ({ nickname, wins }))
+      .sort((a, b) => b.wins - a.wins || a.nickname.localeCompare(b.nickname, 'ko'))
+      .slice(0, 5);
+
+    const fameList = $('hallOfFameList');
+    if (sortedFame.length === 0) {
+      fameList.innerHTML = '<li style="color: var(--text-muted); font-weight: normal;">집계된 순위가 없습니다.</li>';
+    } else {
+      fameList.innerHTML = sortedFame.map((user, idx) => {
+        const medal = ['🥇', '🥈', '🥉'][idx] || '⭐';
+        return `<li>${medal} <strong>${esc(user.nickname)}</strong> — 1등 ${user.wins}회</li>`;
+      }).join('');
+    }
   }
 
   /* ── 제출 ────────────────────────────── */
@@ -262,7 +376,10 @@
       msg($('formMsg'),
         `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다. 오늘도 수고하셨어요! 📖`, 'ok');
       $('submitBtn').textContent = '인증 수정하기';
+      
       await paintMine(pid);
+      await refreshSocialFeed();
+      await calculateRanksAndFame();
       $('myCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       msg($('formMsg'), `저장 실패: ${esc(err.message)}`, 'bad');
@@ -279,6 +396,8 @@
     tickCountdown();
     setInterval(tickCountdown, 1000);
     await loadParticipants();
+    await refreshSocialFeed();
+    await calculateRanksAndFame();
 
     $('participant').addEventListener('change', onSelect);
     $('verifyForm').addEventListener('submit', onSubmit);
@@ -290,12 +409,14 @@
     ['chapter', 'sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));
 
-    // 운영진 화면에서 명단을 바꾸면 이 탭에도 반영
+    // 실시간 동기화
     window.addEventListener('storage', async (e) => {
       if (e.key && e.key.startsWith(CONFIG.storagePrefix)) {
         const keep = $('participant').value;
         await loadParticipants();
         if (keep) { $('participant').value = keep; await onSelect(); }
+        await refreshSocialFeed();
+        await calculateRanksAndFame();
       }
     });
   }

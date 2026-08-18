@@ -16,31 +16,47 @@
       <p id="brandSub">커밍쏜 독서챌린지 · 프로세스 이코노미</p>
     </div>
     <nav class="navlinks">
-      <a href="index.html">인증하기</a>
-      <a href="admin.html" aria-current="page">운영진</a>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="index.html">인증하기</a>
+        <a href="admin.html" aria-current="page">운영진</a>
+        <div id="adminAuthHeader" style="display: none; align-items: center; gap: 8px;">
+          <span id="adminEmailLabel" style="font-size: 13.5px; color: var(--text-dim);"></span>
+          <button id="adminLogoutBtn" style="padding: 4px 8px; font-size: 12px;">로그아웃</button>
+        </div>
+      </div>
     </nav>
   </div>
 </header>
 
-<main class="wrap wide">
 
-  <section class="banner">
-    <div class="col"><span class="lbl">오늘</span><span class="big" id="todayLabel">-</span></div>
-    <div class="sep"></div>
-    <div class="col"><span class="lbl">진행</span><span class="big" id="dayLabel">-</span></div>
-    <div class="sep"></div>
-    <div class="col"><span class="lbl">마감까지</span><span class="big" id="countdown">--:--:--</span></div>
+  <!-- 운영진 인증 대기 화면 -->
+  <section class="card wrap" id="adminAuthGate" style="max-width: 480px; margin: 40px auto; text-align: center;">
+    <h2>운영진 로그인</h2>
+    <p class="hint">대시보드 접근을 위해 승인된 Google 운영진 계정으로 로그인해 주세요.</p>
+    <div id="adminAuthMsg" style="margin-bottom: 15px;"></div>
+    <button class="primary" id="adminLoginBtn" style="width: 100%; justify-content: center; padding: 12px;">Google 계정으로 로그인</button>
   </section>
 
-  <div class="stats" style="margin-bottom:18px">
-    <div class="stat"><div class="n" id="kTotal">0</div><div class="k">참여중</div></div>
-    <div class="stat ok"><div class="n" id="kToday">0</div><div class="k">오늘 인증</div></div>
-    <div class="stat warn"><div class="n" id="kTodayRate">0%</div><div class="k">오늘 인증률</div></div>
-    <div class="stat bad"><div class="n" id="kYesterday">0</div><div class="k">어제 미인증</div></div>
-    <div class="stat bad"><div class="n" id="kRisk">0</div><div class="k">킥아웃 대상</div></div>
-  </div>
+  <main class="wrap wide" id="adminDashboard" style="display: none;">
 
-  <div class="tabs" id="tabs">
+    <section class="banner">
+      <div class="col"><span class="lbl">오늘</span><span class="big" id="todayLabel">-</span></div>
+      <div class="sep"></div>
+      <div class="col"><span class="lbl">진행</span><span class="big" id="dayLabel">-</span></div>
+      <div class="sep"></div>
+      <div class="col"><span class="lbl">마감까지</span><span class="big" id="countdown">--:--:--</span></div>
+    </section>
+
+    <div class="stats" style="margin-bottom:18px">
+      <div class="stat"><div class="n" id="kTotal">0</div><div class="k">참여중</div></div>
+      <div class="stat ok"><div class="n" id="kToday">0</div><div class="k">오늘 인증</div></div>
+      <div class="stat warn"><div class="n" id="kTodayRate">0%</div><div class="k">오늘 인증률</div></div>
+      <div class="stat bad"><div class="n" id="kYesterday">0</div><div class="k">어제 미인증</div></div>
+      <div class="stat bad"><div class="n" id="kRisk">0</div><div class="k">킥아웃 대상</div></div>
+    </div>
+
+    <div class="tabs" id="tabs">
+
     <button data-tab="status" class="on">일일현황</button>
     <button data-tab="roster">명단 관리</button>
     <button data-tab="report">리포트 · 공지문</button>

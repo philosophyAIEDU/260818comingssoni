@@ -19,10 +19,13 @@ CS.CONFIG = {
   // 저장소 백엔드: 'local' | 'firebase'
   //  - local    : 브라우저 localStorage (현재 기본값)
   //  - firebase : js/store-firebase.js 의 Firestore 어댑터 사용
-  backend: 'local',
+  backend: 'firebase',
 
   // 로컬 저장소 키 접두사 (버전 올리면 기존 데이터와 분리됨)
   storagePrefix: 'comingsoon.reading.v1',
+
+  // 관리자 구글 계정 화이트리스트
+  adminEmails: ['warmcomfortforyou@gmail.com', 'comingssoni@gmail.com'],
 
   // 참고용 원본 구글폼 링크 (안내 문구에만 사용)
   links: {
@@ -33,10 +36,11 @@ CS.CONFIG = {
 
 // Firebase 연결 시 채워 넣을 자리 (backend: 'firebase' 로 바꾼 뒤 사용)
 CS.FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: "AIzaSyDZU5Q6GTnFuZxu3NbPcWrM_pedoLA4frY",
+  authDomain: "comingssoni-e7517.firebaseapp.com",
+  projectId: "comingssoni-e7517",
+  storageBucket: "comingssoni-e7517.firebasestorage.app",
+  messagingSenderId: "454941132246",
+  appId: "1:454941132246:web:37df91296b01d9966cd077"
 };
+
