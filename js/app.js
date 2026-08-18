@@ -93,18 +93,52 @@
     localStorage.setItem(REMEMBER_KEY, on ? '1' : '0');
   }
 
-  /* ── 참가자 드롭다운 (이름 앞글자 검색으로 좁혀볼 수 있음) ── */
+  /* ── 참가자 드롭다운 (이름·초성 검색으로 좁혀볼 수 있음) ── */
 
-  /** 검색어로 시작하는 닉네임만 남기고 드롭다운을 다시 그린다.
+  const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
+    'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+  /** '필로소피' → 'ㅍㄹㅅㅍ' (한글이 아닌 글자는 그대로 둔다) */
+  function chosungOf(str) {
+    let out = '';
+    for (const ch of String(str)) {
+      const code = ch.charCodeAt(0);
+      out += (code >= 0xac00 && code <= 0xd7a3)
+        ? CHOSUNG[Math.floor((code - 0xac00) / 588)]
+        : ch;
+    }
+    return out;
+  }
+
+  /** 검색어가 닉네임과 맞는지
+   *  - 'ㅍ', 'ㅍㄹ' 처럼 자음만 입력하면 초성으로 찾는다 (한글 입력 중간 상태도 그대로 동작)
+   *  - '필로' 처럼 글자를 입력하면 이름 앞부분으로 찾고, 못 찾으면 이름 중간도 찾아본다
+   */
+  function nicknameMatches(nick, term) {
+    return matchRank(nick, term) > 0;
+  }
+
+  /** 검색 우선순위: 이름 앞부분(3) > 초성(2) > 이름 중간(1) > 안 맞음(0) */
+  function matchRank(nick, term) {
+    if (!term) return 3;
+    const n = String(nick).toLowerCase();
+    if (n.startsWith(term)) return 3;
+    if (/^[ㄱ-ㅎ]+$/.test(term)) return chosungOf(n).startsWith(term) ? 2 : 0;
+    return n.includes(term) ? 1 : 0;
+  }
+
+  /** 검색어에 맞는 닉네임만 남기고 드롭다운을 다시 그린다.
    *  이미 선택되어 있던 사람은 검색어와 안 맞아도 목록에서 사라지지 않는다. */
   function renderParticipantOptions() {
     const sel = $('participant');
     const keepId = sel.value;
     const term = $('participantSearch').value.trim().toLowerCase();
-    const matches = (nick) => !term || String(nick).toLowerCase().startsWith(term);
+    const matches = (nick) => nicknameMatches(nick, term);
+    // 앞부분이 맞는 이름을 위로 (같은 순위면 원래의 가나다순 유지)
+    const byRank = (a, b) => matchRank(b.nickname, term) - matchRank(a.nickname, term);
 
-    let activeList = participants.filter((p) => p.status !== 'out' && matches(p.nickname));
-    let outList = participants.filter((p) => p.status === 'out' && matches(p.nickname));
+    let activeList = participants.filter((p) => p.status !== 'out' && matches(p.nickname)).sort(byRank);
+    let outList = participants.filter((p) => p.status === 'out' && matches(p.nickname)).sort(byRank);
 
     const kept = participants.find((p) => p.id === keepId);
     if (kept && kept.status !== 'out' && !activeList.some((p) => p.id === kept.id)) activeList = [kept, ...activeList];
@@ -129,9 +163,7 @@
     sel.value = kept ? kept.id : '';
 
     const count = activeList.length + outList.length;
-    $('participantSearch').title = term
-      ? `'${term}'(으)로 시작하는 ${count}명`
-      : '';
+    $('participantSearch').title = term ? `'${term}' 검색 결과 ${count}명` : '';
   }
 
   async function loadParticipants() {
