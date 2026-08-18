@@ -66,7 +66,7 @@ body {
 
 a { color: var(--accent); }
 
-.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 72px; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 16px 72px; }
 .wrap.wide { max-width: 1200px; }
 
 /* ── 헤더 ─────────────────────────────── */
@@ -137,6 +137,8 @@ input[type="text"], input[type="date"], input[type="password"], input[type="numb
   font-family: inherit; font-size: 16px; line-height: 1.5;
 }
 textarea { resize: vertical; min-height: 76px; }
+/* 인상 깊은 내용 / 느낀 점: 충분히 길게 쓸 수 있도록 넉넉하게, 입력하는 만큼 자동으로 늘어남 */
+#sentence, #reflection { min-height: 160px; max-height: 70vh; overflow-y: auto; }
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent);
 }
@@ -289,17 +291,18 @@ footer.foot {
 .intro-body .meta { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
 .intro-body .desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-faint); }
 
-/* ── 2단 본문 레이아웃 ────────────────── */
-.main-grid {
-  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 20px; align-items: start;
-}
-.main-grid > * { min-width: 0; }
-.col-main, .col-side { display: flex; flex-direction: column; }
-.col-main > .card:last-child, .col-side > .card:last-child { margin-bottom: 18px; }
-
 /* 폼: 좁은 항목 2개를 한 줄로 */
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 14px; }
+
+/* 참여 아이디 검색 + 드롭다운 */
+.participant-picker { display: flex; flex-direction: column; gap: 6px; }
+
+/* 참여 아이디 기억 체크박스 */
+.checkbox-field {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  font-size: 12.5px; font-weight: 400; color: var(--text-dim); cursor: pointer;
+}
+.checkbox-field input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 
 /* ── 접이식 블록 ──────────────────────── */
 .fold { margin-top: 16px; }
@@ -315,8 +318,10 @@ footer.foot {
 .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
 .fold[open] > summary { margin-bottom: 12px; }
 .card > .fold { margin-top: 0; }
-.fold.guide ul { padding-left: 18px; margin: 0; }
-.fold.guide li + li { margin-top: 4px; }
+
+/* 안내 목록 */
+.card > ul.muted { padding-left: 18px; margin: 0; }
+.card > ul.muted li + li { margin-top: 4px; }
 
 /* ── 나의 진행 스트립 (달력형) ────────── */
 .strip {
@@ -345,20 +350,35 @@ footer.foot {
 .fame .cnt { margin-left: auto; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
 
-/* ── 오늘의 인증 피드 ─────────────────── */
+/* ── 인증 피드 ────────────────────────── */
 .feed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .feed-head h2 { margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 button.ghost { background: transparent; }
 .winner-badge { display: block; margin-bottom: 10px; font-weight: 700; padding: 6px 10px; text-align: center; }
 .winner-badge[hidden] { display: none; }
 
+/* 날짜 넘기기 */
+.feed-datenav {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin: 4px 0 14px;
+}
+.feed-datenav button {
+  width: 32px; height: 32px; padding: 0; border-radius: 999px; flex: 0 0 auto;
+}
+.feed-datenav button:disabled { opacity: .3; cursor: default; }
+.feed-date { font-size: 14.5px; font-weight: 700; min-width: 9em; text-align: center; }
+
 .feed-scroll {
   display: flex; flex-direction: column; gap: 10px;
-  max-height: 560px; overflow-y: auto; overscroll-behavior: contain;
+  max-height: 620px; overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; padding-right: 4px;
+  touch-action: pan-y;
 }
 .feed-scroll::-webkit-scrollbar { width: 8px; }
 .feed-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+
+.feed-more-wrap { display: flex; justify-content: center; margin-top: 12px; }
+.feed-more-wrap[hidden] { display: none; }
 
 .feed-item {
   border: 1px solid var(--border); border-radius: 11px;
@@ -397,13 +417,7 @@ button.ghost { background: transparent; }
 
 /* ── 반응형 ───────────────────────────── */
 @media (max-width: 900px) {
-  .main-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .feed-scroll { max-height: 62vh; }
-  /* 한 줄로 쌓일 때는 인증 → 피드 → 명예의 전당 순서가 자연스럽다 */
-  .col-side { display: contents; }
-  .col-main { order: 1; }
-  .feed-card { order: 2; }
-  .fame-card { order: 3; }
 }
 
 @media (max-width: 640px) {
@@ -412,7 +426,6 @@ button.ghost { background: transparent; }
   .navlinks a { padding: 7px 13px; }
   .wrap { padding: 0 13px 56px; }
   .card { padding: 16px; margin-bottom: 14px; }
-  .col-main > .card:last-child, .col-side > .card:last-child { margin-bottom: 14px; }
 
   .intro { grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: start; }
   .intro-body h2 { font-size: 17px; }

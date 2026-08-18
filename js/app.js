@@ -6,9 +6,13 @@
   const CELL_CLASS = { O: 'cell-o', X: 'cell-x', P: 'cell-p', '-': 'cell-none', '·': 'cell-off' };
   const DRAFT_KEY = `${CONFIG.storagePrefix}.draft`;
   const LAST_KEY = `${CONFIG.storagePrefix}.lastParticipant`;
+  const REMEMBER_KEY = `${CONFIG.storagePrefix}.rememberMe`;
   const CLIENT_KEY = `${CONFIG.storagePrefix}.clientId`;
+  const FEED_PAGE_SIZE = 20;
 
   let participants = [];
+  let feedDate = U.today();
+  let feedVisibleCount = FEED_PAGE_SIZE;
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -80,29 +84,60 @@
   }
 
 
-  /* ── 참가자 드롭다운 ─────────────────── */
-  async function loadParticipants() {
-    participants = await Store.listParticipants();
+  /* ── 참여 아이디 기억하기 ─────────────── */
+  function getRememberPref() {
+    // 처음 여는 경우(값이 없음)는 기본적으로 기억하기를 켜 둔다
+    return localStorage.getItem(REMEMBER_KEY) !== '0';
+  }
+  function setRememberPref(on) {
+    localStorage.setItem(REMEMBER_KEY, on ? '1' : '0');
+  }
+
+  /* ── 참가자 드롭다운 (이름 앞글자 검색으로 좁혀볼 수 있음) ── */
+
+  /** 검색어로 시작하는 닉네임만 남기고 드롭다운을 다시 그린다.
+   *  이미 선택되어 있던 사람은 검색어와 안 맞아도 목록에서 사라지지 않는다. */
+  function renderParticipantOptions() {
     const sel = $('participant');
-    const active = participants.filter((p) => p.status !== 'out');
-    const out = participants.filter((p) => p.status === 'out');
+    const keepId = sel.value;
+    const term = $('participantSearch').value.trim().toLowerCase();
+    const matches = (nick) => !term || String(nick).toLowerCase().startsWith(term);
+
+    let activeList = participants.filter((p) => p.status !== 'out' && matches(p.nickname));
+    let outList = participants.filter((p) => p.status === 'out' && matches(p.nickname));
+
+    const kept = participants.find((p) => p.id === keepId);
+    if (kept && kept.status !== 'out' && !activeList.some((p) => p.id === kept.id)) activeList = [kept, ...activeList];
+    if (kept && kept.status === 'out' && !outList.some((p) => p.id === kept.id)) outList = [kept, ...outList];
 
     sel.innerHTML = '<option value="">— 닉네임 선택 —</option>';
-    for (const p of active) {
+    for (const p of activeList) {
       const o = document.createElement('option');
       o.value = p.id; o.textContent = p.nickname;
       sel.appendChild(o);
     }
-    if (out.length) {
+    if (outList.length) {
       const g = document.createElement('optgroup');
       g.label = '참여 종료';
-      for (const p of out) {
+      for (const p of outList) {
         const o = document.createElement('option');
         o.value = p.id; o.textContent = `${p.nickname} (아웃)`;
         g.appendChild(o);
       }
       sel.appendChild(g);
     }
+    sel.value = kept ? kept.id : '';
+
+    const count = activeList.length + outList.length;
+    $('participantSearch').title = term
+      ? `'${term}'(으)로 시작하는 ${count}명`
+      : '';
+  }
+
+  async function loadParticipants() {
+    participants = await Store.listParticipants();
+    renderParticipantOptions();
+    $('rememberMe').checked = getRememberPref();
 
     if (!participants.length) {
       msg($('formMsg'),
@@ -113,9 +148,9 @@
     }
     if (canSubmitToday()) $('submitBtn').disabled = false;
 
-    const last = localStorage.getItem(LAST_KEY);
+    const last = getRememberPref() ? localStorage.getItem(LAST_KEY) : null;
     if (last && participants.some((p) => p.id === last)) {
-      sel.value = last;
+      $('participant').value = last;
       await onSelect();
     }
   }
@@ -126,7 +161,8 @@
     const card = $('myCard');
     if (!pid) { card.hidden = true; msg($('formMsg'), ''); return; }
 
-    localStorage.setItem(LAST_KEY, pid);
+    if ($('rememberMe').checked) localStorage.setItem(LAST_KEY, pid);
+    else localStorage.removeItem(LAST_KEY);
     const today = U.today();
     const existing = await Store.getSubmission(pid, today);
 
@@ -146,8 +182,16 @@
       if (canSubmitToday()) $('submitBtn').textContent = '인증 제출하기';
       msg($('formMsg'), '');
     }
+    autoGrow($('sentence'));
+    autoGrow($('reflection'));
 
     await paintMine(pid);
+  }
+
+  /** 입력한 만큼 textarea 높이가 자동으로 늘어나게 (min-height/max-height는 CSS가 담당) */
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
   }
 
   /* ── 임시 저장 (작성 중 이탈 대비) ────── */
@@ -243,7 +287,60 @@
     </div>`;
   }
 
-  /* ── 오늘의 피드 & 명예의 전당 ───────────────────── */
+  /* ── 인증 피드 & 명예의 전당 ───────────────────── */
+
+  /** 피드에서 넘겨볼 수 있는 날짜 범위. 챌린지 시작 전(연습 기간)에는 오늘 하루만 보여준다. */
+  function feedDateBounds() {
+    const t = U.today();
+    return { lo: t < CONFIG.startDate ? t : CONFIG.startDate, hi: t };
+  }
+
+  function shiftFeedDate(delta) {
+    const { lo, hi } = feedDateBounds();
+    const next = U.addDays(feedDate, delta);
+    if (next < lo || next > hi) return;
+    feedDate = next;
+    feedVisibleCount = FEED_PAGE_SIZE;
+    refreshSocialFeed();
+  }
+
+  /** 피드 카드에서 좌우로 밀면 이전/다음 날짜로 이동 (모바일 스와이프) */
+  function bindFeedSwipe(el) {
+    if (!el) return;
+    let sx = 0, sy = 0, tracking = false;
+    el.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      // 세로 스크롤과 헷갈리지 않도록 충분히 수평에 가까운 스와이프만 인정
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        shiftFeedDate(dx < 0 ? 1 : -1);
+      }
+    }, { passive: true });
+  }
+
+  function bindUpvoteButtons(container) {
+    container.querySelectorAll('.upvote-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await Store.upvoteSubmission(btn.dataset.id, clientId);
+          await refreshSocialFeed();
+          await calculateRanksAndFame();
+        } catch (err) {
+          btn.disabled = false;
+          alert(err.message);
+        }
+      });
+    });
+  }
+
   function renderFeedItem(s, isWinner, hasUpvoted) {
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-top">
@@ -266,52 +363,58 @@
   }
 
   async function refreshSocialFeed() {
-    const todayISO = U.today();
-    const todaySubs = (await Store.listSubmissions({ date: todayISO })).slice();
+    const date = feedDate;
+    const daySubs = (await Store.listSubmissions({ date })).slice();
 
     // 엄지척 순 내림차순 정렬 (동점이면 먼저 올린 사람이 위로)
-    todaySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
+    daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
       String(a.createdAt).localeCompare(String(b.createdAt)));
 
     // 1등(가장 많이 추천된 사람) 선정 — 공동 1등 모두 인정
-    const maxVotes = todaySubs.length ? (todaySubs[0].upvotes || 0) : 0;
+    const maxVotes = daySubs.length ? (daySubs[0].upvotes || 0) : 0;
     const winners = maxVotes > 0
-      ? todaySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
+      ? daySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
       : [];
 
-    $('feedCount').textContent = `${todaySubs.length}명`;
+    $('feedCount').textContent = `${daySubs.length}명`;
+
+    // 날짜 넘기기 컨트롤
+    const { lo, hi } = feedDateBounds();
+    const isToday = date === U.today();
+    $('feedPrevDate').disabled = date <= lo;
+    $('feedNextDate').disabled = date >= hi;
+    $('feedDateLabel').textContent = isToday ? `오늘 · ${U.shortLabel(date)}` : U.shortLabel(date);
 
     const badge = $('todayWinnerBadge');
     if (winners.length) {
-      badge.textContent = `👑 오늘의 1등: ${winners.join(', ')} (👍 ${maxVotes})`;
+      badge.textContent = `👑 1등: ${winners.join(', ')} (👍 ${maxVotes})`;
       badge.hidden = false;
     } else {
       badge.hidden = true;
     }
 
     const feedList = $('socialFeedList');
-    if (!todaySubs.length) {
-      feedList.innerHTML = '<div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>';
+    const moreWrap = $('feedLoadMoreWrap');
+    if (!daySubs.length) {
+      feedList.innerHTML = `<div class="empty">${isToday ? '오늘' : U.shortLabel(date) + '에'} 제출된 인증글이 없습니다.` +
+        `${isToday ? ' 첫 번째 글을 작성해 보세요!' : ''}</div>`;
+      moreWrap.hidden = true;
       return;
     }
 
     const winnerSet = new Set(winners);
-    feedList.innerHTML = todaySubs.map((s) =>
+    const visible = daySubs.slice(0, feedVisibleCount);
+    feedList.innerHTML = visible.map((s) =>
       renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
+    bindUpvoteButtons(feedList);
 
-    feedList.querySelectorAll('.upvote-btn').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        try {
-          await Store.upvoteSubmission(btn.dataset.id, clientId);
-          await refreshSocialFeed();
-          await calculateRanksAndFame();
-        } catch (err) {
-          btn.disabled = false;
-          alert(err.message);
-        }
-      });
-    });
+    const remaining = daySubs.length - visible.length;
+    if (remaining > 0) {
+      moreWrap.hidden = false;
+      $('feedLoadMoreBtn').textContent = `더 보기 (${remaining}명 더 남음)`;
+    } else {
+      moreWrap.hidden = true;
+    }
   }
 
   // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
@@ -383,8 +486,10 @@
       msg($('formMsg'),
         `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다. 오늘도 수고하셨어요! 📖`, 'ok');
       $('submitBtn').textContent = '인증 수정하기';
-      
+
       await paintMine(pid);
+      feedDate = U.today();
+      feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
       await calculateRanksAndFame();
       $('myCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -407,16 +512,38 @@
     await calculateRanksAndFame();
 
     $('participant').addEventListener('change', onSelect);
+    $('participantSearch').addEventListener('input', renderParticipantOptions);
     $('verifyForm').addEventListener('submit', onSubmit);
     $('resetBtn').addEventListener('click', () => {
       ['chapter', 'sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
+      autoGrow($('sentence'));
+      autoGrow($('reflection'));
       const pid = $('participant').value;
       if (pid) clearDraft(pid);
     });
     ['chapter', 'sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));
+    ['sentence', 'reflection'].forEach((k) =>
+      $(k).addEventListener('input', () => autoGrow($(k))));
 
-    // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 오늘 피드만 주기적 갱신
+    $('rememberMe').addEventListener('change', () => {
+      const on = $('rememberMe').checked;
+      setRememberPref(on);
+      const pid = $('participant').value;
+      if (on && pid) localStorage.setItem(LAST_KEY, pid);
+      if (!on) localStorage.removeItem(LAST_KEY);
+    });
+
+    // 피드 날짜 넘기기 (버튼 + 좌우 스와이프)
+    $('feedPrevDate').addEventListener('click', () => shiftFeedDate(-1));
+    $('feedNextDate').addEventListener('click', () => shiftFeedDate(1));
+    $('feedLoadMoreBtn').addEventListener('click', () => {
+      feedVisibleCount += FEED_PAGE_SIZE;
+      refreshSocialFeed();
+    });
+    bindFeedSwipe(document.querySelector('.feed-card'));
+
+    // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
     // (명예의 전당은 전체 기록을 읽어야 해서 Firestore 읽기 비용이 크므로 자동 갱신에서 제외)
     $('feedRefresh').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
@@ -427,7 +554,9 @@
       } finally { btn.disabled = false; }
     });
     const pollFeed = () => {
-      if (document.visibilityState === 'visible') refreshSocialFeed().catch(console.error);
+      if (document.visibilityState === 'visible' && feedDate === U.today()) {
+        refreshSocialFeed().catch(console.error);
+      }
     };
     setInterval(pollFeed, 120000);
     document.addEventListener('visibilitychange', pollFeed);
