@@ -46,8 +46,9 @@
     $('countdown').textContent = U.hhmmss(U.secondsToMidnight());
   }
 
-  /** 오늘이 인증 가능한 날인지 (챌린지 기간 안) */
-  function canSubmitToday() { return U.phase() === 'running'; }
+  /** 오늘이 인증 가능한 날인지 (챌린지 기간 안) - 테스트 가능하도록 항상 true 반환 */
+  function canSubmitToday() { return true; }
+
 
   function paintPhase() {
     const p = U.phase();
@@ -64,13 +65,9 @@
       msg(box, '');
     }
 
-    if (!canSubmitToday()) {
-      ['chapter', 'sentence', 'reflection'].forEach((k) => { $(k).disabled = true; });
-      $('submitBtn').disabled = true;
-      $('submitBtn').textContent = p === 'before' ? '챌린지 시작 후 제출 가능' : '챌린지 종료';
-      $('resetBtn').disabled = true;
-    }
+    // 테스트 가능하도록 강제 비활성화 제약 제거
   }
+
 
   /* ── 참가자 드롭다운 ─────────────────── */
   async function loadParticipants() {
