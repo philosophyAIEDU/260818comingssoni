@@ -1,17 +1,18 @@
 /* 커밍쏜 독서챌린지 — 공통 스타일 */
 :root {
-  --bg: #0022a1;                /* 이미지 상단 블루 배경 테마 */
+  --bg: #102d84;                /* 눈 피로도를 덜어주는 부드러운 다크 네이비 블루 */
   --surface: #ffffff;           /* 깔끔한 하얀 카드 면 */
-  --surface-2: #f4f6fd;         /* 보조 연블루 하이라이트 면 */
-  --border: #d2daeb;
-  --border-strong: #a1b2de;
+  --surface-2: #f2f5fc;         /* 보조 연블루 하이라이트 면 */
+  --border: #ccd4e5;
+  --border-strong: #96a7d0;
   --text: #0d1b40;              /* 딥 블루 텍스트 */
   --text-dim: #455680;
   --text-faint: #798cb3;
-  --accent: #0026c6;            /* 선명한 블루 버튼 및 강조 포인트 */
+  --accent: #173fa7;            /* 부드러운 다크 블루 버튼 포인트 */
   --accent-soft: #ffea00;       /* 포스터 하단의 시그니처 옐로우 */
-  --yellow-banner: #ffeb00;     /* 카운트다운 배너 옐로우 */
-  --yellow-banner-text: #00166d;
+  --yellow-banner: #ffe600;     /* 따뜻하고 편안한 옐로우 */
+  --yellow-banner-text: #081d58;
+
   --ok: #058852;
   --ok-soft: #e3f7ec;
   --bad: #d92626;
@@ -70,7 +71,7 @@ a { color: var(--accent); }
 
 /* ── 헤더 ─────────────────────────────── */
 .top {
-  background: #0022a1;
+  background: #102d84;
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   padding: 20px 0;
   margin-bottom: 24px;
@@ -81,16 +82,16 @@ a { color: var(--accent); }
 }
 .brand { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
 .brand h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: #ffffff; }
-.brand p { margin: 0; font-size: 13px; color: #ffeb00; font-weight: 600; }
+.brand p { margin: 0; font-size: 13px; color: #ffe600; font-weight: 600; }
 .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
 .navlinks a {
   font-size: 13.5px; text-decoration: none; color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 999px; padding: 6px 14px;
   background: rgba(255, 255, 255, 0.1); font-weight: 600;
 }
-.navlinks a:hover { border-color: #ffeb00; color: #ffeb00; }
+.navlinks a:hover { border-color: #ffe600; color: #ffe600; }
 .navlinks a[aria-current="page"] {
-  background: #ffeb00; border-color: #ffeb00; color: #00166d; font-weight: 700;
+  background: #ffe600; border-color: #ffe600; color: #081d58; font-weight: 700;
 }
 
 /* ── 카드 ─────────────────────────────── */
@@ -112,16 +113,16 @@ a { color: var(--accent); }
 /* ── 카운트다운 배너 ───────────────────── */
 .banner {
   display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
-  background: #ffeb00;
-  color: #00166d;
+  background: #ffe600;
+  color: #081d58;
   border-radius: var(--radius);
   padding: 18px 24px; margin-bottom: 22px;
-  box-shadow: 0 4px 16px rgba(255, 235, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(255, 230, 0, 0.25);
 }
-.banner .big { font-size: 28px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #00166d; }
+.banner .big { font-size: 28px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #081d58; }
 .banner .lbl { font-size: 12px; color: #3d4f8f; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
 .banner .col { display: flex; flex-direction: column; }
-.banner .sep { width: 2px; align-self: stretch; background: rgba(0, 22, 109, 0.15); }
+.banner .sep { width: 2px; align-self: stretch; background: rgba(8, 29, 88, 0.15); }
 
 
 /* ── 폼 ───────────────────────────────── */
@@ -152,10 +153,11 @@ button, .btn {
 }
 button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
 button.primary {
-  background: #0022a1; border-color: #0022a1; color: #ffffff; font-weight: 700;
-  box-shadow: 0 3px 8px rgba(0, 34, 161, 0.25);
+  background: #102d84; border-color: #102d84; color: #ffffff; font-weight: 700;
+  box-shadow: 0 3px 8px rgba(16, 45, 132, 0.25);
 }
-button.primary:hover { background: #00166d; border-color: #00166d; color: #ffeb00; }
+button.primary:hover { background: #081d58; border-color: #081d58; color: #ffe600; }
+
 button.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
 button.danger:hover { background: var(--bad-soft); }
 button.small { font-size: 12.5px; padding: 5px 10px; font-weight: 500; }
