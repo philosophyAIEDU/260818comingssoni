@@ -56,7 +56,17 @@
     const total = U.challengeDates().length;
     $('dayLabel').textContent = idx ? `${idx} / ${total}일차` : `— / ${total}일차`;
     $('footRange').textContent = `${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)}`;
-    $('backendTag').textContent = Store.name === 'firebase' ? 'Firebase Firestore' : 'localStorage (이 브라우저)';
+    const isFirebase = Store.name === 'firebase';
+    $('backendTag').textContent = isFirebase ? 'Firebase Firestore' : 'localStorage (이 브라우저)';
+    $('backendDesc').textContent = isFirebase
+      ? '— 참가자들이 각자 어떤 기기·브라우저에서 제출하든 하나의 데이터베이스에 함께 저장·집계됩니다.'
+      : '— 이 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우면 사라지므로 정기적으로 백업하세요.';
+    $('firebaseInfo').innerHTML = isFirebase
+      ? '✅ 이미 <strong>Firebase(Firestore)</strong>에 연결되어 있습니다. 참가자들이 각자 인증하면 실시간으로 이 화면에 모입니다. ' +
+        '데이터를 보호하려면 위의 <strong>전체 백업</strong>을 정기적으로 받아두세요.'
+      : '나중에 여러 기기에서 함께 쓰려면 <code>js/config.js</code>의 <code>CS.FIREBASE_CONFIG</code>를 채우고 ' +
+        '<code>backend</code>를 <code>\'firebase\'</code>로 바꾸면 됩니다. 저장 인터페이스가 동일해 화면 코드는 그대로 동작합니다. ' +
+        '전환 전에 위의 <strong>전체 백업</strong>을 받아두고, 전환 후 <strong>복원하기</strong>로 그대로 옮길 수 있습니다.';
   }
 
   function tick() { $('countdown').textContent = U.hhmmss(U.secondsToMidnight()); }
