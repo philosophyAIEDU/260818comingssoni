@@ -1,137 +1,187 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>커밍쏜 독서챌린지 · 인증하기</title>
-<meta name="description" content="커밍쏜 독서챌린지 프로세스 이코노미 인증 시스템">
-<link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>커밍쏜 독서챌린지 · 인증하기</title>
+  <meta name="description" content="커밍쏜 독서챌린지 프로세스 이코노미 인증 시스템">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 </head>
+
 <body>
 
-<header class="top">
-  <div class="top-in">
-    <div class="brand">
-      <h1 id="brandTitle">커밍쏜 독서챌린지</h1>
-      <p id="brandSub">프로세스 이코노미 인증 시스템</p>
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <h1 id="brandTitle">커밍쏜 독서챌린지</h1>
+        <p id="brandSub">프로세스 이코노미 인증 시스템</p>
+      </div>
+      <nav class="navlinks">
+        <a href="index.html" aria-current="page">인증하기</a>
+        <a href="admin.html">운영진</a>
+      </nav>
     </div>
-    <nav class="navlinks">
-      <a href="index.html" aria-current="page">인증하기</a>
-      <a href="admin.html">운영진</a>
-    </nav>
-  </div>
-</header>
+  </header>
 
-<main class="wrap">
+  <main class="wrap">
 
-  <section class="banner">
-    <div class="col">
-      <span class="lbl">오늘</span>
-      <span class="big" id="todayLabel">-</span>
-    </div>
-    <div class="sep"></div>
-    <div class="col">
-      <span class="lbl">진행</span>
-      <span class="big" id="dayLabel">-</span>
-    </div>
-    <div class="sep"></div>
-    <div class="col">
-      <span class="lbl">마감(24:00)까지</span>
-      <span class="big" id="countdown">--:--:--</span>
-    </div>
-  </section>
+    <section class="banner">
+      <div class="col">
+        <span class="lbl">오늘</span>
+        <span class="big" id="todayLabel">-</span>
+      </div>
+      <div class="sep"></div>
+      <div class="col">
+        <span class="lbl">진행</span>
+        <span class="big" id="dayLabel">-</span>
+      </div>
+      <div class="sep"></div>
+      <div class="col">
+        <span class="lbl">마감(24:00)까지</span>
+        <span class="big" id="countdown">--:--:--</span>
+      </div>
+    </section>
 
-  <div id="phaseNote"></div>
+    <div id="phaseNote"></div>
 
-  <section class="card">
-    <h2>오늘의 인증</h2>
-    <p class="hint">
-      매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 마감 후에는 미인증으로 처리되며 유예 시간은 없습니다.
-    </p>
+    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; margin-bottom: 20px;">
+      <!-- Main Form & Submissions Feed -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <section class="card">
+          <h2>오늘의 인증</h2>
+          <p class="hint">
+            매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 마감 후에는 미인증으로 처리되며 유예 시간은 없습니다.
+          </p>
 
-    <div id="formMsg"></div>
+          <div id="formMsg"></div>
 
-    <form id="verifyForm" autocomplete="off">
-      <div class="field">
-        <label for="participant">참여 아이디 <span class="sub">신청 시 등록한 단톡방 닉네임을 선택하세요</span></label>
-        <select id="participant" required>
-          <option value="">— 닉네임 선택 —</option>
-        </select>
+          <form id="verifyForm" autocomplete="off">
+            <div class="field">
+              <label for="participant">참여 아이디 <span class="sub">단톡방 닉네임을 선택하세요</span></label>
+              <select id="participant" required>
+                <option value="">— 닉네임 선택 —</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="chapter">오늘 읽은 챕터</label>
+              <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
+            </div>
+
+            <div class="field">
+              <label for="sentence">그 챕터 내용 중에서 인상 깊은 내용</label>
+              <textarea id="sentence" placeholder="가장 인상 깊었던 핵심 내용을 적어 주세요." required></textarea>
+            </div>
+
+            <div class="field">
+              <label for="reflection">오늘 책을 읽고 느낀 점</label>
+              <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘의 생각을 남겨 주세요." required></textarea>
+            </div>
+
+            <div class="actions">
+              <button type="submit" class="primary" id="submitBtn">인증 제출하기</button>
+              <button type="button" id="resetBtn">다시 쓰기</button>
+              <span class="muted" id="draftNote"></span>
+            </div>
+          </form>
+        </section>
+
+        <!-- Social Feed -->
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2>오늘의 인증 피드</h2>
+            <span class="tag ok" id="todayWinnerBadge" style="display:none; font-weight:bold; font-size:13px; padding: 4px 8px;">👑 오늘의 1등: -</span>
+          </div>
+          <p class="hint" style="margin-top: 6px;">오늘 다른 참가자들이 등록한 독서 인증 기록입니다. 좋은 글에 엄지척(👍)을 눌러주세요!</p>
+          <div id="socialFeedList" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+            <div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>
+          </div>
+        </section>
       </div>
 
-      <div class="field">
-        <label for="chapter">오늘 읽은 챕터</label>
-        <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
+      <!-- Sidebar / Hall of Fame & Personal Status -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Hall of Fame 누적 1등 랭킹 -->
+        <section class="card" style="border: 2px solid gold;">
+          <h2 style="color: #d4af37; display: flex; align-items: center; gap: 6px;">명예의 전당 (Top 5) 🏆</h2>
+          <p class="hint">매일 엄지척(👍)을 가장 많이 받아 1등을 달성한 누적 횟수 순위입니다.</p>
+          <ol id="hallOfFameList" style="padding-left: 20px; font-size: 15px; line-height: 2; margin: 10px 0 0 0; font-weight: 600;">
+            <li style="color: var(--text-muted); font-weight: normal;">집계된 순위가 없습니다.</li>
+          </ol>
+        </section>
+
+        <section class="card" id="myCard" hidden>
+          <h2>나의 진행 현황 <span class="tag" id="myStatusTag"></span></h2>
+          <p class="hint" id="myHint"></p>
+
+          <div class="stats">
+            <div class="stat ok">
+              <div class="n" id="stVerified">0</div>
+              <div class="k">인증</div>
+            </div>
+            <div class="stat bad">
+              <div class="n" id="stMissed">0</div>
+              <div class="k">미인증</div>
+            </div>
+            <div class="stat">
+              <div class="n" id="stExempt">0</div>
+              <div class="k">면제</div>
+            </div>
+            <div class="stat">
+              <div class="n" id="stStreak">0</div>
+              <div class="k">연속 인증</div>
+            </div>
+            <div class="stat warn">
+              <div class="n" id="stRate">0%</div>
+              <div class="k">인증률</div>
+            </div>
+          </div>
+
+          <div class="scroll" style="margin-top:16px">
+            <table class="matrix">
+              <tbody>
+                <tr id="myStrip"></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="legend" style="margin-top: 10px;">
+            <span><b class="cell cell-o">O</b> 인증</span>
+            <span><b class="cell cell-x">X</b> 미인증</span>
+            <span><b class="cell cell-p">P</b> 면제</span>
+            <span><b class="cell cell-none">·</b> 예정</span>
+          </div>
+
+          <h2 style="margin-top:22px">최근 기록</h2>
+          <div id="myEntries"></div>
+        </section>
       </div>
-
-      <div class="field">
-        <label for="sentence">오늘 읽은 문장 중 가장 좋았던 문장</label>
-        <textarea id="sentence" placeholder="책 속 문장을 그대로 옮겨 적어 주세요." required></textarea>
-      </div>
-
-      <div class="field">
-        <label for="reflection">오늘 책을 읽고 느낀 점</label>
-        <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘의 생각을 남겨 주세요." required></textarea>
-      </div>
-
-      <div class="actions">
-        <button type="submit" class="primary" id="submitBtn">인증 제출하기</button>
-        <button type="button" id="resetBtn">다시 쓰기</button>
-        <span class="muted" id="draftNote"></span>
-      </div>
-    </form>
-  </section>
-
-  <section class="card" id="myCard" hidden>
-    <h2>나의 진행 현황 <span class="tag" id="myStatusTag"></span></h2>
-    <p class="hint" id="myHint"></p>
-
-    <div class="stats">
-      <div class="stat ok"><div class="n" id="stVerified">0</div><div class="k">인증</div></div>
-      <div class="stat bad"><div class="n" id="stMissed">0</div><div class="k">미인증</div></div>
-      <div class="stat"><div class="n" id="stExempt">0</div><div class="k">면제</div></div>
-      <div class="stat"><div class="n" id="stStreak">0</div><div class="k">연속 인증</div></div>
-      <div class="stat warn"><div class="n" id="stRate">0%</div><div class="k">인증률</div></div>
     </div>
 
-    <div class="scroll" style="margin-top:16px">
-      <table class="matrix">
-        <tbody><tr id="myStrip"></tr></tbody>
-      </table>
-    </div>
-    <div class="legend">
-      <span><b class="cell cell-o">O</b> 인증</span>
-      <span><b class="cell cell-x">X</b> 미인증</span>
-      <span><b class="cell cell-p">P</b> 면제</span>
-      <span><b class="cell cell-none">·</b> 예정</span>
-    </div>
+    <section class="card">
+      <h2>안내</h2>
+      <ul class="muted" style="padding-left:18px;margin:0">
+        <li>인증은 <strong>텍스트 제출</strong>로만 진행됩니다.</li>
+        <li>참여 아이디는 드롭다운에서 선택합니다.</li>
+        <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
+        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 사정이 있는 날은 운영진에게 <strong>면제일</strong> 등록을 요청하세요.</li>
+        <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
+      </ul>
+    </section>
 
-    <h2 style="margin-top:22px">최근 기록</h2>
-    <div id="myEntries"></div>
-  </section>
+  </main>
 
-  <section class="card">
-    <h2>안내</h2>
-    <ul class="muted" style="padding-left:18px;margin:0">
-      <li>인증은 <strong>텍스트 제출</strong>로만 진행됩니다.</li>
-      <li>참여 아이디는 신청 시 등록한 닉네임과 <strong>동일해야</strong> 정상 반영됩니다. (드롭다운에서 선택)</li>
-      <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
-      <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 사정이 있는 날은 운영진에게 <strong>면제일</strong> 등록을 요청하세요.</li>
-      <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
-    </ul>
-  </section>
+  <footer class="foot">
+    커밍쏜 독서챌린지 · <span id="footRange"></span> · 데이터는 Firestore DB에 저장되어 공유됩니다.
+  </footer>
 
-</main>
-
-<footer class="foot">
-  커밍쏜 독서챌린지 · <span id="footRange"></span> · 데이터는 현재 <strong>이 브라우저에만</strong> 저장됩니다.
-</footer>
-
-<script src="js/config.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/store-firebase.js"></script>
-<script src="js/store.js"></script>
-<script src="js/app.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/store-firebase.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
 </body>
+
 </html>

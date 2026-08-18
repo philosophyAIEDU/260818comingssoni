@@ -456,7 +456,7 @@
     const head = ['날짜', '닉네임', '챕터', '좋았던 문장', '느낀 점', '제출시각'];
     const lines = [head.map(csvCell).join(',')].concat(
       submissions.map((s) => [s.date, s.nickname, s.chapter, s.sentence, s.reflection,
-        U.stampLabel(s.updatedAt || s.createdAt)].map(csvCell).join(',')));
+      U.stampLabel(s.updatedAt || s.createdAt)].map(csvCell).join(',')));
     download(`인증기록_${U.today()}.csv`, lines.join('\n'), 'text/csv');
   }
 
@@ -554,17 +554,61 @@
       msg($('dataMsg'), '전체 데이터를 삭제했습니다.', 'warn');
     });
 
-    window.addEventListener('storage', (e) => {
-      if (e.key && e.key.startsWith(CONFIG.storagePrefix)) refresh();
-    });
+    // 운영진 로그인 바인딩
+    if (Store.onAuthStateChanged) {
+      $('adminLoginBtn').addEventListener('click', async () => {
+        try {
+          await Store.signInWithGoogle();
+        } catch (err) {
+          msg($('adminAuthMsg'), '로그인 실패: ' + err.message, 'bad');
+        }
+      });
+      $('adminLogoutBtn').addEventListener('click', async () => {
+        try {
+          await Store.signOut();
+        } catch (err) {
+          alert('로그아웃 실패: ' + err.message);
+        }
+      });
 
-    await refresh();
-    if (last) $('reportOut').textContent = buildReport(last);
+      Store.onAuthStateChanged(async (user) => {
+        if (user) {
+          const email = user.email || '';
+          const whitelist = CONFIG.adminEmails || [];
+          if (whitelist.includes(email)) {
+            $('adminAuthGate').style.display = 'none';
+            $('adminDashboard').style.display = 'block';
+            $('adminAuthHeader').style.display = 'flex';
+            $('adminEmailLabel').textContent = `${email} (운영진)`;
+            await refresh();
+            if (last) $('reportOut').textContent = buildReport(last);
+          } else {
+            $('adminAuthGate').style.display = 'block';
+            $('adminDashboard').style.display = 'none';
+            $('adminAuthHeader').style.display = 'none';
+            msg($('adminAuthMsg'), `계정 권한이 없습니다: <strong>${esc(email)}</strong><br>승인된 운영진 Google 계정으로 로그인해 주세요.`, 'bad');
+            // 비인증된 구글 세션 로그아웃 처리
+            await Store.signOut();
+          }
+        } else {
+          $('adminAuthGate').style.display = 'block';
+          $('adminDashboard').style.display = 'none';
+          $('adminAuthHeader').style.display = 'none';
+          msg($('adminAuthMsg'), '', '');
+        }
+      });
+    } else {
+      // LocalStorage mode bypass
+      $('adminAuthGate').style.display = 'none';
+      $('adminDashboard').style.display = 'block';
+      await refresh();
+      if (last) $('reportOut').textContent = buildReport(last);
+    }
   }
 
   boot().catch((err) => {
     console.error(err);
-    document.querySelector('main').insertAdjacentHTML('afterbegin',
+    document.getElementById('adminAuthGate').insertAdjacentHTML('afterbegin',
       `<div class="note bad">초기화 실패: ${esc(err.message)}</div>`);
   });
 })();
