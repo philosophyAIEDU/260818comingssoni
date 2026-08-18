@@ -74,25 +74,23 @@
       <div id="formMsg"></div>
 
       <form id="verifyForm" autocomplete="off">
-        <div class="field-row">
-          <div class="field">
-            <label for="participantSearch">참여 아이디 <span class="sub">이름 앞글자로 검색 후 선택</span></label>
-            <div class="participant-picker">
-              <input type="text" id="participantSearch" placeholder="예) 소 → '소'로 시작하는 이름만 보기" autocomplete="off">
-              <select id="participant" required>
-                <option value="">— 닉네임 선택 —</option>
-              </select>
-            </div>
-            <label class="checkbox-field">
-              <input type="checkbox" id="rememberMe" checked>
-              <span>이 기기에서 다음에도 이 아이디로 자동 선택</span>
-            </label>
+        <div class="field">
+          <label for="participantSearch">참여 아이디 <span class="sub">이름 또는 초성으로 검색 후 선택</span></label>
+          <div class="participant-picker">
+            <input type="text" id="participantSearch" placeholder="예) 필로소피 → '필' 또는 'ㅍㄹ'" autocomplete="off">
+            <select id="participant" required>
+              <option value="">— 닉네임 선택 —</option>
+            </select>
           </div>
+          <label class="checkbox-field">
+            <input type="checkbox" id="rememberMe" checked>
+            <span>이 기기에서 다음에도 이 아이디로 자동 선택</span>
+          </label>
+        </div>
 
-          <div class="field">
-            <label for="chapter">오늘 읽은 챕터</label>
-            <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
-          </div>
+        <div class="field">
+          <label for="chapter">오늘 읽은 챕터</label>
+          <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
         </div>
 
         <div class="field">
