@@ -3,7 +3,10 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102d84">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="color-scheme" content="light dark">
   <title>커밍쏜 독서챌린지 · 인증하기</title>
   <meta name="description" content="커밍쏜 독서챌린지 프로세스 이코노미 인증 시스템">
   <link rel="stylesheet" href="css/style.css">
@@ -16,8 +19,8 @@
   <header class="top">
     <div class="top-in">
       <div class="brand">
-        <h1 id="brandTitle">커밍쏜 독서챌린지</h1>
-        <p id="brandSub">프로세스 이코노미 인증 시스템</p>
+        <h1 id="brandTitle">독서챌린지 인증 시스템</h1>
+        <p id="brandSub"></p>
       </div>
       <nav class="navlinks">
         <a href="index.html" aria-current="page">인증하기</a>
@@ -27,6 +30,20 @@
   </header>
 
   <main class="wrap">
+
+    <!-- 책 소개 -->
+    <section class="card intro">
+      <img class="intro-cover" src="프로세스이코노미.png" alt="프로세스 이코노미 책 표지">
+      <div class="intro-body">
+        <h2>프로세스 이코노미</h2>
+        <p class="author">오바라 가즈히로 지음</p>
+        <p class="meta">
+          📅 <strong>챌린지 기간</strong> 2026년 8월 24일(월) ~ 9월 20일(일), 4주간<br>
+          📢 <strong>오티(OT)</strong> 2026년 8월 23일(일) 오전 10시
+        </p>
+        <p class="desc">결과보다 과정을 파는 시대, 매일 독서 인증으로 과정을 공유하며 나만의 성장 팬덤을 함께 만들어 갑니다.</p>
+      </div>
+    </section>
 
     <section class="banner">
       <div class="col">
@@ -47,9 +64,11 @@
 
     <div id="phaseNote"></div>
 
-    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; margin-bottom: 20px;">
-      <!-- Main Form & Submissions Feed -->
-      <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div class="main-grid">
+
+      <!-- ── 왼쪽: 인증 작성 + 나의 현황 ── -->
+      <div class="col-main">
+
         <section class="card">
           <h2>오늘의 인증</h2>
           <p class="hint">
@@ -59,16 +78,18 @@
           <div id="formMsg"></div>
 
           <form id="verifyForm" autocomplete="off">
-            <div class="field">
-              <label for="participant">참여 아이디 <span class="sub">단톡방 닉네임을 선택하세요</span></label>
-              <select id="participant" required>
-                <option value="">— 닉네임 선택 —</option>
-              </select>
-            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="participant">참여 아이디 <span class="sub">닉네임 선택</span></label>
+                <select id="participant" required>
+                  <option value="">— 닉네임 선택 —</option>
+                </select>
+              </div>
 
-            <div class="field">
-              <label for="chapter">오늘 읽은 챕터</label>
-              <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
+              <div class="field">
+                <label for="chapter">오늘 읽은 챕터</label>
+                <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
+              </div>
             </div>
 
             <div class="field">
@@ -89,30 +110,7 @@
           </form>
         </section>
 
-        <!-- Social Feed -->
-        <section class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <h2>오늘의 인증 피드</h2>
-            <span class="tag ok" id="todayWinnerBadge" style="display:none; font-weight:bold; font-size:13px; padding: 4px 8px;">👑 오늘의 1등: -</span>
-          </div>
-          <p class="hint" style="margin-top: 6px;">오늘 다른 참가자들이 등록한 독서 인증 기록입니다. 좋은 글에 엄지척(👍)을 눌러주세요!</p>
-          <div id="socialFeedList" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
-            <div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>
-          </div>
-        </section>
-      </div>
-
-      <!-- Sidebar / Hall of Fame & Personal Status -->
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <!-- Hall of Fame 누적 1등 랭킹 -->
-        <section class="card" style="border: 2px solid gold;">
-          <h2 style="color: #d4af37; display: flex; align-items: center; gap: 6px;">명예의 전당 (Top 5) 🏆</h2>
-          <p class="hint">매일 엄지척(👍)을 가장 많이 받아 1등을 달성한 누적 횟수 순위입니다.</p>
-          <ol id="hallOfFameList" style="padding-left: 20px; font-size: 15px; line-height: 2; margin: 10px 0 0 0; font-weight: 600;">
-            <li style="color: var(--text-muted); font-weight: normal;">집계된 순위가 없습니다.</li>
-          </ol>
-        </section>
-
+        <!-- 나의 진행 현황 -->
         <section class="card" id="myCard" hidden>
           <h2>나의 진행 현황 <span class="tag" id="myStatusTag"></span></h2>
           <p class="hint" id="myHint"></p>
@@ -140,35 +138,59 @@
             </div>
           </div>
 
-          <div class="scroll" style="margin-top:16px">
-            <table class="matrix">
-              <tbody>
-                <tr id="myStrip"></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="legend" style="margin-top: 10px;">
+          <div class="strip" id="myStrip"></div>
+
+          <div class="legend">
             <span><b class="cell cell-o">O</b> 인증</span>
             <span><b class="cell cell-x">X</b> 미인증</span>
             <span><b class="cell cell-p">P</b> 면제</span>
             <span><b class="cell cell-none">·</b> 예정</span>
           </div>
 
-          <h2 style="margin-top:22px">최근 기록</h2>
-          <div id="myEntries"></div>
+          <details class="fold" id="myEntriesFold">
+            <summary>최근 인증 기록 보기</summary>
+            <div id="myEntries" class="entry-list"></div>
+          </details>
         </section>
       </div>
+
+      <!-- ── 오른쪽: 명예의 전당 + 오늘의 피드 ── -->
+      <aside class="col-side">
+
+        <section class="card fame-card">
+          <h2>🏆 명예의 전당 <span class="tag warn">Top 5</span></h2>
+          <p class="hint">매일 엄지척(👍)을 가장 많이 받아 1등을 달성한 누적 횟수입니다.</p>
+          <ol id="hallOfFameList" class="fame">
+            <li class="none">집계된 순위가 없습니다.</li>
+          </ol>
+        </section>
+
+        <section class="card feed-card">
+          <div class="feed-head">
+            <h2>오늘의 인증 피드 <span class="tag" id="feedCount">0명</span></h2>
+            <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
+          </div>
+          <p class="hint">오늘 올라온 인증글입니다. 좋은 글에 엄지척(👍)을 눌러주세요!</p>
+          <div class="tag ok winner-badge" id="todayWinnerBadge" hidden>👑 오늘의 1등: -</div>
+          <div id="socialFeedList" class="feed-scroll">
+            <div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
+    <!-- 안내 -->
     <section class="card">
-      <h2>안내</h2>
-      <ul class="muted" style="padding-left:18px;margin:0">
-        <li>인증은 <strong>텍스트 제출</strong>로만 진행됩니다.</li>
-        <li>참여 아이디는 드롭다운에서 선택합니다.</li>
-        <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
-        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 사정이 있는 날은 운영진에게 <strong>면제일</strong> 등록을 요청하세요.</li>
-        <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
-      </ul>
+      <details class="fold guide">
+        <summary>안내 · 챌린지 규칙</summary>
+        <ul class="muted">
+          <li>인증은 <strong>텍스트 제출</strong>로만 진행됩니다.</li>
+          <li>참여 아이디는 드롭다운에서 선택합니다.</li>
+          <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
+          <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 사정이 있는 날은 운영진에게 <strong>면제일</strong> 등록을 요청하세요.</li>
+          <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
+        </ul>
+      </details>
     </section>
 
   </main>

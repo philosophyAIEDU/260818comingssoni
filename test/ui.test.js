@@ -23,7 +23,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     let body = await res.text();
     body = body.replace(/startDate: '[^']+'/, `startDate: '${START}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${END}'`)
-               .replace(/otAt: '[^']+'/, `otAt: '${shift(-9)}T10:00'`);
+               .replace(/otAt: '[^']+'/, `otAt: '${shift(-9)}T10:00'`)
+               // 테스트는 네트워크·구글 로그인 없이 돌도록 localStorage 백엔드로 고정
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
 

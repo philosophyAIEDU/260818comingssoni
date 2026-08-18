@@ -46,18 +46,26 @@
     $('countdown').textContent = U.hhmmss(U.secondsToMidnight());
   }
 
-  /** 오늘이 인증 가능한 날인지 (챌린지 기간 안) - 테스트 가능하도록 항상 true 반환 */
-  function canSubmitToday() { return true; }
+  /** 오늘 인증을 제출할 수 있는지
+   *  기본은 챌린지 기간 안에서만 허용. CONFIG.allowSubmitOutsidePeriod 가 true 면
+   *  시작 전·종료 후에도 제출할 수 있다(시연·테스트용).
+   */
+  function canSubmitToday() {
+    return CONFIG.allowSubmitOutsidePeriod === true || U.phase() === 'running';
+  }
 
 
   function paintPhase() {
     const p = U.phase();
     const box = $('phaseNote');
+    const open = canSubmitToday();
     if (p === 'before') {
       const d = U.diffDays(U.today(), CONFIG.startDate);
       msg(box, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
         `OT는 ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시입니다. ` +
-        `인증은 시작일부터 제출할 수 있어요.`, 'info');
+        (open
+          ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
+          : '인증은 시작일부터 제출할 수 있어요.'), 'info');
     } else if (p === 'after') {
       msg(box, `챌린지가 <strong>${U.longLabel(CONFIG.endDate)}</strong>에 종료되었습니다. ` +
         `4주간 고생 많으셨습니다! 🎉 아래에서 닉네임을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
@@ -65,7 +73,10 @@
       msg(box, '');
     }
 
-    // 테스트 가능하도록 강제 비활성화 제약 제거
+    if (!open) {
+      $('submitBtn').disabled = true;
+      $('submitBtn').textContent = '기간 외 제출 잠김';
+    }
   }
 
 
@@ -197,22 +208,21 @@
         ? '아직 미인증이 없습니다. 이 페이스를 지켜 주세요! 💪'
         : `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`);
 
-    // 날짜 스트립
+    // 날짜 스트립 (화면 폭에 맞춰 자동 줄바꿈)
     const strip = $('myStrip');
-    strip.innerHTML = '';
-    for (const c of stat.cells) {
-      const td = document.createElement('td');
-      td.title = `${U.shortLabel(c.date)} — ${labelOf(c.status)}`;
-      td.innerHTML = `<span class="cell ${CELL_CLASS[c.status]}">${c.status === '-' ? '·' : c.status}</span>` +
-        `<div style="font-size:9px;color:var(--text-faint)">${Number(c.date.slice(8))}</div>`;
-      strip.appendChild(td);
-    }
+    strip.innerHTML = stat.cells.map((c) => `
+      <div class="strip-cell" title="${esc(U.shortLabel(c.date))} — ${esc(labelOf(c.status))}">
+        <span class="cell ${CELL_CLASS[c.status]}">${c.status === '-' ? '·' : c.status}</span>
+        <span class="d">${Number(c.date.slice(8))}</span>
+      </div>`).join('');
 
     // 최근 기록 (최신 5건)
     const box = $('myEntries');
     const recent = subs.slice().reverse().slice(0, 5);
     box.innerHTML = recent.length ? recent.map(renderEntry).join('') :
       '<div class="empty">아직 제출한 인증이 없습니다.</div>';
+    $('myEntriesFold').querySelector('summary').textContent =
+      recent.length ? `최근 인증 기록 ${recent.length}건 보기` : '최근 인증 기록 보기';
   }
 
   function labelOf(st) {
@@ -233,111 +243,111 @@
     </div>`;
   }
 
-  /* ── 오늘의 피드 & 명예의 전당 ─────────────────────── */
+  /* ── 오늘의 피드 & 명예의 전당 ───────────────────── */
+  function renderFeedItem(s, isWinner, hasUpvoted) {
+    return `<article class="feed-item${isWinner ? ' win' : ''}">
+      <div class="feed-top">
+        <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
+        <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        <button type="button" class="upvote-btn${hasUpvoted ? ' voted' : ''}" data-id="${esc(s.id)}"
+          ${hasUpvoted ? 'disabled' : ''} aria-label="엄지척 ${s.upvotes || 0}개">👍 ${s.upvotes || 0}</button>
+      </div>
+      <p class="feed-chapter">📖 ${esc(s.chapter)}</p>
+      <p class="feed-quote">“${esc(s.sentence)}”</p>
+      <details class="feed-more">
+        <summary>느낀 점 보기</summary>
+        <dl class="body">
+          <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
+          <dt>인상 깊은 내용</dt><dd>${esc(s.sentence)}</dd>
+          <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
+        </dl>
+      </details>
+    </article>`;
+  }
+
   async function refreshSocialFeed() {
     const todayISO = U.today();
-    const allSubs = await Store.listSubmissions();
-    const todaySubs = allSubs.filter(s => s.date === todayISO);
+    const todaySubs = (await Store.listSubmissions({ date: todayISO })).slice();
 
-    // 엄지척 순 내림차순 정렬
-    todaySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+    // 엄지척 순 내림차순 정렬 (동점이면 먼저 올린 사람이 위로)
+    todaySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
+      String(a.createdAt).localeCompare(String(b.createdAt)));
 
-    // 1등(가장 많이 추천된 사람) 선정
-    let winner = null;
-    if (todaySubs.length > 0) {
-      const maxVotes = todaySubs[0].upvotes || 0;
-      if (maxVotes > 0) {
-        winner = todaySubs[0].nickname;
-      }
-    }
+    // 1등(가장 많이 추천된 사람) 선정 — 공동 1등 모두 인정
+    const maxVotes = todaySubs.length ? (todaySubs[0].upvotes || 0) : 0;
+    const winners = maxVotes > 0
+      ? todaySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
+      : [];
+
+    $('feedCount').textContent = `${todaySubs.length}명`;
 
     const badge = $('todayWinnerBadge');
-    if (winner) {
-      badge.textContent = `👑 오늘의 1등: ${esc(winner)}`;
-      badge.style.display = 'inline-block';
+    if (winners.length) {
+      badge.textContent = `👑 오늘의 1등: ${winners.join(', ')} (👍 ${maxVotes})`;
+      badge.hidden = false;
     } else {
-      badge.style.display = 'none';
+      badge.hidden = true;
     }
 
     const feedList = $('socialFeedList');
-    if (todaySubs.length === 0) {
+    if (!todaySubs.length) {
       feedList.innerHTML = '<div class="empty">오늘 제출된 인증글이 없습니다. 첫 번째 글을 작성해 보세요!</div>';
-    } else {
-      feedList.innerHTML = todaySubs.map((s, idx) => {
-        const isWinner = winner && s.nickname === winner;
-        const hasUpvoted = (s.upvotedBy || []).includes(clientId);
-        return `
-          <div class="entry" style="${isWinner ? 'border-left: 4px solid gold; background: #fffdf0;' : ''}">
-            <h4 style="display:flex; justify-content:space-between; align-items:center;">
-              <span>
-                ${isWinner ? '👑 ' : ''}<strong>${esc(s.nickname)}</strong>
-                <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
-              </span>
-              <button class="upvote-btn" data-id="${s.id}" ${hasUpvoted ? 'disabled style="opacity:0.6;"' : ''} style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;">
-                👍 ${s.upvotes || 0}
-              </button>
-            </h4>
-            <dl>
-              <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
-              <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
-              <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-            </dl>
-          </div>
-        `;
-      }).join('');
-
-      feedList.querySelectorAll('.upvote-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const subId = btn.dataset.id;
-          try {
-            await Store.upvoteSubmission(subId, clientId);
-            await refreshSocialFeed();
-            await calculateRanksAndFame();
-          } catch (err) {
-            alert(err.message);
-          }
-        });
-      });
+      return;
     }
+
+    const winnerSet = new Set(winners);
+    feedList.innerHTML = todaySubs.map((s) =>
+      renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
+
+    feedList.querySelectorAll('.upvote-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await Store.upvoteSubmission(btn.dataset.id, clientId);
+          await refreshSocialFeed();
+          await calculateRanksAndFame();
+        } catch (err) {
+          btn.disabled = false;
+          alert(err.message);
+        }
+      });
+    });
   }
 
-  // 매일의 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
+  // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
   async function calculateRanksAndFame() {
     const allSubs = await Store.listSubmissions();
-    const dates = U.challengeDates();
 
-    // 일자별 1등 닉네임 구하기
-    const winsMap = {}; // 닉네임 -> 1등 횟수
-    for (const d of dates) {
-      const daySubs = allSubs.filter(s => s.date === d);
-      if (daySubs.length === 0) continue;
-      // 엄지척 수 정렬
-      daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
-      const maxVotes = daySubs[0].upvotes || 0;
-      if (maxVotes > 0) {
-        // 공동 1등 인정
-        const winners = daySubs.filter(s => (s.upvotes || 0) === maxVotes).map(s => s.nickname);
-        for (const w of winners) {
-          winsMap[w] = (winsMap[w] || 0) + 1;
-        }
+    // 제출이 있는 날짜별로 묶어 1등을 뽑는다 (공동 1등 모두 인정)
+    const byDate = new Map();
+    for (const s of allSubs) {
+      if (!byDate.has(s.date)) byDate.set(s.date, []);
+      byDate.get(s.date).push(s);
+    }
+
+    const winsMap = {}; // 닉네임 → 1등 횟수
+    for (const daySubs of byDate.values()) {
+      const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
+      if (maxVotes <= 0) continue;
+      for (const s of daySubs) {
+        if ((s.upvotes || 0) === maxVotes) winsMap[s.nickname] = (winsMap[s.nickname] || 0) + 1;
       }
     }
 
-    // Top 5 리스트 생성
     const sortedFame = Object.entries(winsMap)
       .map(([nickname, wins]) => ({ nickname, wins }))
       .sort((a, b) => b.wins - a.wins || a.nickname.localeCompare(b.nickname, 'ko'))
       .slice(0, 5);
 
     const fameList = $('hallOfFameList');
-    if (sortedFame.length === 0) {
-      fameList.innerHTML = '<li style="color: var(--text-muted); font-weight: normal;">집계된 순위가 없습니다.</li>';
-    } else {
-      fameList.innerHTML = sortedFame.map((user, idx) => {
+    fameList.innerHTML = sortedFame.length
+      ? sortedFame.map((user, idx) => {
         const medal = ['🥇', '🥈', '🥉'][idx] || '⭐';
-        return `<li>${medal} <strong>${esc(user.nickname)}</strong> — 1등 ${user.wins}회</li>`;
-      }).join('');
-    }
+        return `<li><span class="medal">${medal}</span>` +
+          `<span class="who">${esc(user.nickname)}</span>` +
+          `<span class="cnt">1등 ${user.wins}회</span></li>`;
+      }).join('')
+      : '<li class="none">집계된 순위가 없습니다.</li>';
   }
 
   /* ── 제출 ────────────────────────────── */
@@ -405,6 +415,22 @@
     });
     ['chapter', 'sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));
+
+    // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 오늘 피드만 주기적 갱신
+    // (명예의 전당은 전체 기록을 읽어야 해서 Firestore 읽기 비용이 크므로 자동 갱신에서 제외)
+    $('feedRefresh').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await refreshSocialFeed();
+        await calculateRanksAndFame();
+      } finally { btn.disabled = false; }
+    });
+    const pollFeed = () => {
+      if (document.visibilityState === 'visible') refreshSocialFeed().catch(console.error);
+    };
+    setInterval(pollFeed, 120000);
+    document.addEventListener('visibilitychange', pollFeed);
 
     // 실시간 동기화
     window.addEventListener('storage', async (e) => {

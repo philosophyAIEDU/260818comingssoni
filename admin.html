@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>커밍쏜 독서챌린지 · 운영진</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
@@ -13,14 +14,13 @@
   <div class="top-in">
     <div class="brand">
       <h1>운영진 대시보드</h1>
-      <p id="brandSub">커밍쏜 독서챌린지 · 프로세스 이코노미</p>
     </div>
     <nav class="navlinks">
       <div style="display: flex; align-items: center; gap: 10px;">
         <a href="index.html">인증하기</a>
         <a href="admin.html" aria-current="page">운영진</a>
         <div id="adminAuthHeader" style="display: none; align-items: center; gap: 8px;">
-          <span id="adminEmailLabel" style="font-size: 13.5px; color: var(--text-dim);"></span>
+          <span id="adminEmailLabel" style="font-size: 13.5px; color: #ffffff; font-weight: 500;"></span>
           <button id="adminLogoutBtn" style="padding: 4px 8px; font-size: 12px;">로그아웃</button>
         </div>
       </div>
@@ -155,8 +155,8 @@
   <section class="card panel" data-panel="data" hidden>
     <h2>데이터 관리</h2>
     <p class="hint">
-      현재 저장 위치: <span class="tag info" id="backendTag">localStorage</span>
-      — 이 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우면 사라지므로 정기적으로 백업하세요.
+      현재 저장 위치: <span class="tag info" id="backendTag">Firebase Firestore</span>
+      <span id="backendDesc">— 참가자들이 각자 어떤 기기·브라우저에서 제출하든 하나의 데이터베이스에 함께 저장·집계됩니다.</span>
     </p>
     <div id="dataMsg"></div>
     <div class="actions" style="margin-bottom:18px">
@@ -173,7 +173,7 @@
     </div>
 
     <h2>Firebase 연결</h2>
-    <p class="hint">
+    <p class="hint" id="firebaseInfo">
       나중에 여러 기기에서 함께 쓰려면 <code>js/config.js</code>의 <code>CS.FIREBASE_CONFIG</code>를 채우고
       <code>backend</code>를 <code>'firebase'</code>로 바꾸면 됩니다. 저장 인터페이스가 동일해 화면 코드는 그대로 동작합니다.
       전환 전에 위의 <strong>전체 백업</strong>을 받아두고, 전환 후 <strong>복원하기</strong>로 그대로 옮길 수 있습니다.

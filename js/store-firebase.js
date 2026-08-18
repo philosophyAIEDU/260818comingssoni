@@ -191,10 +191,15 @@ CS.FirebaseStore = (function () {
     if (upvotedBy.includes(clientId)) {
       throw new Error('이미 이 글을 추천했습니다.');
     }
-    upvotedBy.push(clientId);
-    const upvotes = (data.upvotes || 0) + 1;
-    await fs.updateDoc(docRef, { upvotes, upvotedBy });
-    return Object.assign({ id }, data, { upvotes, upvotedBy });
+    // 여러 명이 동시에 눌러도 표가 유실되지 않도록 서버 측 원자 연산 사용
+    await fs.updateDoc(docRef, {
+      upvotes: fs.increment(1),
+      upvotedBy: fs.arrayUnion(clientId)
+    });
+    return Object.assign({ id }, data, {
+      upvotes: (data.upvotes || 0) + 1,
+      upvotedBy: upvotedBy.concat(clientId)
+    });
   }
 
   async function getMeta() {
