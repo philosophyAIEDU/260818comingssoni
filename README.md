@@ -103,6 +103,7 @@ js/app.js                         참가자 화면 로직
 js/admin.js                       운영진 화면 로직
 netlify.toml                      Netlify 배포·예약 함수(스케줄) 설정
 netlify/functions/                야간 인증 알림 메일 발송 함수 (아래 항목 참고)
+package.json                      알림 메일 발송용 nodemailer 의존성 (Netlify가 배포 시 자동 설치)
 test/logic.test.js                날짜·집계·저장소 회귀 테스트
 test/ui.test.js                   브라우저 시나리오 테스트
 ```
@@ -164,15 +165,23 @@ netlify/functions/send-daily-reminder-test.js  운영진 화면의 [지금 테�
 netlify/functions/_lib/notify.js               공통 로직 (수신자 조회 + 메일 발송)
 ```
 
-동작하려면 **Netlify 사이트 설정 → Environment variables**에 아래 값을 등록해야 합니다.
+**비용 없이 지메일 SMTP로 발송**하도록 구현했습니다 (`nodemailer` 사용). 아래 순서로 준비하세요.
+
+1. 발송용으로 쓸 구글 계정에서 **2단계 인증**을 켭니다. (계정 설정 → 보안 → 2단계 인증)
+2. https://myaccount.google.com/apppasswords 에서 **앱 비밀번호**를 발급받습니다. (16자리, 공백 없이)
+3. **Netlify 사이트 설정 → Environment variables**에 아래 값을 등록합니다.
 
 | 변수 | 설명 |
 | --- | --- |
-| `RESEND_API_KEY` | [Resend](https://resend.com)에서 발급받은 API 키. 다른 메일 발송 서비스를 쓰려면 `_lib/notify.js`의 `sendViaResend`만 바꿔주면 됩니다. |
-| `MAIL_FROM` | 발신자 주소. Resend에 도메인 인증을 마친 주소여야 합니다. 예) `퍼스널메이커스 독서 챌린지 <noreply@yourdomain.com>` |
+| `GMAIL_USER` | 발송용 지메일 주소. 예) `personalmakers.reading@gmail.com` |
+| `GMAIL_APP_PASSWORD` | 1~2번에서 발급받은 앱 비밀번호 16자리 (일반 로그인 비밀번호 아님) |
 
-메일 본문에는 인증 앱 주소(`https://comingssoni.netlify.app/`)와 오늘 밤 24시 마감 안내가 포함됩니다.
-수신자끼리 서로의 메일 주소가 보이지 않도록 `bcc`로 발송합니다.
+지메일 개인 계정은 **하루 약 500통(수신자 합산 기준)까지 무료**로 보낼 수 있어, 이 정도 규모의
+챌린지에는 별도 비용이 들지 않습니다. 메일 본문에는 인증 앱 주소(`https://comingssoni.netlify.app/`)와
+오늘 밤 24시 마감 안내가 포함되고, 수신자끼리 서로의 메일 주소가 보이지 않도록 `bcc`로 발송합니다.
+
+> 다른 메일 발송 방식(회사 도메인 메일, Resend 등 유료 서비스)으로 바꾸고 싶다면
+> `netlify/functions/_lib/notify.js`의 `sendViaGmail` 함수만 교체하면 됩니다.
 
 > `send-daily-reminder.js`는 Firestore의 `notifyEmails` 컬렉션을 **REST API로 인증 없이** 조회합니다.
 > 이 프로젝트의 다른 컬렉션(참가자·제출 기록)도 클라이언트에서 로그인 없이 읽고 쓰는 구조이므로 동일하게 열어 둔
