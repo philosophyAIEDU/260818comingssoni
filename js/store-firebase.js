@@ -2,7 +2,8 @@
  *
  * 컬렉션 구조
  *   participants/{id}  { nickname, status, joinDate, outDate, exemptDates[], note, createdAt }
- *   submissions/{id}   { participantId, nickname, date, chapter, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
+ *   submissions/{id}   { participantId, nickname, date, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
+ *   notifyEmails/{id}  { email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
  *   meta/app           { ... }
  */
 window.CS = window.CS || {};
@@ -202,6 +203,50 @@ CS.FirebaseStore = (function () {
     });
   }
 
+  /** 추천 취소 (본인이 눌렀던 엄지척을 되돌린다) */
+  async function unvoteSubmission(id, clientId) {
+    await init();
+    const docRef = fs.doc(db, 'submissions', id);
+    const snap = await fs.getDoc(docRef);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const upvotedBy = data.upvotedBy || [];
+    if (!upvotedBy.includes(clientId)) {
+      throw new Error('추천한 적이 없는 글입니다.');
+    }
+    await fs.updateDoc(docRef, {
+      upvotes: fs.increment(-1),
+      upvotedBy: fs.arrayRemove(clientId)
+    });
+    return Object.assign({ id }, data, {
+      upvotes: Math.max(0, (data.upvotes || 0) - 1),
+      upvotedBy: upvotedBy.filter((c) => c !== clientId)
+    });
+  }
+
+  /* ── 인증 알림 메일 수신자 목록 ───────── */
+  async function listNotifyEmails() {
+    await init();
+    const snap = await fs.getDocs(col('notifyEmails'));
+    return snap.docs.map(withId).sort((a, b) => a.email.localeCompare(b.email));
+  }
+
+  async function addNotifyEmail(email) {
+    await init();
+    const clean = String(email || '').trim().toLowerCase();
+    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+    const dup = await fs.getDocs(fs.query(col('notifyEmails'), fs.where('email', '==', clean)));
+    if (!dup.empty) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
+    const body = { email: clean, createdAt: CS.U.nowStamp() };
+    const ref = await fs.addDoc(col('notifyEmails'), body);
+    return Object.assign({ id: ref.id }, body);
+  }
+
+  async function removeNotifyEmail(id) {
+    await init();
+    await fs.deleteDoc(fs.doc(db, 'notifyEmails', id));
+  }
+
   async function getMeta() {
     await init();
     const snap = await fs.getDoc(fs.doc(db, 'meta', 'app'));
@@ -252,7 +297,8 @@ CS.FirebaseStore = (function () {
     name: 'firebase',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
-    onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser
+    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
+    onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser,
+    listNotifyEmails, addNotifyEmail, removeNotifyEmail
   };
 })();

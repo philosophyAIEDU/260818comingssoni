@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#102d84">
   <meta name="format-detection" content="telephone=no">
   <meta name="color-scheme" content="light dark">
-  <title>커밍쏜 독서챌린지 · 인증하기</title>
-  <meta name="description" content="커밍쏜 독서챌린지 프로세스 이코노미 인증 시스템">
+  <title>퍼스널메이커스 독서 챌린지 · 인증하기</title>
+  <meta name="description" content="퍼스널메이커스 독서 챌린지 프로세스 이코노미 인증 시스템">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
@@ -19,8 +19,11 @@
   <header class="top">
     <div class="top-in">
       <div class="brand">
-        <h1 id="brandTitle">독서챌린지 인증 시스템</h1>
-        <p id="brandSub"></p>
+        <img class="brand-logo" src="logo.png" alt="퍼스널메이커스 로고">
+        <div class="brand-text">
+          <h1 id="brandTitle">독서 챌린지 인증 시스템</h1>
+          <p id="brandSub"></p>
+        </div>
       </div>
       <nav class="navlinks">
         <a href="index.html" aria-current="page">인증하기</a>
@@ -68,7 +71,7 @@
     <section class="card">
       <h2>오늘의 인증</h2>
       <p class="hint">
-        매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 마감 후에는 미인증으로 처리되며 유예 시간은 없습니다.
+        매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 미인증으로 처리되니 미리 인증해주세요.
       </p>
 
       <div id="formMsg"></div>
@@ -77,31 +80,26 @@
         <div class="field">
           <label for="participantSearch">참여 아이디 <span class="sub">이름 또는 초성으로 검색 후 선택</span></label>
           <div class="participant-picker">
-            <input type="text" id="participantSearch" placeholder="예) 필로소피 → '필' 또는 'ㅍㄹ'를 검색한 후 닉네임 선택 부분을 누르세요" autocomplete="off">
+            <input type="text" id="participantSearch" placeholder="예) 필로소피 → '필' 또는 'ㅍㄹ'를 검색한 후 이름 선택 부분을 누르세요" autocomplete="off">
             <select id="participant" required>
-              <option value="">— 닉네임 선택 —</option>
+              <option value="">— 이름 선택 —</option>
             </select>
           </div>
         </div>
 
         <div class="field">
-          <label for="chapter">오늘 읽은 챕터</label>
-          <input type="text" id="chapter" placeholder="예) 2장 – 과정을 파는 사람들 (p.48~72)" required>
-        </div>
-
-        <div class="field">
-          <label for="sentence">그 챕터 내용 중에서 인상 깊은 내용</label>
-          <textarea id="sentence" placeholder="가장 인상 깊었던 핵심 내용을 적어 주세요." required></textarea>
+          <label for="sentence">오늘 읽은 챕터에서 가장 인상 깊었던 핵심 내용을 적어주세요</label>
+          <textarea id="sentence" placeholder="가장 인상 깊었던 핵심 내용을 적거나 요약해주세요.&#10;ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. 흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. 그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 되어 응원해주는 것이다. - 185쪽" required></textarea>
         </div>
 
         <div class="field">
           <label for="reflection">오늘 책을 읽고 느낀 점</label>
-          <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘의 생각을 남겨 주세요." required></textarea>
+          <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요." required></textarea>
         </div>
 
-        <div class="actions">
-          <button type="submit" class="primary" id="submitBtn">인증 제출하기</button>
-          <button type="button" id="resetBtn">다시 쓰기</button>
+        <div class="actions form-actions">
+          <button type="button" id="resetBtn" class="btn-delete">삭제</button>
+          <button type="submit" class="primary btn-verify" id="submitBtn">인증하기</button>
           <span class="muted" id="draftNote"></span>
         </div>
       </form>
@@ -113,20 +111,37 @@
         <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
         <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨가며 다른 날의 인증글을 볼 수 있습니다. 좋은 글에 엄지척(👍)을 눌러주세요!</p>
+      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨가며 다른 날의 인증글을 볼 수 있습니다. 좋은 글에 엄지척(👍)을 눌러주세요! (다시 누르면 취소됩니다)</p>
 
-      <div class="feed-datenav">
-        <button type="button" id="feedPrevDate" class="small ghost" aria-label="이전 날짜">◀</button>
-        <span class="feed-date" id="feedDateLabel">-</span>
-        <button type="button" id="feedNextDate" class="small ghost" aria-label="다음 날짜">▶</button>
+      <div class="feed-tabs" id="feedTabs">
+        <button type="button" class="on" data-feedtab="date">날짜별 보기</button>
+        <button type="button" data-feedtab="all">전체 보기</button>
       </div>
 
-      <div class="tag ok winner-badge" id="todayWinnerBadge" hidden>👑 1등: -</div>
-      <div id="socialFeedList" class="feed-scroll">
-        <div class="empty">제출된 인증글이 없습니다.</div>
+      <div id="feedDateView">
+        <div class="feed-datenav">
+          <button type="button" id="feedPrevDate" class="small ghost" aria-label="이전 날짜">◀</button>
+          <span class="feed-date" id="feedDateLabel">-</span>
+          <button type="button" id="feedNextDate" class="small ghost" aria-label="다음 날짜">▶</button>
+        </div>
+
+        <div class="tag ok winner-badge" id="todayWinnerBadge" hidden>👑 1등: -</div>
+        <div id="socialFeedList" class="feed-scroll">
+          <div class="empty">제출된 인증글이 없습니다.</div>
+        </div>
+        <div class="feed-more-wrap" id="feedLoadMoreWrap" hidden>
+          <button type="button" id="feedLoadMoreBtn" class="small"></button>
+        </div>
       </div>
-      <div class="feed-more-wrap" id="feedLoadMoreWrap" hidden>
-        <button type="button" id="feedLoadMoreBtn" class="small"></button>
+
+      <div id="feedAllView" hidden>
+        <p class="hint">지금까지 제출된 모든 인증글을 최신순으로 한눈에 볼 수 있습니다.</p>
+        <div id="allFeedList" class="all-feed-grid">
+          <div class="empty">제출된 인증글이 없습니다.</div>
+        </div>
+        <div class="feed-more-wrap" id="allFeedLoadMoreWrap" hidden>
+          <button type="button" id="allFeedLoadMoreBtn" class="small"></button>
+        </div>
       </div>
     </section>
 
@@ -137,6 +152,35 @@
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
       </ol>
+    </section>
+
+    <!-- 전체 진행현황 -->
+    <section class="card">
+      <h2>📊 전체 진행현황 <span class="tag" id="overallCount">0명</span></h2>
+      <p class="hint">참여자 전체의 인증 현황을 한눈에 볼 수 있는 대시보드입니다.</p>
+
+      <div class="stats" id="overallStats">
+        <div class="stat">
+          <div class="n" id="ovToday">0%</div>
+          <div class="k">오늘 인증률</div>
+        </div>
+        <div class="stat ok">
+          <div class="n" id="ovAvgRate">0%</div>
+          <div class="k">평균 인증률</div>
+        </div>
+        <div class="stat">
+          <div class="n" id="ovActive">0</div>
+          <div class="k">참여중</div>
+        </div>
+        <div class="stat bad">
+          <div class="n" id="ovRisk">0</div>
+          <div class="k">킥아웃 대상</div>
+        </div>
+      </div>
+
+      <div class="scroll" style="margin-top:16px">
+        <table id="overallTable"></table>
+      </div>
     </section>
 
     <!-- 나의 진행 현황 -->
@@ -186,18 +230,18 @@
     <section class="card">
       <h2>안내 · 챌린지 규칙</h2>
       <ul class="muted">
-        <li>인증은 <strong>텍스트 제출</strong>로만 진행됩니다.</li>
         <li>참여 아이디는 드롭다운에서 선택합니다.</li>
         <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
-        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 사정이 있는 날은 운영진에게 <strong>면제일</strong> 등록을 요청하세요.</li>
+        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 개인적인 사정으로 인증이 어려운 날엔 최소 3주일 전 운영진께 요청주세요.</li>
         <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
+        <li id="rulesPhaseNote" hidden></li>
       </ul>
     </section>
 
   </main>
 
   <footer class="foot">
-    커밍쏜 독서챌린지 · <span id="footRange"></span> · 데이터는 Firestore DB에 저장되어 공유됩니다.
+    퍼스널메이커스 독서 챌린지 · <span id="footRange"></span> · 데이터는 Firestore DB에 저장되어 공유됩니다.
   </footer>
 
   <script src="js/config.js"></script>

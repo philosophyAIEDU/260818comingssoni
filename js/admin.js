@@ -8,6 +8,7 @@
   let participants = [];
   let submissions = [];
   let stats = [];
+  let notifyEmails = [];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -33,6 +34,7 @@
     paintParticipantFilter();
     paintEntries();
     paintNotice();
+    await refreshNotify();
   }
 
   /* ── 상단 지표 ───────────────────────── */
@@ -118,8 +120,7 @@
 
     const body = sub ? `
       <dl>
-        <dt>챕터</dt><dd>${esc(sub.chapter)}</dd>
-        <dt>좋았던 문장</dt><dd class="quote">“${esc(sub.sentence)}”</dd>
+        <dt>인상 깊은 내용</dt><dd class="quote">“${esc(sub.sentence)}”</dd>
         <dt>느낀 점</dt><dd>${esc(sub.reflection)}</dd>
         <dt>제출 시각</dt><dd>${esc(U.stampLabel(sub.updatedAt || sub.createdAt))}</dd>
       </dl>` : '<p class="muted">제출된 인증이 없습니다.</p>';
@@ -196,7 +197,7 @@
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>닉네임</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -204,7 +205,7 @@
       el.addEventListener('change', async () => {
         try {
           await Store.updateParticipant(el.dataset.rename, { nickname: el.value });
-          msg($('rosterMsg'), '닉네임을 수정했습니다.', 'ok');
+          msg($('rosterMsg'), '이름을 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refresh();
       });
@@ -256,7 +257,7 @@
   async function bulkAdd() {
     const raw = $('bulkNames').value;
     const names = raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
-    if (!names.length) { msg($('rosterMsg'), '등록할 닉네임을 입력해 주세요.', 'warn'); return; }
+    if (!names.length) { msg($('rosterMsg'), '등록할 이름을 입력해 주세요.', 'warn'); return; }
     const { added, skipped } = await Store.addParticipants(names);
     $('bulkNames').value = '';
     msg($('rosterMsg'),
@@ -347,7 +348,7 @@
       L.push(`OT : ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시`);
       L.push(`기간 : ${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)} (4주)`);
       L.push('');
-      L.push('신청 시 등록하신 단톡방 닉네임이 인증의 기준이 됩니다.');
+      L.push('신청 시 등록하신 이름이 인증의 기준이 됩니다.');
       L.push('OT에서 인증 방법을 자세히 안내드릴게요. 🙌');
       return L.join('\n');
     }
@@ -386,10 +387,9 @@
     }
 
     L.push(`오늘은 ${idx}일차 / 총 ${total}일 (D-${total - idx}) 입니다.`);
-    L.push('오늘 밤 24시까지 아래 3가지를 인증해 주세요.');
-    L.push('  1) 오늘 읽은 챕터');
-    L.push('  2) 오늘 읽은 문장 중 가장 좋았던 문장');
-    L.push('  3) 오늘 책을 읽고 느낀 점');
+    L.push('오늘 밤 24시까지 아래 2가지를 인증해 주세요.');
+    L.push('  1) 오늘 읽은 챕터에서 가장 인상 깊었던 핵심 내용');
+    L.push('  2) 오늘 책을 읽고 느낀 점 (나에게 어떻게 적용할지)');
     L.push('');
     L.push('마감은 24시 정각, 유예 없습니다. 오늘도 한 챕터 함께해요! 📚');
     return L.join('\n');
@@ -432,7 +432,7 @@
     if (date) rows = rows.filter((s) => s.date === date);
     if (pid) rows = rows.filter((s) => s.participantId === pid);
     if (kw) {
-      rows = rows.filter((s) => [s.chapter, s.sentence, s.reflection, s.nickname]
+      rows = rows.filter((s) => [s.sentence, s.reflection, s.nickname]
         .join(' ').toLowerCase().includes(kw));
     }
 
@@ -441,12 +441,86 @@
         <h4>${esc(s.nickname)} <span class="tag">${esc(U.shortLabel(s.date))}</span>
           <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span></h4>
         <dl>
-          <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
-          <dt>좋았던 문장</dt><dd class="quote">“${esc(s.sentence)}”</dd>
+          <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
           <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
         </dl>
       </div>`).join('') + (rows.length > 200 ? '<p class="muted">최근 200건만 표시합니다.</p>' : '')
       : '<div class="empty">조건에 맞는 제출 기록이 없습니다.</div>';
+  }
+
+  /* ── 알림 메일 ───────────────────────── */
+  function buildNotifyEmailBody() {
+    const L = [];
+    L.push(`[${CONFIG.title}] 오늘 인증하셨나요? 📖`);
+    L.push('');
+    L.push('안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.');
+    L.push('마감은 24시 정각이며 유예 시간은 없습니다.');
+    L.push('');
+    L.push(`인증하러 가기 → ${CONFIG.appUrl}`);
+    L.push('');
+    L.push('오늘도 함께 읽어주셔서 감사합니다. 🙌');
+    L.push('');
+    L.push('※ 이 알림을 더 이상 받고 싶지 않으시면 운영진에게 말씀해 주세요. 운영진 페이지의 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.');
+    return L.join('\n');
+  }
+
+  function paintNotify() {
+    $('notifyCount').textContent = `${notifyEmails.length}명`;
+    const t = $('notifyTable');
+    t.innerHTML = notifyEmails.length
+      ? `<thead><tr><th>메일 주소</th><th>등록일</th><th></th></tr></thead><tbody>${
+        notifyEmails.map((e) => `<tr>
+          <td>${esc(e.email)}</td>
+          <td class="muted">${esc(U.stampLabel(e.createdAt))}</td>
+          <td><button class="small danger" data-delmail="${esc(e.id)}">삭제</button></td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">등록된 메일 주소가 없습니다.</td></tr></tbody>';
+
+    t.querySelectorAll('[data-delmail]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        await Store.removeNotifyEmail(el.dataset.delmail);
+        await refreshNotify();
+      });
+    });
+
+    $('notifyPreview').textContent =
+      `제목: [${CONFIG.title}] 오늘 인증하셨나요? 📖\n\n${buildNotifyEmailBody()}`;
+  }
+
+  async function refreshNotify() {
+    notifyEmails = await Store.listNotifyEmails();
+    paintNotify();
+  }
+
+  async function addNotifyEmail() {
+    const input = $('notifyEmailInput');
+    try {
+      await Store.addNotifyEmail(input.value);
+      input.value = '';
+      msg($('notifyMsg'), '메일 주소를 추가했습니다.', 'ok');
+      await refreshNotify();
+    } catch (e) {
+      msg($('notifyMsg'), esc(e.message), 'bad');
+    }
+  }
+
+  async function sendNotifyTest() {
+    const btn = $('notifySendTest');
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '발송 중…';
+    try {
+      const res = await fetch('/.netlify/functions/send-daily-reminder-test', { method: 'POST' });
+      if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      msg($('notifyMsg'), `테스트 발송 완료 (${data.sent != null ? `${data.sent}건` : '완료'})`, 'ok');
+    } catch (e) {
+      msg($('notifyMsg'),
+        `테스트 발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정되어 있는지 확인해 주세요. (README 참고)`, 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
   }
 
   /* ── 내보내기 / 가져오기 ─────────────── */
@@ -463,16 +537,16 @@
   const csvCell = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
 
   function exportSubmissionsCsv() {
-    const head = ['날짜', '닉네임', '챕터', '좋았던 문장', '느낀 점', '제출시각'];
+    const head = ['날짜', '이름', '인상 깊은 내용', '느낀 점', '제출시각'];
     const lines = [head.map(csvCell).join(',')].concat(
-      submissions.map((s) => [s.date, s.nickname, s.chapter, s.sentence, s.reflection,
+      submissions.map((s) => [s.date, s.nickname, s.sentence, s.reflection,
       U.stampLabel(s.updatedAt || s.createdAt)].map(csvCell).join(',')));
     download(`인증기록_${U.today()}.csv`, lines.join('\n'), 'text/csv');
   }
 
   function exportMatrixCsv() {
     const dates = U.challengeDates();
-    const head = ['닉네임', '상태', '인증', '미인증', '면제', '인증률'].concat(dates.map(U.shortLabel));
+    const head = ['이름', '상태', '인증', '미인증', '면제', '인증률'].concat(dates.map(U.shortLabel));
     const lines = [head.map(csvCell).join(',')].concat(stats.map((s) => [
       s.participant.nickname,
       s.participant.status === 'out' ? '아웃' : (s.atRisk ? '킥아웃 대상' : '참여중'),
@@ -551,6 +625,10 @@
       $('fDate').value = ''; $('fParticipant').value = ''; $('fKeyword').value = '';
       paintEntries();
     });
+
+    $('notifyAddBtn').addEventListener('click', addNotifyEmail);
+    $('notifyEmailInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNotifyEmail(); });
+    $('notifySendTest').addEventListener('click', sendNotifyTest);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);

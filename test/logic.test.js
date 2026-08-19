@@ -59,16 +59,16 @@ function t(name, cond, extra) {
   // 제출 데이터 심기: 소니는 8/24~8/26 인증, 8/27~9/1 미인증
   for (const d of ['2026-08-24','2026-08-25','2026-08-26']) {
     await Store.saveSubmission({ participantId: sony.id, nickname: '소니', date: d,
-      chapter: '1장', sentence: '문장', reflection: '느낀 점' });
+      sentence: '문장', reflection: '느낀 점' });
   }
   t('제출 3건', (await Store.listSubmissions({ participantId: sony.id })).length === 3);
 
   // 같은 날 재제출 → 덮어쓰기
   await Store.saveSubmission({ participantId: sony.id, nickname: '소니', date: '2026-08-24',
-    chapter: '1장 수정', sentence: 'ㄴ', reflection: 'ㄷ' });
+    sentence: '문장 수정', reflection: 'ㄷ' });
   const subs = await Store.listSubmissions({ participantId: sony.id });
   t('중복 제출 시 덮어쓰기(건수 유지)', subs.length === 3, subs.length);
-  t('덮어쓴 내용 반영', (await Store.getSubmission(sony.id, '2026-08-24')).chapter === '1장 수정');
+  t('덮어쓴 내용 반영', (await Store.getSubmission(sony.id, '2026-08-24')).sentence === '문장 수정');
 
   console.log('— 집계 (오늘=2026-09-02 가정) —');
   const T = '2026-09-02';
@@ -95,7 +95,7 @@ function t(name, cond, extra) {
   // 연속 인증: 8/31, 9/1 인증 추가 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)
   for (const d of ['2026-08-31','2026-09-01']) {
     await Store.saveSubmission({ participantId: whale.id, nickname: '책읽는고래', date: d,
-      chapter: 'c', sentence: 's', reflection: 'r' });
+      sentence: 's', reflection: 'r' });
   }
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
     .find(s => s.participant.id === whale.id);
@@ -105,6 +105,33 @@ function t(name, cond, extra) {
   await Store.updateParticipant(whale.id, { nickname: '고래' });
   const wsubs = await Store.listSubmissions({ participantId: whale.id });
   t('닉네임 변경 전파', wsubs.every(s => s.nickname === '고래'), wsubs.map(s=>s.nickname));
+
+  console.log('— 엄지척 추천/취소 —');
+  const firstSub = (await Store.listSubmissions({ participantId: whale.id }))[0];
+  const up = await Store.upvoteSubmission(firstSub.id, 'cli_test');
+  t('추천 반영', up.upvotes === 1 && up.upvotedBy.includes('cli_test'), up);
+  let dupVoteErr = null;
+  try { await Store.upvoteSubmission(firstSub.id, 'cli_test'); } catch (e) { dupVoteErr = e.message; }
+  t('중복 추천 거부', !!dupVoteErr, dupVoteErr);
+  const down = await Store.unvoteSubmission(firstSub.id, 'cli_test');
+  t('추천 취소 반영', down.upvotes === 0 && !down.upvotedBy.includes('cli_test'), down);
+  let unvoteErr = null;
+  try { await Store.unvoteSubmission(firstSub.id, 'cli_test'); } catch (e) { unvoteErr = e.message; }
+  t('추천한 적 없는 취소 거부', !!unvoteErr, unvoteErr);
+
+  console.log('— 인증 알림 메일 목록 —');
+  await Store.addNotifyEmail('Reader@Example.com');
+  let mailDupErr = null;
+  try { await Store.addNotifyEmail('reader@example.com'); } catch (e) { mailDupErr = e.message; }
+  t('메일 소문자 정규화 + 중복 거부', !!mailDupErr, mailDupErr);
+  let mailFormatErr = null;
+  try { await Store.addNotifyEmail('not-an-email'); } catch (e) { mailFormatErr = e.message; }
+  t('메일 형식 검증', !!mailFormatErr, mailFormatErr);
+  let mails = await Store.listNotifyEmails();
+  t('메일 목록 1건', mails.length === 1 && mails[0].email === 'reader@example.com', mails);
+  await Store.removeNotifyEmail(mails[0].id);
+  mails = await Store.listNotifyEmails();
+  t('메일 삭제', mails.length === 0);
 
   // 아웃 처리 후 이후 날짜는 '·'
   await Store.updateParticipant(whale.id, { status: 'out', outDate: '2026-09-01' });

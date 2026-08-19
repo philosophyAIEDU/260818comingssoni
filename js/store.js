@@ -16,14 +16,19 @@
  *   saveSubmission(data)                  → Promise<Submission>
  *   removeSubmission(id)                  → Promise<void>
  *   upvoteSubmission(id, clientId)        → Promise<Submission|null>
+ *   unvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   getMeta() / setMeta(patch)            → Promise<object>
  *   exportAll() / importAll(obj)          → Promise<object|void>
  *   clearAll()                            → Promise<void>
+ *   listNotifyEmails()                    → Promise<NotifyEmail[]>
+ *   addNotifyEmail(email)                 → Promise<NotifyEmail>
+ *   removeNotifyEmail(id)                 → Promise<void>
  *
  *  Participant { id, nickname, status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
- *  Submission  { id, participantId, nickname, date, chapter, sentence,
+ *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
+ *  NotifyEmail { id, email, createdAt }
  * ───────────────────────────────────────────────────────────
  */
 window.CS = window.CS || {};
@@ -191,8 +196,45 @@ CS.LocalStore = (function () {
     return all[i];
   }
 
+  /** 추천 취소 (본인이 눌렀던 엄지척을 되돌린다) */
+  async function unvoteSubmission(id, clientId) {
+    const all = read(S, []);
+    const i = all.findIndex((s) => s.id === id);
+    if (i < 0) return null;
+    const upvotedBy = all[i].upvotedBy || [];
+    if (!upvotedBy.includes(clientId)) throw new Error('추천한 적이 없는 글입니다.');
+    all[i] = Object.assign({}, all[i], {
+      upvotes: Math.max(0, (all[i].upvotes || 0) - 1),
+      upvotedBy: upvotedBy.filter((c) => c !== clientId)
+    });
+    write(S, all);
+    return all[i];
+  }
+
   async function getMeta() { return read(M, {}); }
   async function setMeta(patch) { return write(M, Object.assign(read(M, {}), patch)); }
+
+  /* ── 인증 알림 메일 수신자 목록 ───────── */
+  const N = 'notifyEmails';
+
+  async function listNotifyEmails() {
+    return read(N, []).slice().sort((a, b) => a.email.localeCompare(b.email));
+  }
+
+  async function addNotifyEmail(email) {
+    const clean = String(email || '').trim().toLowerCase();
+    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+    const all = read(N, []);
+    if (all.some((e) => e.email === clean)) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
+    const row = { id: CS.U.uid('mail'), email: clean, createdAt: CS.U.nowStamp() };
+    all.push(row);
+    write(N, all);
+    return row;
+  }
+
+  async function removeNotifyEmail(id) {
+    write(N, read(N, []).filter((e) => e.id !== id));
+  }
 
   async function exportAll() {
     return {
@@ -221,7 +263,8 @@ CS.LocalStore = (function () {
     name: 'local',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll
+    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
+    listNotifyEmails, addNotifyEmail, removeNotifyEmail
   };
 })();
 
