@@ -37,23 +37,50 @@ async function fetchNotifyEmails() {
     .filter(Boolean);
 }
 
-function buildEmail() {
-  const subject = `[${CHALLENGE_TITLE}] 오늘 인증하셨나요? 📖`;
-  const text = [
+// 운영진이 관리자 화면([알림 메일] 탭)에서 아직 저장한 적 없을 때 쓰이는 기본 제목·본문.
+// admin.js 의 defaultNotifySubject()/defaultNotifyBody() 와 내용을 맞춰 주세요.
+function defaultSubject() {
+  return `[${CHALLENGE_TITLE}] 오늘 인증하셨나요? 📖`;
+}
+function defaultBody() {
+  return [
     '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
     '마감은 24시 정각이며 유예 시간은 없습니다.',
     '',
-    `인증하러 가기 → ${APP_URL}`,
+    '인증하러 가기 → {{APP_URL}}',
     '',
     '오늘도 함께 읽어주셔서 감사합니다. 🙌',
     '',
     '※ 이 알림을 더 이상 받고 싶지 않으시면 운영진에게 말씀해 주세요. 운영진 페이지의 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.'
   ].join('\n');
+}
+
+/** Firestore REST API로 meta/app 문서에 저장된 운영진 커스텀 제목·본문을 읽는다.
+ *  저장한 적이 없으면 null을 반환하고, 이 경우 호출부에서 기본값을 사용한다. */
+async function fetchNotifyTemplate() {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`;
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Firestore 조회 실패 (${res.status}): meta 문서의 읽기 권한을 확인해 주세요.`);
+  }
+  const data = await res.json();
+  const f = data.fields || {};
+  const subject = f.notifySubject && f.notifySubject.stringValue;
+  const body = f.notifyBody && f.notifyBody.stringValue;
+  return (subject && body) ? { subject, body } : null;
+}
+
+async function buildEmail() {
+  const custom = await fetchNotifyTemplate();
+  const subject = (custom && custom.subject) || defaultSubject();
+  const rawBody = (custom && custom.body) || defaultBody();
+  const text = rawBody.split('{{APP_URL}}').join(APP_URL);
   const html = text
     .split('\n')
     .map((line) => (line.includes(APP_URL)
-      ? `<p><a href="${APP_URL}">${APP_URL}</a></p>`
-      : `<p>${line || '&nbsp;'}</p>`))
+      ? line.replace(APP_URL, `<a href="${APP_URL}">${APP_URL}</a>`)
+      : (line || '&nbsp;'))).map((l) => `<p>${l}</p>`)
     .join('\n');
   return { subject, text, html };
 }
@@ -72,7 +99,7 @@ async function sendViaGmail(recipients) {
     auth: { user, pass }
   });
 
-  const { subject, text, html } = buildEmail();
+  const { subject, text, html } = await buildEmail();
   await transporter.sendMail({
     from: `"${CHALLENGE_TITLE}" <${user}>`,
     to: user,

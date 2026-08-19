@@ -169,6 +169,29 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   t('메일 주소 삭제됨', /0명/.test(await page.textContent('#notifyCount')));
 
+  // 알림 메일 제목·본문 편집
+  t('기본 제목 자동 채움', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
+  await page.fill('#notifySubjectInput', '테스트 제목입니다');
+  await page.fill('#notifyBodyInput', '커스텀 본문입니다.\n링크: {{APP_URL}}');
+  await page.waitForTimeout(150);
+  t('편집 중 미리보기 즉시 반영', (await page.textContent('#notifyPreview')).includes('커스텀 본문입니다'));
+  t('플레이스홀더가 앱 주소로 치환됨', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
+  await page.click('#notifyTemplateSave');
+  await page.waitForTimeout(300);
+  t('템플릿 저장 완료 메시지', /저장했습니다/.test(await page.textContent('#notifyTemplateMsg')));
+
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  t('새로고침 후에도 저장한 제목 유지', (await page.inputValue('#notifySubjectInput')) === '테스트 제목입니다');
+
+  await page.click('#notifyTemplateReset');
+  await page.waitForTimeout(150);
+  t('기본값 초기화', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
+  await page.click('#notifyTemplateSave');
+  await page.waitForTimeout(300);
+
   // 데이터 탭
   await page.click('button[data-tab="data"]');
   await page.waitForTimeout(200);

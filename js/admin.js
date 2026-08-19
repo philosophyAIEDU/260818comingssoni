@@ -35,6 +35,7 @@
     paintEntries();
     paintNotice();
     await refreshNotify();
+    await loadNotifyTemplate();
   }
 
   /* ── 상단 지표 ───────────────────────── */
@@ -449,19 +450,31 @@
   }
 
   /* ── 알림 메일 ───────────────────────── */
-  function buildNotifyEmailBody() {
-    const L = [];
-    L.push(`[${CONFIG.title}] 오늘 인증하셨나요? 📖`);
-    L.push('');
-    L.push('안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.');
-    L.push('마감은 24시 정각이며 유예 시간은 없습니다.');
-    L.push('');
-    L.push(`인증하러 가기 → ${CONFIG.appUrl}`);
-    L.push('');
-    L.push('오늘도 함께 읽어주셔서 감사합니다. 🙌');
-    L.push('');
-    L.push('※ 이 알림을 더 이상 받고 싶지 않으시면 운영진에게 말씀해 주세요. 운영진 페이지의 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.');
-    return L.join('\n');
+
+  // 운영진이 아직 한 번도 저장한 적 없을 때 쓰이는 기본 제목·본문.
+  // 본문의 {{APP_URL}}은 발송 시 CONFIG.appUrl로 치환됩니다.
+  function defaultNotifySubject() {
+    return `[${CONFIG.title}] 오늘 인증하셨나요? 📖`;
+  }
+  function defaultNotifyBody() {
+    return [
+      '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
+      '마감은 24시 정각이며 유예 시간은 없습니다.',
+      '',
+      '인증하러 가기 → {{APP_URL}}',
+      '',
+      '오늘도 함께 읽어주셔서 감사합니다. 🙌',
+      '',
+      '※ 이 알림을 더 이상 받고 싶지 않으시면 운영진에게 말씀해 주세요. 운영진 페이지의 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.'
+    ].join('\n');
+  }
+
+  let notifyTemplateDirty = false; // 저장 안 한 편집 중인 내용을 다른 새로고침이 덮어쓰지 않도록
+
+  function paintNotifyPreview() {
+    const subject = $('notifySubjectInput').value || defaultNotifySubject();
+    const body = ($('notifyBodyInput').value || defaultNotifyBody()).split('{{APP_URL}}').join(CONFIG.appUrl);
+    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}`;
   }
 
   function paintNotify() {
@@ -482,14 +495,46 @@
         await refreshNotify();
       });
     });
-
-    $('notifyPreview').textContent =
-      `제목: [${CONFIG.title}] 오늘 인증하셨나요? 📖\n\n${buildNotifyEmailBody()}`;
   }
 
   async function refreshNotify() {
     notifyEmails = await Store.listNotifyEmails();
     paintNotify();
+  }
+
+  /** 저장된 제목·본문을 불러와 입력창에 채운다. 편집 중(dirty)이면 덮어쓰지 않는다. */
+  async function loadNotifyTemplate() {
+    if (notifyTemplateDirty) return;
+    $('notifyAppUrlHint').textContent = CONFIG.appUrl;
+    const meta = await Store.getMeta();
+    $('notifySubjectInput').value = meta.notifySubject || defaultNotifySubject();
+    $('notifyBodyInput').value = meta.notifyBody || defaultNotifyBody();
+    paintNotifyPreview();
+  }
+
+  async function saveNotifyTemplate() {
+    const subject = $('notifySubjectInput').value.trim();
+    const body = $('notifyBodyInput').value.trim();
+    if (!subject || !body) {
+      msg($('notifyTemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    try {
+      await Store.setMeta({ notifySubject: subject, notifyBody: body });
+      notifyTemplateDirty = false;
+      msg($('notifyTemplateMsg'), '저장했습니다. 다음 발송부터 반영됩니다.', 'ok');
+      paintNotifyPreview();
+    } catch (e) {
+      msg($('notifyTemplateMsg'), `저장 실패: ${esc(e.message)}`, 'bad');
+    }
+  }
+
+  function resetNotifyTemplate() {
+    $('notifySubjectInput').value = defaultNotifySubject();
+    $('notifyBodyInput').value = defaultNotifyBody();
+    notifyTemplateDirty = true; // 초기화만 하고 아직 저장 전이므로 다음 새로고침에 덮어써지지 않게
+    paintNotifyPreview();
+    msg($('notifyTemplateMsg'), '기본값으로 채웠습니다. [저장]을 눌러야 실제로 반영됩니다.', 'warn');
   }
 
   async function addNotifyEmail() {
@@ -629,6 +674,12 @@
     $('notifyAddBtn').addEventListener('click', addNotifyEmail);
     $('notifyEmailInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNotifyEmail(); });
     $('notifySendTest').addEventListener('click', sendNotifyTest);
+
+    $('notifyTemplateSave').addEventListener('click', saveNotifyTemplate);
+    $('notifyTemplateReset').addEventListener('click', resetNotifyTemplate);
+    ['notifySubjectInput', 'notifyBodyInput'].forEach((id) => {
+      $(id).addEventListener('input', () => { notifyTemplateDirty = true; paintNotifyPreview(); });
+    });
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
