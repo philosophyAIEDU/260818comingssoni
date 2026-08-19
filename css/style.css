@@ -1,4 +1,4 @@
-/* 커밍쏜 독서챌린지 — 공통 스타일 */
+/* 퍼스널메이커스 독서 챌린지 — 공통 스타일 */
 :root {
   --bg: #102d84;                /* 눈 피로도를 덜어주는 부드러운 다크 네이비 블루 */
   --surface: #ffffff;           /* 깔끔한 하얀 카드 면 */
@@ -80,7 +80,9 @@ a { color: var(--accent); }
   max-width: 1200px; margin: 0 auto; padding: 0 16px;
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
-.brand { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.brand-logo { height: 36px; width: auto; border-radius: 6px; display: block; flex: 0 0 auto; }
+.brand-text { display: flex; flex-direction: column; gap: 2px; }
 .brand h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: #ffffff; }
 .brand p { margin: 0; font-size: 13px; color: #ffe600; font-weight: 600; }
 .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -165,6 +167,19 @@ button.danger:hover { background: var(--bad-soft); }
 button.small { font-size: 12.5px; padding: 5px 10px; font-weight: 500; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* 인증 폼 액션: 인증하기 버튼을 가운데·크게, 삭제 버튼은 그보다 작게 */
+.form-actions { justify-content: center; text-align: center; }
+.form-actions .btn-verify {
+  order: 2; font-size: 17px; padding: 15px 48px; border-radius: 999px;
+  box-shadow: 0 5px 16px rgba(16, 45, 132, 0.35);
+}
+.form-actions .btn-delete {
+  order: 1; font-size: 12.5px; padding: 7px 16px; color: var(--bad);
+  border-color: var(--bad); background: transparent;
+}
+.form-actions .btn-delete:hover { background: var(--bad-soft); }
+.form-actions #draftNote { order: 3; flex-basis: 100%; }
 
 
 /* ── 알림 ─────────────────────────────── */
@@ -347,6 +362,25 @@ button.ghost { background: transparent; }
 .winner-badge { display: block; margin-bottom: 10px; font-weight: 700; padding: 6px 10px; text-align: center; }
 .winner-badge[hidden] { display: none; }
 
+/* 인증 피드 탭 (날짜별 보기 / 전체 보기) */
+.feed-tabs { display: flex; gap: 6px; margin: 10px 0 4px; }
+.feed-tabs button {
+  border-radius: 999px; font-weight: 600; font-size: 12.5px; padding: 6px 14px;
+  background: var(--surface-2);
+}
+.feed-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 전체 보기: 인증 카드들을 그리드로 한눈에 */
+.all-feed-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px; max-height: 640px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px;
+}
+.all-feed-grid::-webkit-scrollbar { width: 8px; }
+.all-feed-grid::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+.all-feed-grid .empty { grid-column: 1 / -1; }
+
+.upvote-btn.self { opacity: .5; cursor: not-allowed; }
+
 /* 날짜 넘기기 */
 .feed-datenav {
   display: flex; align-items: center; justify-content: center; gap: 14px;
@@ -378,12 +412,8 @@ button.ghost { background: transparent; }
 .feed-top { display: flex; align-items: center; gap: 8px; }
 .feed-nick { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-time { font-size: 11.5px; color: var(--text-faint); margin-left: auto; white-space: nowrap; }
-.feed-chapter {
-  margin: 7px 0 0; font-size: 13px; color: var(--text-dim);
-  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
-}
 .feed-quote {
-  margin: 5px 0 0; font-size: 13px; line-height: 1.55; font-style: italic; color: var(--accent);
+  margin: 7px 0 0; font-size: 13px; line-height: 1.55; font-style: italic; color: var(--accent);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .feed-more { margin-top: 8px; }
@@ -437,6 +467,9 @@ button.ghost { background: transparent; }
   .actions { gap: 8px; }
   .actions button { flex: 1 1 auto; min-height: 44px; }
   .actions .muted { flex-basis: 100%; }
+  .form-actions { flex-direction: column-reverse; }
+  .form-actions .btn-verify { flex: 1 1 100%; width: 100%; }
+  .form-actions .btn-delete { flex: 0 0 auto; align-self: center; min-height: 38px; }
 
   .entry dl { grid-template-columns: 1fr; gap: 2px; }
   .entry dt { margin-top: 6px; }

@@ -11,6 +11,10 @@
   let participants = [];
   let feedDate = U.today();
   let feedVisibleCount = FEED_PAGE_SIZE;
+  let allFeedVisibleCount = FEED_PAGE_SIZE;
+  let feedTab = 'date';
+  let currentPid = '';
+  let currentSubmission = null;
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -61,18 +65,24 @@
     const p = U.phase();
     const box = $('phaseNote');
     const open = canSubmitToday();
+    const ruleNote = $('rulesPhaseNote');
+
     if (p === 'before') {
       const d = U.diffDays(U.today(), CONFIG.startDate);
-      msg(box, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
+      msg(box, '');
+      ruleNote.innerHTML = `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
         `OT는 ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시입니다. ` +
         (open
           ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
-          : '인증은 시작일부터 제출할 수 있어요.'), 'info');
+          : '인증은 시작일부터 제출할 수 있어요.');
+      ruleNote.hidden = false;
     } else if (p === 'after') {
       msg(box, `챌린지가 <strong>${U.longLabel(CONFIG.endDate)}</strong>에 종료되었습니다. ` +
-        `4주간 고생 많으셨습니다! 🎉 아래에서 닉네임을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
+        `4주간 고생 많으셨습니다! 🎉 아래에서 이름을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
+      ruleNote.hidden = true;
     } else {
       msg(box, '');
+      ruleNote.hidden = true;
     }
 
     if (!open) {
@@ -133,7 +143,7 @@
     if (kept && kept.status !== 'out' && !activeList.some((p) => p.id === kept.id)) activeList = [kept, ...activeList];
     if (kept && kept.status === 'out' && !outList.some((p) => p.id === kept.id)) outList = [kept, ...outList];
 
-    sel.innerHTML = '<option value="">— 닉네임 선택 —</option>';
+    sel.innerHTML = '<option value="">— 이름 선택 —</option>';
     for (const p of activeList) {
       const o = document.createElement('option');
       o.value = p.id; o.textContent = p.nickname;
@@ -162,7 +172,7 @@
     if (!participants.length) {
       msg($('formMsg'),
         '아직 등록된 참가자 명단이 없습니다. 운영진이 <a href="admin.html">운영진 화면</a>의 ' +
-        '<strong>명단 관리</strong>에서 신청 폼으로 모은 닉네임을 먼저 등록해 주세요.', 'warn');
+        '<strong>명단 관리</strong>에서 신청 폼으로 모은 이름을 먼저 등록해 주세요.', 'warn');
       $('submitBtn').disabled = true;
       return;
     }
@@ -172,14 +182,20 @@
   /* ── 선택 시: 오늘 제출분 불러오기 + 현황 ─ */
   async function onSelect() {
     const pid = $('participant').value;
+    currentPid = pid;
     const card = $('myCard');
-    if (!pid) { card.hidden = true; msg($('formMsg'), ''); return; }
+    if (!pid) {
+      card.hidden = true; msg($('formMsg'), ''); currentSubmission = null;
+      await refreshSocialFeed();
+      await refreshAllFeed();
+      return;
+    }
 
     const today = U.today();
     const existing = await Store.getSubmission(pid, today);
+    currentSubmission = existing || null;
 
     if (existing) {
-      $('chapter').value = existing.chapter || '';
       $('sentence').value = existing.sentence || '';
       $('reflection').value = existing.reflection || '';
       if (canSubmitToday()) $('submitBtn').textContent = '인증 수정하기';
@@ -188,16 +204,17 @@
         `(${U.stampLabel(existing.updatedAt || existing.createdAt)}) 내용을 고치고 다시 제출하면 덮어씁니다.`, 'ok');
     } else {
       const draft = loadDraft(pid);
-      $('chapter').value = draft.chapter || '';
       $('sentence').value = draft.sentence || '';
       $('reflection').value = draft.reflection || '';
-      if (canSubmitToday()) $('submitBtn').textContent = '인증 제출하기';
+      if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
       msg($('formMsg'), '');
     }
     autoGrow($('sentence'));
     autoGrow($('reflection'));
 
     await paintMine(pid);
+    await refreshSocialFeed();
+    await refreshAllFeed();
   }
 
   /** 입력한 만큼 textarea 높이가 자동으로 늘어나게 (min-height/max-height는 CSS가 담당) */
@@ -222,7 +239,6 @@
     let all = {};
     try { all = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch (e) { all = {}; }
     all[`${pid}|${U.today()}`] = {
-      chapter: $('chapter').value,
       sentence: $('sentence').value,
       reflection: $('reflection').value
     };
@@ -292,7 +308,6 @@
         <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
       </h4>
       <dl>
-        <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
         <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
         <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
       </dl>
@@ -337,13 +352,24 @@
     }, { passive: true });
   }
 
+  /** 본인 글인지 (선택된 참여 아이디 기준). 여론 조작 방지를 위해 본인 글은 추천할 수 없다. */
+  function isOwnSubmission(s) {
+    return !!currentPid && s.participantId === currentPid;
+  }
+
   function bindUpvoteButtons(container) {
     container.querySelectorAll('.upvote-btn').forEach((btn) => {
+      if (btn.classList.contains('self')) return; // 본인 글: 클릭 자체를 막는다
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
-          await Store.upvoteSubmission(btn.dataset.id, clientId);
+          if (btn.classList.contains('voted')) {
+            await Store.unvoteSubmission(btn.dataset.id, clientId);
+          } else {
+            await Store.upvoteSubmission(btn.dataset.id, clientId);
+          }
           await refreshSocialFeed();
+          await refreshAllFeed();
           await calculateRanksAndFame();
         } catch (err) {
           btn.disabled = false;
@@ -354,19 +380,20 @@
   }
 
   function renderFeedItem(s, isWinner, hasUpvoted) {
+    const own = isOwnSubmission(s);
+    const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
+    const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-top">
         <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
         <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
-        <button type="button" class="upvote-btn${hasUpvoted ? ' voted' : ''}" data-id="${esc(s.id)}"
-          ${hasUpvoted ? 'disabled' : ''} aria-label="엄지척 ${s.upvotes || 0}개">👍 ${s.upvotes || 0}</button>
+        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
+          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
-      <p class="feed-chapter">📖 ${esc(s.chapter)}</p>
       <p class="feed-quote">“${esc(s.sentence)}”</p>
       <details class="feed-more">
         <summary>느낀 점 보기</summary>
         <dl class="body">
-          <dt>챕터</dt><dd>${esc(s.chapter)}</dd>
           <dt>인상 깊은 내용</dt><dd>${esc(s.sentence)}</dd>
           <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
         </dl>
@@ -429,6 +456,68 @@
     }
   }
 
+  /* ── 인증 피드 전체 보기 ─────────────────────── */
+  function renderAllFeedItem(s) {
+    const own = isOwnSubmission(s);
+    const hasUpvoted = (s.upvotedBy || []).includes(clientId);
+    const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
+    const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
+    return `<article class="feed-item">
+      <div class="feed-top">
+        <span class="feed-nick">${esc(s.nickname)}</span>
+        <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
+          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개">👍 ${s.upvotes || 0}</button>
+      </div>
+      <p class="feed-quote">“${esc(s.sentence)}”</p>
+      <details class="feed-more">
+        <summary>느낀 점 보기</summary>
+        <dl class="body">
+          <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
+        </dl>
+      </details>
+    </article>`;
+  }
+
+  async function refreshAllFeed() {
+    if (feedTab !== 'all') return;
+    const all = (await Store.listSubmissions()).slice()
+      .sort((a, b) => (b.date === a.date
+        ? String(b.createdAt).localeCompare(String(a.createdAt))
+        : b.date.localeCompare(a.date)));
+
+    const list = $('allFeedList');
+    const moreWrap = $('allFeedLoadMoreWrap');
+    if (!all.length) {
+      list.innerHTML = '<div class="empty">제출된 인증글이 없습니다.</div>';
+      moreWrap.hidden = true;
+      return;
+    }
+    const visible = all.slice(0, allFeedVisibleCount);
+    list.innerHTML = visible.map(renderAllFeedItem).join('');
+    bindUpvoteButtons(list);
+
+    const remaining = all.length - visible.length;
+    if (remaining > 0) {
+      moreWrap.hidden = false;
+      $('allFeedLoadMoreBtn').textContent = `더 보기 (${remaining}건 더 남음)`;
+    } else {
+      moreWrap.hidden = true;
+    }
+  }
+
+  function switchFeedTab(tab) {
+    feedTab = tab;
+    $('feedTabs').querySelectorAll('button[data-feedtab]').forEach((b) =>
+      b.classList.toggle('on', b.dataset.feedtab === tab));
+    $('feedDateView').hidden = tab !== 'date';
+    $('feedAllView').hidden = tab !== 'all';
+    if (tab === 'all') {
+      allFeedVisibleCount = FEED_PAGE_SIZE;
+      refreshAllFeed();
+    }
+  }
+
   // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
   async function calculateRanksAndFame() {
     const allSubs = await Store.listSubmissions();
@@ -465,6 +554,51 @@
       : '<li class="none">집계된 순위가 없습니다.</li>';
   }
 
+  /* ── 전체 진행현황 대시보드 (모든 참여자 공개) ─── */
+  async function paintOverall() {
+    if (!participants.length) {
+      $('overallCount').textContent = '0명';
+      $('overallTable').innerHTML = '<tbody><tr><td class="empty">등록된 참가자가 없습니다.</td></tr></tbody>';
+      return;
+    }
+    const allSubs = await Store.listSubmissions();
+    const stats = U.buildStats(participants, allSubs)
+      .sort((a, b) => (b.rate - a.rate) || (b.streak - a.streak)
+        || a.participant.nickname.localeCompare(b.participant.nickname, 'ko'));
+
+    const active = stats.filter((s) => s.participant.status !== 'out');
+    const todayDone = active.filter((s) => s.submittedToday).length;
+    const avgRate = active.length
+      ? Math.round(active.reduce((sum, s) => sum + s.rate, 0) / active.length) : 0;
+
+    $('overallCount').textContent = `${active.length}명`;
+    $('ovToday').textContent = active.length ? `${Math.round((todayDone / active.length) * 100)}%` : '0%';
+    $('ovAvgRate').textContent = `${avgRate}%`;
+    $('ovActive').textContent = active.length;
+    $('ovRisk').textContent = active.filter((s) => s.atRisk).length;
+
+    const head = '<thead><tr><th>이름</th><th class="num">인증</th><th class="num">미인증</th>' +
+      '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
+    const body = stats.map((s) => {
+      const p = s.participant;
+      const statusTag = p.status === 'out'
+        ? '<span class="tag bad">아웃</span>'
+        : (s.atRisk ? '<span class="tag bad">킥아웃 대상</span>' : '<span class="tag ok">참여중</span>');
+      const todayTag = s.submittedToday ? '<span class="tag ok">인증</span>' : '<span class="tag">-</span>';
+      return `<tr>
+        <td>${esc(p.nickname)}</td>
+        <td class="num">${s.verified}</td>
+        <td class="num">${s.missed}</td>
+        <td class="num">${s.rate}%</td>
+        <td class="num">${s.streak}</td>
+        <td>${todayTag}</td>
+        <td>${statusTag}</td>
+      </tr>`;
+    }).join('');
+
+    $('overallTable').innerHTML = `${head}<tbody>${body}</tbody>`;
+  }
+
   /* ── 제출 ────────────────────────────── */
   async function onSubmit(e) {
     e.preventDefault();
@@ -482,27 +616,28 @@
       participantId: pid,
       nickname: p ? p.nickname : '',
       date: U.today(),
-      chapter: $('chapter').value.trim(),
       sentence: $('sentence').value.trim(),
       reflection: $('reflection').value.trim()
     };
-    if (!payload.chapter || !payload.sentence || !payload.reflection) {
-      msg($('formMsg'), '세 항목을 모두 작성해 주세요.', 'bad');
+    if (!payload.sentence || !payload.reflection) {
+      msg($('formMsg'), '두 항목을 모두 작성해 주세요.', 'bad');
       return;
     }
 
     $('submitBtn').disabled = true;
     try {
-      await Store.saveSubmission(payload);
+      currentSubmission = await Store.saveSubmission(payload);
       clearDraft(pid);
       msg($('formMsg'),
         `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다. 오늘도 수고하셨어요! 📖`, 'ok');
       $('submitBtn').textContent = '인증 수정하기';
 
       await paintMine(pid);
+      await paintOverall();
       feedDate = U.today();
       feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
+      await refreshAllFeed();
       await calculateRanksAndFame();
       $('myCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
@@ -522,18 +657,42 @@
     await loadParticipants();
     await refreshSocialFeed();
     await calculateRanksAndFame();
+    await paintOverall();
 
     $('participant').addEventListener('change', onSelect);
     $('participantSearch').addEventListener('input', renderParticipantOptions);
     $('verifyForm').addEventListener('submit', onSubmit);
-    $('resetBtn').addEventListener('click', () => {
-      ['chapter', 'sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
-      autoGrow($('sentence'));
-      autoGrow($('reflection'));
+    $('resetBtn').addEventListener('click', async () => {
       const pid = $('participant').value;
-      if (pid) clearDraft(pid);
+      if (currentSubmission) {
+        if (!confirm('오늘 제출한 인증을 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
+        try {
+          await Store.removeSubmission(currentSubmission.id);
+          currentSubmission = null;
+          ['sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
+          autoGrow($('sentence'));
+          autoGrow($('reflection'));
+          if (pid) clearDraft(pid);
+          if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
+          msg($('formMsg'), '인증을 삭제했습니다. 다시 작성해 제출할 수 있습니다.', 'warn');
+          if (pid) await paintMine(pid);
+          await paintOverall();
+          feedDate = U.today();
+          feedVisibleCount = FEED_PAGE_SIZE;
+          await refreshSocialFeed();
+          await refreshAllFeed();
+          await calculateRanksAndFame();
+        } catch (err) {
+          msg($('formMsg'), `삭제 실패: ${esc(err.message)}`, 'bad');
+        }
+      } else {
+        ['sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
+        autoGrow($('sentence'));
+        autoGrow($('reflection'));
+        if (pid) clearDraft(pid);
+      }
     });
-    ['chapter', 'sentence', 'reflection'].forEach((k) =>
+    ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', () => autoGrow($(k))));
@@ -547,6 +706,17 @@
     });
     bindFeedSwipe(document.querySelector('.feed-card'));
 
+    // 인증 피드: 날짜별 보기 / 전체 보기 탭
+    $('feedTabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-feedtab]');
+      if (!btn) return;
+      switchFeedTab(btn.dataset.feedtab);
+    });
+    $('allFeedLoadMoreBtn').addEventListener('click', () => {
+      allFeedVisibleCount += FEED_PAGE_SIZE;
+      refreshAllFeed();
+    });
+
     // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
     // (명예의 전당은 전체 기록을 읽어야 해서 Firestore 읽기 비용이 크므로 자동 갱신에서 제외)
     $('feedRefresh').addEventListener('click', async (e) => {
@@ -554,7 +724,9 @@
       btn.disabled = true;
       try {
         await refreshSocialFeed();
+        await refreshAllFeed();
         await calculateRanksAndFame();
+        await paintOverall();
       } finally { btn.disabled = false; }
     });
     const pollFeed = () => {
@@ -572,7 +744,9 @@
         await loadParticipants();
         if (keep) { $('participant').value = keep; await onSelect(); }
         await refreshSocialFeed();
+        await refreshAllFeed();
         await calculateRanksAndFame();
+        await paintOverall();
       }
     });
   }

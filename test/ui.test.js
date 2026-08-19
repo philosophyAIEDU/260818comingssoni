@@ -48,10 +48,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   // ── 참가자 화면: 인증 제출 ──
   await page.goto(BASE + '/index.html');
   await page.waitForTimeout(400);
+  t('브랜드 로고 노출', await page.isVisible('.brand-logo'));
+  t('브랜드명 반영', (await page.textContent('#brandTitle')).includes('퍼스널메이커스'));
   const opts = await page.locator('#participant option').count();
   t('드롭다운 채워짐 (5 = 안내 + 4명)', opts === 5, opts);
   await page.selectOption('#participant', { label: '커밍쏜' });
-  await page.fill('#chapter', '2장 – 과정을 파는 사람들 (p.48~72)');
   await page.fill('#sentence', '과정을 팔면 결과를 기다리는 시간마저 팬이 된다.');
   await page.fill('#reflection', '결과가 나오기 전에도 보여줄 것이 있다는 말이 위로가 됐다.');
   await page.click('#submitBtn');
@@ -70,10 +71,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.selectOption('#participant', { label: '커밍쏜' });
   await page.waitForTimeout(300);
   t('재방문 시 제출완료 안내', /제출 완료/.test(await page.textContent('#formMsg')));
-  t('입력값 복원', (await page.inputValue('#chapter')).includes('2장'));
+  t('입력값 복원', (await page.inputValue('#sentence')).includes('과정을 팔면'));
 
   // 같은 날 재제출 → 덮어쓰기
-  await page.fill('#chapter', '3장 – 팬이 되는 순간');
+  await page.fill('#sentence', '팬이 되는 순간을 함께 만든다.');
   await page.click('#submitBtn');
   await page.waitForTimeout(400);
   t('수정 후에도 인증 1건', (await page.textContent('#stVerified')) === '1');
@@ -81,12 +82,36 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   // 두 번째 참가자 제출
   await page.selectOption('#participant', { label: '밤톨' });
   await page.waitForTimeout(300);
-  t('참가자 전환 시 폼 비워짐', (await page.inputValue('#chapter')) === '');
-  await page.fill('#chapter', '1장');
+  t('참가자 전환 시 폼 비워짐', (await page.inputValue('#sentence')) === '');
   await page.fill('#sentence', '읽는다는 건 버티는 일이다.');
   await page.fill('#reflection', '오늘은 30분만 읽었다.');
   await page.click('#submitBtn');
   await page.waitForTimeout(400);
+
+  // ── 참가자 화면: 삭제 버튼 라벨 & 전체 진행현황 ──
+  t('삭제 버튼 라벨', (await page.textContent('#resetBtn')).trim() === '삭제');
+  const overallRows = await page.locator('#overallTable tbody tr').count();
+  t('전체 진행현황 행 4개', overallRows === 4, overallRows);
+  t('전체 진행현황에 참가자 이름 노출', (await page.textContent('#overallTable')).includes('밤톨'));
+
+  // ── 인증 피드: 전체 보기 탭 ──
+  await page.click('button[data-feedtab="all"]');
+  await page.waitForTimeout(300);
+  t('전체 보기 카드 노출', (await page.locator('#allFeedList .feed-item').count()) >= 2);
+  t('날짜별 보기 영역 숨김', await page.isHidden('#feedDateView'));
+
+  // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (현재 선택: 밤톨) ──
+  const bamtolCard = page.locator('#allFeedList .feed-item', { hasText: '밤톨' });
+  t('본인 글 엄지척 비활성', await bamtolCard.locator('.upvote-btn').isDisabled());
+  const otherCard = page.locator('#allFeedList .feed-item', { hasText: '커밍쏜' });
+  const upvoteBtn = otherCard.locator('.upvote-btn');
+  await upvoteBtn.click();
+  await page.waitForTimeout(400);
+  t('엄지척 1로 증가', (await upvoteBtn.textContent()).includes('👍 1'));
+  await upvoteBtn.click();
+  await page.waitForTimeout(400);
+  t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
+  await page.click('button[data-feedtab="date"]');
 
   // ── 운영진 화면: 현황/리포트 ──
   await page.goto(BASE + '/admin.html');
@@ -116,7 +141,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.click('button[data-tab="report"]');
   await page.waitForTimeout(300);
   const notice = await page.textContent('#noticeOut');
-  t('공지문 생성됨', notice.length > 60 && notice.includes('커밍쏜 독서챌린지'), notice.slice(0, 80));
+  t('공지문 생성됨', notice.length > 60 && notice.includes('퍼스널메이커스 독서 챌린지'), notice.slice(0, 80));
 
   await page.click('#genReport');
   await page.waitForTimeout(300);
@@ -131,6 +156,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   const ec = await page.locator('#entryList .entry').count();
   t('검색어 필터 1건', ec === 1, ec);
+
+  // 알림 메일 탭
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  await page.fill('#notifyEmailInput', 'reader@example.com');
+  await page.click('#notifyAddBtn');
+  await page.waitForTimeout(300);
+  t('메일 주소 등록됨', /1명/.test(await page.textContent('#notifyCount')));
+  t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
+  await page.click('[data-delmail]');
+  await page.waitForTimeout(300);
+  t('메일 주소 삭제됨', /0명/.test(await page.textContent('#notifyCount')));
 
   // 데이터 탭
   await page.click('button[data-tab="data"]');

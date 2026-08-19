@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>커밍쏜 독서챌린지 · 운영진</title>
+<title>퍼스널메이커스 독서 챌린지 · 운영진</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 </head>
@@ -13,7 +13,11 @@
 <header class="top">
   <div class="top-in">
     <div class="brand">
-      <h1>운영진 대시보드</h1>
+      <img class="brand-logo" src="logo.png" alt="퍼스널메이커스 로고">
+      <div class="brand-text">
+        <h1>운영진 대시보드</h1>
+        <p>퍼스널메이커스 독서 챌린지</p>
+      </div>
     </div>
     <nav class="navlinks">
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -61,6 +65,7 @@
     <button data-tab="roster">명단 관리</button>
     <button data-tab="report">리포트 · 공지문</button>
     <button data-tab="entries">제출 기록</button>
+    <button data-tab="notify">알림 메일</button>
     <button data-tab="data">데이터</button>
   </div>
 
@@ -84,10 +89,10 @@
   <!-- ── 명단 관리 ─────────────────────── -->
   <section class="card panel" data-panel="roster" hidden>
     <h2>명단 등록</h2>
-    <p class="hint">신청 폼으로 모은 닉네임을 한 줄에 하나씩 붙여넣고 등록하세요. 이미 있는 닉네임은 건너뜁니다.</p>
+    <p class="hint">신청 폼으로 모은 이름을 한 줄에 하나씩 붙여넣고 등록하세요. 이미 있는 이름은 건너뜁니다.</p>
     <div id="rosterMsg"></div>
     <div class="field">
-      <textarea id="bulkNames" placeholder="예시&#10;소니&#10;커밍쏜&#10;책읽는고래"></textarea>
+      <textarea id="bulkNames" placeholder="예시&#10;홍길동&#10;김철수&#10;이영희"></textarea>
     </div>
     <div class="actions">
       <button class="primary" id="bulkAdd">명단 일괄 등록</button>
@@ -95,7 +100,7 @@
     </div>
 
     <h2 style="margin-top:26px">참가자 목록 <span class="tag" id="rosterCount"></span></h2>
-    <p class="hint">상태 변경, 면제일 등록, 닉네임 수정, 삭제를 할 수 있습니다.</p>
+    <p class="hint">상태 변경, 면제일 등록, 이름 수정, 삭제를 할 수 있습니다.</p>
     <div class="scroll">
       <table id="rosterTable"></table>
     </div>
@@ -141,7 +146,7 @@
       </div>
       <div>
         <label class="muted" for="fKeyword">검색어</label>
-        <input type="text" id="fKeyword" placeholder="챕터 · 문장 · 느낀 점">
+        <input type="text" id="fKeyword" placeholder="인상 깊은 내용 · 느낀 점">
       </div>
       <div style="display:flex;align-items:flex-end;gap:8px">
         <button id="applyFilter" class="primary" style="flex:1">조회</button>
@@ -149,6 +154,40 @@
       </div>
     </div>
     <div id="entryList"></div>
+  </section>
+
+  <!-- ── 알림 메일 ─────────────────────── -->
+  <section class="card panel" data-panel="notify" hidden>
+    <h2>인증 알림 메일</h2>
+    <p class="hint">
+      매일 밤 <strong>22시(밤 10시)</strong>에 아래 목록의 메일 주소로 인증 알림 메일을 자동 발송합니다.
+      알림을 원하지 않는 분은 목록에서 삭제하면 더 이상 메일을 받지 않습니다.
+    </p>
+    <div id="notifyMsg"></div>
+
+    <div class="field">
+      <label for="notifyEmailInput">메일 주소 추가</label>
+      <div class="row">
+        <input type="text" id="notifyEmailInput" placeholder="예) reader@example.com">
+        <div style="display:flex;align-items:flex-end">
+          <button class="primary" id="notifyAddBtn" style="width:100%">추가</button>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:26px">등록된 메일 주소 <span class="tag" id="notifyCount"></span></h2>
+    <div class="scroll">
+      <table id="notifyTable"></table>
+    </div>
+
+    <h2 style="margin-top:26px">발송 메일 내용 미리보기</h2>
+    <p class="hint">실제 발송되는 메일의 제목과 본문입니다. (참여자 인증 앱 주소가 함께 발송됩니다)</p>
+    <pre class="report" id="notifyPreview"></pre>
+
+    <div class="actions">
+      <button id="notifySendTest">지금 테스트 발송</button>
+      <span class="muted">서버(Netlify Scheduled Function)에 발송 기능이 연결되어 있어야 동작합니다. 자세한 설정은 README를 참고하세요.</span>
+    </div>
   </section>
 
   <!-- ── 데이터 ───────────────────────── -->
@@ -187,7 +226,7 @@
 </main>
 
 <footer class="foot">
-  커밍쏜 독서챌린지 운영진 화면 · <span id="footRange"></span>
+  퍼스널메이커스 독서 챌린지 운영진 화면 · <span id="footRange"></span>
 </footer>
 
 <script src="js/config.js"></script>
