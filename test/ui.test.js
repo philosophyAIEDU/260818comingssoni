@@ -157,17 +157,45 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const ec = await page.locator('#entryList .entry').count();
   t('검색어 필터 1건', ec === 1, ec);
 
-  // 알림 메일 탭
+  // 알림 메일 탭 — 일괄 등록
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
-  await page.fill('#notifyEmailInput', 'reader@example.com');
+  await page.fill('#notifyEmailInput', 'reader1@example.com\nreader2@example.com, reader1@example.com\n안녕하세요');
   await page.click('#notifyAddBtn');
   await page.waitForTimeout(300);
-  t('메일 주소 등록됨', /1명/.test(await page.textContent('#notifyCount')));
+  t('일괄 등록 메시지(등록/중복/오류 구분)',
+    /2건 등록 완료/.test(await page.textContent('#notifyMsg')) &&
+    /중복 1건/.test(await page.textContent('#notifyMsg')) &&
+    /형식 오류 1건/.test(await page.textContent('#notifyMsg')),
+    await page.textContent('#notifyMsg'));
+  t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
   t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
   await page.click('[data-delmail]');
   await page.waitForTimeout(300);
-  t('메일 주소 삭제됨', /0명/.test(await page.textContent('#notifyCount')));
+  t('메일 주소 삭제 후 1건 남음', /1명/.test(await page.textContent('#notifyCount')));
+
+  // 알림 메일 제목·본문 편집
+  t('기본 제목 자동 채움', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
+  await page.fill('#notifySubjectInput', '테스트 제목입니다');
+  await page.fill('#notifyBodyInput', '커스텀 본문입니다.\n링크: {{APP_URL}}');
+  await page.waitForTimeout(150);
+  t('편집 중 미리보기 즉시 반영', (await page.textContent('#notifyPreview')).includes('커스텀 본문입니다'));
+  t('플레이스홀더가 앱 주소로 치환됨', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
+  await page.click('#notifyTemplateSave');
+  await page.waitForTimeout(300);
+  t('템플릿 저장 완료 메시지', /저장했습니다/.test(await page.textContent('#notifyTemplateMsg')));
+
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  t('새로고침 후에도 저장한 제목 유지', (await page.inputValue('#notifySubjectInput')) === '테스트 제목입니다');
+
+  await page.click('#notifyTemplateReset');
+  await page.waitForTimeout(150);
+  t('기본값 초기화', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
+  await page.click('#notifyTemplateSave');
+  await page.waitForTimeout(300);
 
   // 데이터 탭
   await page.click('button[data-tab="data"]');

@@ -133,6 +133,14 @@ function t(name, cond, extra) {
   mails = await Store.listNotifyEmails();
   t('메일 삭제', mails.length === 0);
 
+  const bulk = await Store.addNotifyEmails(['a@example.com', 'B@Example.com', 'a@example.com', '이상한값', '']);
+  t('일괄 등록: 등록 2건', bulk.added.length === 2, bulk.added.map(m => m.email));
+  t('일괄 등록: 중복 1건', bulk.skipped.length === 1 && bulk.skipped[0] === 'a@example.com', bulk.skipped);
+  t('일괄 등록: 형식 오류 1건', bulk.invalid.length === 1, bulk.invalid);
+  mails = await Store.listNotifyEmails();
+  t('일괄 등록 후 목록 2건', mails.length === 2, mails.map(m => m.email));
+  for (const m of mails) await Store.removeNotifyEmail(m.id);
+
   // 아웃 처리 후 이후 날짜는 '·'
   await Store.updateParticipant(whale.id, { status: 'out', outDate: '2026-09-01' });
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)

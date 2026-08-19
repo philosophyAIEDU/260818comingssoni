@@ -242,6 +242,23 @@ CS.FirebaseStore = (function () {
     return Object.assign({ id: ref.id }, body);
   }
 
+  /** 줄바꿈/쉼표로 구분된 여러 메일 주소를 한 번에 등록한다. */
+  async function addNotifyEmails(emails) {
+    const existing = new Set((await listNotifyEmails()).map((e) => e.email));
+    const added = [];
+    const skipped = [];
+    const invalid = [];
+    for (const raw of emails) {
+      const clean = String(raw || '').trim().toLowerCase();
+      if (!clean) continue;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) { invalid.push(clean); continue; }
+      if (existing.has(clean)) { skipped.push(clean); continue; }
+      added.push(await addNotifyEmail(clean));
+      existing.add(clean);
+    }
+    return { added, skipped, invalid };
+  }
+
   async function removeNotifyEmail(id) {
     await init();
     await fs.deleteDoc(fs.doc(db, 'notifyEmails', id));
@@ -299,6 +316,6 @@ CS.FirebaseStore = (function () {
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser,
-    listNotifyEmails, addNotifyEmail, removeNotifyEmail
+    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail
   };
 })();
