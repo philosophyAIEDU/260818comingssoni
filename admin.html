@@ -167,12 +167,11 @@
 
     <div class="field">
       <label for="notifyEmailInput">메일 주소 추가</label>
-      <div class="row">
-        <input type="text" id="notifyEmailInput" placeholder="예) reader@example.com">
-        <div style="display:flex;align-items:flex-end">
-          <button class="primary" id="notifyAddBtn" style="width:100%">추가</button>
-        </div>
-      </div>
+      <textarea id="notifyEmailInput" placeholder="예시&#10;reader1@example.com&#10;reader2@example.com&#10;reader3@example.com"></textarea>
+    </div>
+    <div class="actions">
+      <button class="primary" id="notifyAddBtn">메일 주소 등록</button>
+      <span class="muted">한 줄에 하나씩, 또는 쉼표(,)로 구분해 여러 개를 한 번에 등록할 수 있습니다.</span>
     </div>
 
     <h2 style="margin-top:26px">등록된 메일 주소 <span class="tag" id="notifyCount"></span></h2>

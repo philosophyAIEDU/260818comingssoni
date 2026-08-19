@@ -22,6 +22,7 @@
  *   clearAll()                            → Promise<void>
  *   listNotifyEmails()                    → Promise<NotifyEmail[]>
  *   addNotifyEmail(email)                 → Promise<NotifyEmail>
+ *   addNotifyEmails(emails[])             → Promise<{added, skipped, invalid}>
  *   removeNotifyEmail(id)                 → Promise<void>
  *
  *  Participant { id, nickname, status:'active'|'out', joinDate, outDate,
@@ -216,6 +217,7 @@ CS.LocalStore = (function () {
 
   /* ── 인증 알림 메일 수신자 목록 ───────── */
   const N = 'notifyEmails';
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   async function listNotifyEmails() {
     return read(N, []).slice().sort((a, b) => a.email.localeCompare(b.email));
@@ -223,13 +225,34 @@ CS.LocalStore = (function () {
 
   async function addNotifyEmail(email) {
     const clean = String(email || '').trim().toLowerCase();
-    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+    if (!clean || !EMAIL_RE.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
     const all = read(N, []);
     if (all.some((e) => e.email === clean)) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
     const row = { id: CS.U.uid('mail'), email: clean, createdAt: CS.U.nowStamp() };
     all.push(row);
     write(N, all);
     return row;
+  }
+
+  /** 줄바꿈/쉼표로 구분된 여러 메일 주소를 한 번에 등록한다. */
+  async function addNotifyEmails(emails) {
+    const all = read(N, []);
+    const existing = new Set(all.map((e) => e.email));
+    const added = [];
+    const skipped = [];
+    const invalid = [];
+    for (const raw of emails) {
+      const clean = String(raw || '').trim().toLowerCase();
+      if (!clean) continue;
+      if (!EMAIL_RE.test(clean)) { invalid.push(clean); continue; }
+      if (existing.has(clean)) { skipped.push(clean); continue; }
+      const row = { id: CS.U.uid('mail'), email: clean, createdAt: CS.U.nowStamp() };
+      all.push(row);
+      existing.add(clean);
+      added.push(row);
+    }
+    write(N, all);
+    return { added, skipped, invalid };
   }
 
   async function removeNotifyEmail(id) {
@@ -264,7 +287,7 @@ CS.LocalStore = (function () {
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
-    listNotifyEmails, addNotifyEmail, removeNotifyEmail
+    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail
   };
 })();
 

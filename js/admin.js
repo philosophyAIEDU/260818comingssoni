@@ -539,10 +539,16 @@
 
   async function addNotifyEmail() {
     const input = $('notifyEmailInput');
+    const raw = input.value;
+    const list = raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    if (!list.length) { msg($('notifyMsg'), '등록할 메일 주소를 입력해 주세요.', 'warn'); return; }
     try {
-      await Store.addNotifyEmail(input.value);
+      const { added, skipped, invalid } = await Store.addNotifyEmails(list);
       input.value = '';
-      msg($('notifyMsg'), '메일 주소를 추가했습니다.', 'ok');
+      const parts = [`${added.length}건 등록 완료`];
+      if (skipped.length) parts.push(`중복 ${skipped.length}건 건너뜀 (${esc(skipped.join(', '))})`);
+      if (invalid.length) parts.push(`형식 오류 ${invalid.length}건 건너뜀 (${esc(invalid.join(', '))})`);
+      msg($('notifyMsg'), parts.join(' · '), added.length ? 'ok' : 'warn');
       await refreshNotify();
     } catch (e) {
       msg($('notifyMsg'), esc(e.message), 'bad');
@@ -672,7 +678,6 @@
     });
 
     $('notifyAddBtn').addEventListener('click', addNotifyEmail);
-    $('notifyEmailInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNotifyEmail(); });
     $('notifySendTest').addEventListener('click', sendNotifyTest);
 
     $('notifyTemplateSave').addEventListener('click', saveNotifyTemplate);
