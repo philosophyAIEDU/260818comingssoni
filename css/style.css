@@ -168,18 +168,13 @@ button.small { font-size: 12.5px; padding: 5px 10px; font-weight: 500; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-/* 인증 폼 액션: 인증하기 버튼을 가운데·크게, 삭제 버튼은 그보다 작게 */
+/* 인증 폼 액션: 인증하기 버튼을 가운데·크게 */
 .form-actions { justify-content: center; text-align: center; }
 .form-actions .btn-verify {
-  order: 2; font-size: 17px; padding: 15px 48px; border-radius: 999px;
+  font-size: 17px; padding: 15px 48px; border-radius: 999px;
   box-shadow: 0 5px 16px rgba(16, 45, 132, 0.35);
 }
-.form-actions .btn-delete {
-  order: 1; font-size: 12.5px; padding: 7px 16px; color: var(--bad);
-  border-color: var(--bad); background: transparent;
-}
-.form-actions .btn-delete:hover { background: var(--bad-soft); }
-.form-actions #draftNote { order: 3; flex-basis: 100%; }
+.form-actions #draftNote { flex-basis: 100%; }
 
 
 /* ── 알림 ─────────────────────────────── */
@@ -356,14 +351,15 @@ footer.foot {
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
 
 /* ── 인증 피드 ────────────────────────── */
-.feed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.feed-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
 .feed-head h2 { margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.feed-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 button.ghost { background: transparent; }
 .winner-badge { display: block; margin-bottom: 10px; font-weight: 700; padding: 6px 10px; text-align: center; }
 .winner-badge[hidden] { display: none; }
 
 /* 인증 피드 탭 (날짜별 보기 / 전체 보기) */
-.feed-tabs { display: flex; gap: 6px; margin: 10px 0 4px; }
+.feed-tabs { display: flex; gap: 6px; }
 .feed-tabs button {
   border-radius: 999px; font-weight: 600; font-size: 12.5px; padding: 6px 14px;
   background: var(--surface-2);
@@ -467,9 +463,7 @@ button.ghost { background: transparent; }
   .actions { gap: 8px; }
   .actions button { flex: 1 1 auto; min-height: 44px; }
   .actions .muted { flex-basis: 100%; }
-  .form-actions { flex-direction: column-reverse; }
   .form-actions .btn-verify { flex: 1 1 100%; width: 100%; }
-  .form-actions .btn-delete { flex: 0 0 auto; align-self: center; min-height: 38px; }
 
   .entry dl { grid-template-columns: 1fr; gap: 2px; }
   .entry dt { margin-top: 6px; }

@@ -88,11 +88,14 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.click('#submitBtn');
   await page.waitForTimeout(400);
 
-  // ── 참가자 화면: 삭제 버튼 라벨 & 전체 진행현황 ──
-  t('삭제 버튼 라벨', (await page.textContent('#resetBtn')).trim() === '삭제');
+  // ── 참가자 화면: 삭제 버튼 제거 & 전체 진행현황 ──
+  t('삭제 버튼 없음', (await page.locator('#resetBtn').count()) === 0);
+  t('인증하기 버튼만 남음', (await page.textContent('#submitBtn')).includes('인증'));
   const overallRows = await page.locator('#overallTable tbody tr').count();
   t('전체 진행현황 행 4개', overallRows === 4, overallRows);
   t('전체 진행현황에 참가자 이름 노출', (await page.textContent('#overallTable')).includes('밤톨'));
+  t('평균 인증률 타일 제거됨', (await page.locator('#ovAvgRate').count()) === 0);
+  t('킥아웃 위험 인원 라벨로 변경', (await page.textContent('#overallStats')).includes('킥아웃 위험 인원'));
 
   // ── 인증 피드: 전체 보기 탭 ──
   await page.click('button[data-feedtab="all"]');
@@ -201,6 +204,37 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.click('button[data-tab="data"]');
   await page.waitForTimeout(200);
   t('저장소 표기', (await page.textContent('#backendTag')).includes('localStorage'));
+
+  // ── 참가자 화면: 문구/구조 점검 (진행 중 상태) ──
+  await page.goto(BASE + '/index.html');
+  await page.waitForTimeout(400);
+  t('브랜드 서브타이틀 제거됨', (await page.locator('#brandSub').count()) === 0);
+  const sentencePh = await page.getAttribute('#sentence', 'placeholder');
+  t('예시 placeholder에 중복 안내문 없음', sentencePh.startsWith('ex)'), sentencePh.slice(0, 30));
+  const rulesText = await page.textContent('.wrap section.card:last-of-type');
+  t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
+  t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
+  const rulesLis = await page.locator('.wrap section.card:last-of-type ul.muted li').count();
+  t('규칙 목록 3개', rulesLis === 3, rulesLis);
+  t('전체 진행현황 3개 지표만 노출', (await page.locator('#overallStats .stat').count()) === 3);
+
+  // ── 참가자 화면: 챌린지 시작 전(before) 상태의 안내 위치 ──
+  const beforeCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await beforeCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(4)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(32)}'`)
+               .replace(/otAt: '[^']+'/, `otAt: '${shift(3)}T10:00'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const beforePage = await beforeCtx.newPage();
+  await beforePage.goto(BASE + '/index.html');
+  await beforePage.waitForTimeout(400);
+  t('시작 전: 안내가 책 소개 카드 안에 노출', /D-4/.test(await beforePage.textContent('#introPhaseNote')));
+  t('시작 전: 상단 phaseNote는 비어 있음(중복 노출 없음)', (await beforePage.textContent('#phaseNote')).trim() === '');
+  await beforeCtx.close();
 
   // 모바일 뷰포트에서 가로 스크롤 없는지
   const m = await ctx.newPage();

@@ -14,7 +14,6 @@
   let allFeedVisibleCount = FEED_PAGE_SIZE;
   let feedTab = 'date';
   let currentPid = '';
-  let currentSubmission = null;
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -36,7 +35,6 @@
   /* ── 헤더 / 배너 ─────────────────────── */
   function paintHeader() {
     $('brandTitle').textContent = CONFIG.title;
-    $('brandSub').textContent = CONFIG.subtitle;
     $('kickN').textContent = CONFIG.kickoutThreshold;
     $('footRange').textContent =
       `${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)}`;
@@ -65,24 +63,23 @@
     const p = U.phase();
     const box = $('phaseNote');
     const open = canSubmitToday();
-    const ruleNote = $('rulesPhaseNote');
+    const introNote = $('introPhaseNote');
 
     if (p === 'before') {
       const d = U.diffDays(U.today(), CONFIG.startDate);
       msg(box, '');
-      ruleNote.innerHTML = `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
+      msg(introNote, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
         `OT는 ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시입니다. ` +
         (open
           ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
-          : '인증은 시작일부터 제출할 수 있어요.');
-      ruleNote.hidden = false;
+          : '인증은 시작일부터 제출할 수 있어요.'), 'info');
     } else if (p === 'after') {
       msg(box, `챌린지가 <strong>${U.longLabel(CONFIG.endDate)}</strong>에 종료되었습니다. ` +
         `4주간 고생 많으셨습니다! 🎉 아래에서 이름을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
-      ruleNote.hidden = true;
+      msg(introNote, '');
     } else {
       msg(box, '');
-      ruleNote.hidden = true;
+      msg(introNote, '');
     }
 
     if (!open) {
@@ -185,7 +182,7 @@
     currentPid = pid;
     const card = $('myCard');
     if (!pid) {
-      card.hidden = true; msg($('formMsg'), ''); currentSubmission = null;
+      card.hidden = true; msg($('formMsg'), '');
       await refreshSocialFeed();
       await refreshAllFeed();
       return;
@@ -193,7 +190,6 @@
 
     const today = U.today();
     const existing = await Store.getSubmission(pid, today);
-    currentSubmission = existing || null;
 
     if (existing) {
       $('sentence').value = existing.sentence || '';
@@ -568,14 +564,14 @@
 
     const active = stats.filter((s) => s.participant.status !== 'out');
     const todayDone = active.filter((s) => s.submittedToday).length;
-    const avgRate = active.length
-      ? Math.round(active.reduce((sum, s) => sum + s.rate, 0) / active.length) : 0;
+    // 킥아웃 위험 인원: 아직 킥아웃 기준(missed>=kickoutThreshold)에는 못 미쳤지만
+    // 누적 미인증이 3~4회로 임박한 사람 (실제 킥아웃 대상은 아래 표의 '킥아웃 대상' 태그 참고)
+    const riskZone = active.filter((s) => s.missed === 3 || s.missed === 4).length;
 
     $('overallCount').textContent = `${active.length}명`;
     $('ovToday').textContent = active.length ? `${Math.round((todayDone / active.length) * 100)}%` : '0%';
-    $('ovAvgRate').textContent = `${avgRate}%`;
     $('ovActive').textContent = active.length;
-    $('ovRisk').textContent = active.filter((s) => s.atRisk).length;
+    $('ovRisk').textContent = riskZone;
 
     const head = '<thead><tr><th>이름</th><th class="num">인증</th><th class="num">미인증</th>' +
       '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
@@ -626,7 +622,7 @@
 
     $('submitBtn').disabled = true;
     try {
-      currentSubmission = await Store.saveSubmission(payload);
+      await Store.saveSubmission(payload);
       clearDraft(pid);
       msg($('formMsg'),
         `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다. 오늘도 수고하셨어요! 📖`, 'ok');
@@ -662,36 +658,6 @@
     $('participant').addEventListener('change', onSelect);
     $('participantSearch').addEventListener('input', renderParticipantOptions);
     $('verifyForm').addEventListener('submit', onSubmit);
-    $('resetBtn').addEventListener('click', async () => {
-      const pid = $('participant').value;
-      if (currentSubmission) {
-        if (!confirm('오늘 제출한 인증을 삭제할까요? 삭제하면 되돌릴 수 없습니다.')) return;
-        try {
-          await Store.removeSubmission(currentSubmission.id);
-          currentSubmission = null;
-          ['sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
-          autoGrow($('sentence'));
-          autoGrow($('reflection'));
-          if (pid) clearDraft(pid);
-          if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
-          msg($('formMsg'), '인증을 삭제했습니다. 다시 작성해 제출할 수 있습니다.', 'warn');
-          if (pid) await paintMine(pid);
-          await paintOverall();
-          feedDate = U.today();
-          feedVisibleCount = FEED_PAGE_SIZE;
-          await refreshSocialFeed();
-          await refreshAllFeed();
-          await calculateRanksAndFame();
-        } catch (err) {
-          msg($('formMsg'), `삭제 실패: ${esc(err.message)}`, 'bad');
-        }
-      } else {
-        ['sentence', 'reflection'].forEach((k) => { $(k).value = ''; });
-        autoGrow($('sentence'));
-        autoGrow($('reflection'));
-        if (pid) clearDraft(pid);
-      }
-    });
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));
     ['sentence', 'reflection'].forEach((k) =>
