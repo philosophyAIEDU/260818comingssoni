@@ -22,7 +22,6 @@
         <img class="brand-logo" src="logo.png" alt="퍼스널메이커스 로고">
         <div class="brand-text">
           <h1 id="brandTitle">독서 챌린지 인증 시스템</h1>
-          <p id="brandSub"></p>
         </div>
       </div>
       <nav class="navlinks">
@@ -40,6 +39,7 @@
       <div class="intro-body">
         <h2>프로세스 이코노미</h2>
         <p class="author">오바라 가즈히로 지음</p>
+        <div id="introPhaseNote"></div>
         <p class="meta">
           📅 <strong>챌린지 기간</strong> 2026년 8월 24일(월) ~ 9월 20일(일), 4주간<br>
           📢 <strong>오티(OT)</strong> 2026년 8월 23일(일) 오전 10시
@@ -89,7 +89,7 @@
 
         <div class="field">
           <label for="sentence">오늘 읽은 챕터에서 가장 인상 깊었던 핵심 내용을 적어주세요</label>
-          <textarea id="sentence" placeholder="가장 인상 깊었던 핵심 내용을 적거나 요약해주세요.&#10;ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. 흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. 그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 되어 응원해주는 것이다. - 185쪽" required></textarea>
+          <textarea id="sentence" placeholder="ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. 흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. 그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 되어 응원해주는 것이다. - 185쪽" required></textarea>
         </div>
 
         <div class="field">
@@ -98,7 +98,6 @@
         </div>
 
         <div class="actions form-actions">
-          <button type="button" id="resetBtn" class="btn-delete">삭제</button>
           <button type="submit" class="primary btn-verify" id="submitBtn">인증하기</button>
           <span class="muted" id="draftNote"></span>
         </div>
@@ -109,14 +108,15 @@
     <section class="card feed-card">
       <div class="feed-head">
         <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
-        <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
+        <div class="feed-head-actions">
+          <div class="feed-tabs" id="feedTabs">
+            <button type="button" class="on" data-feedtab="date">날짜별 보기</button>
+            <button type="button" data-feedtab="all">전체 보기</button>
+          </div>
+          <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
+        </div>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨가며 다른 날의 인증글을 볼 수 있습니다. 좋은 글에 엄지척(👍)을 눌러주세요! (다시 누르면 취소됩니다)</p>
-
-      <div class="feed-tabs" id="feedTabs">
-        <button type="button" class="on" data-feedtab="date">날짜별 보기</button>
-        <button type="button" data-feedtab="all">전체 보기</button>
-      </div>
+      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 확인할 수 있습니다. 전체보기를 통해 일자별 다른 분들의 인사이트를 한눈에 볼 수 있습니다.</p>
 
       <div id="feedDateView">
         <div class="feed-datenav">
@@ -164,17 +164,13 @@
           <div class="n" id="ovToday">0%</div>
           <div class="k">오늘 인증률</div>
         </div>
-        <div class="stat ok">
-          <div class="n" id="ovAvgRate">0%</div>
-          <div class="k">평균 인증률</div>
-        </div>
         <div class="stat">
           <div class="n" id="ovActive">0</div>
           <div class="k">참여중</div>
         </div>
         <div class="stat bad">
           <div class="n" id="ovRisk">0</div>
-          <div class="k">킥아웃 대상</div>
+          <div class="k">킥아웃 위험 인원</div>
         </div>
       </div>
 
@@ -230,11 +226,9 @@
     <section class="card">
       <h2>안내 · 챌린지 규칙</h2>
       <ul class="muted">
-        <li>참여 아이디는 드롭다운에서 선택합니다.</li>
-        <li>마감은 <strong>24시 정각</strong>, 유예 없음.</li>
-        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃 대상이 됩니다. 개인적인 사정으로 인증이 어려운 날엔 최소 3주일 전 운영진께 요청주세요.</li>
-        <li>같은 날 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복 인증으로 쌓이지 않습니다)</li>
-        <li id="rulesPhaseNote" hidden></li>
+        <li>마감은 <strong>24시 정각</strong>입니다. 지각 시 누락으로 체크되니 유의해주세요.</li>
+        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
+        <li>같은 날 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.)</li>
       </ul>
     </section>
 
