@@ -21,15 +21,15 @@
  *   exportAll() / importAll(obj)          → Promise<object|void>
  *   clearAll()                            → Promise<void>
  *   listNotifyEmails()                    → Promise<NotifyEmail[]>
- *   addNotifyEmail(email)                 → Promise<NotifyEmail>
- *   addNotifyEmails(emails[])             → Promise<{added, skipped, invalid}>
+ *   addNotifyEmail(name, email)           → Promise<NotifyEmail>
+ *   addNotifyEmails({name,email}[])       → Promise<{added, skipped, invalid}>
  *   removeNotifyEmail(id)                 → Promise<void>
  *
  *  Participant { id, nickname, status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
- *  NotifyEmail { id, email, createdAt }
+ *  NotifyEmail { id, name, email, createdAt }
  * ───────────────────────────────────────────────────────────
  */
 window.CS = window.CS || {};
@@ -223,30 +223,33 @@ CS.LocalStore = (function () {
     return read(N, []).slice().sort((a, b) => a.email.localeCompare(b.email));
   }
 
-  async function addNotifyEmail(email) {
+  async function addNotifyEmail(name, email) {
     const clean = String(email || '').trim().toLowerCase();
     if (!clean || !EMAIL_RE.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
     const all = read(N, []);
     if (all.some((e) => e.email === clean)) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
-    const row = { id: CS.U.uid('mail'), email: clean, createdAt: CS.U.nowStamp() };
+    const row = { id: CS.U.uid('mail'), name: CS.U.normalizeNick(name), email: clean, createdAt: CS.U.nowStamp() };
     all.push(row);
     write(N, all);
     return row;
   }
 
-  /** 줄바꿈/쉼표로 구분된 여러 메일 주소를 한 번에 등록한다. */
-  async function addNotifyEmails(emails) {
+  /** 줄바꿈으로 구분된 { name, email } 목록을 한 번에 등록한다. */
+  async function addNotifyEmails(entries) {
     const all = read(N, []);
     const existing = new Set(all.map((e) => e.email));
     const added = [];
     const skipped = [];
     const invalid = [];
-    for (const raw of emails) {
-      const clean = String(raw || '').trim().toLowerCase();
+    for (const entry of entries) {
+      const clean = String((entry && entry.email) || '').trim().toLowerCase();
       if (!clean) continue;
       if (!EMAIL_RE.test(clean)) { invalid.push(clean); continue; }
       if (existing.has(clean)) { skipped.push(clean); continue; }
-      const row = { id: CS.U.uid('mail'), email: clean, createdAt: CS.U.nowStamp() };
+      const row = {
+        id: CS.U.uid('mail'), name: CS.U.normalizeNick(entry && entry.name),
+        email: clean, createdAt: CS.U.nowStamp()
+      };
       all.push(row);
       existing.add(clean);
       added.push(row);

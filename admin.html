@@ -166,12 +166,12 @@
     <div id="notifyMsg"></div>
 
     <div class="field">
-      <label for="notifyEmailInput">메일 주소 추가</label>
-      <textarea id="notifyEmailInput" placeholder="예시&#10;reader1@example.com&#10;reader2@example.com&#10;reader3@example.com"></textarea>
+      <label for="notifyEmailInput">이름 · 메일 주소 추가</label>
+      <textarea id="notifyEmailInput" placeholder="예시&#10;홍길동, reader1@example.com&#10;김철수, reader2@example.com&#10;이영희, reader3@example.com"></textarea>
     </div>
     <div class="actions">
-      <button class="primary" id="notifyAddBtn">메일 주소 등록</button>
-      <span class="muted">한 줄에 하나씩, 또는 쉼표(,)로 구분해 여러 개를 한 번에 등록할 수 있습니다.</span>
+      <button class="primary" id="notifyAddBtn">등록</button>
+      <span class="muted">한 줄에 "이름, 메일 주소" 형식으로 하나씩 붙여넣으면 여러 명을 한 번에 등록할 수 있습니다. 엑셀에서 이름·메일 두 열을 복사해 그대로 붙여넣어도 됩니다.</span>
     </div>
 
     <h2 style="margin-top:26px">등록된 메일 주소 <span class="tag" id="notifyCount"></span></h2>
@@ -181,8 +181,9 @@
 
     <h2 style="margin-top:26px">발송 메일 제목 · 본문 편집</h2>
     <p class="hint">
-      제목과 본문을 자유롭게 수정할 수 있습니다. 본문에 <code>{{APP_URL}}</code>이라고 적으면
-      인증 앱 주소(<code id="notifyAppUrlHint"></code>)로 자동 치환되어 발송됩니다. 저장하면 다음 발송부터 바로 반영됩니다.
+      제목과 본문을 자유롭게 수정할 수 있습니다. 본문에 <code>{{NAME}}</code>이라고 적으면 받는 분의 <strong>이름</strong>으로,
+      <code>{{APP_URL}}</code>이라고 적으면 인증 앱 주소(<code id="notifyAppUrlHint"></code>)로 자동 치환되어
+      <strong>사람마다 개인화되어</strong> 발송됩니다. 저장하면 다음 발송부터 바로 반영됩니다.
     </p>
     <div id="notifyTemplateMsg"></div>
 

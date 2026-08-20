@@ -120,21 +120,29 @@ function t(name, cond, extra) {
   t('추천한 적 없는 취소 거부', !!unvoteErr, unvoteErr);
 
   console.log('— 인증 알림 메일 목록 —');
-  await Store.addNotifyEmail('Reader@Example.com');
+  await Store.addNotifyEmail('소니', 'Reader@Example.com');
   let mailDupErr = null;
-  try { await Store.addNotifyEmail('reader@example.com'); } catch (e) { mailDupErr = e.message; }
+  try { await Store.addNotifyEmail('소니', 'reader@example.com'); } catch (e) { mailDupErr = e.message; }
   t('메일 소문자 정규화 + 중복 거부', !!mailDupErr, mailDupErr);
   let mailFormatErr = null;
-  try { await Store.addNotifyEmail('not-an-email'); } catch (e) { mailFormatErr = e.message; }
+  try { await Store.addNotifyEmail('소니', 'not-an-email'); } catch (e) { mailFormatErr = e.message; }
   t('메일 형식 검증', !!mailFormatErr, mailFormatErr);
   let mails = await Store.listNotifyEmails();
-  t('메일 목록 1건', mails.length === 1 && mails[0].email === 'reader@example.com', mails);
+  t('메일 목록 1건 (이름 포함)', mails.length === 1 && mails[0].email === 'reader@example.com'
+    && mails[0].name === '소니', mails);
   await Store.removeNotifyEmail(mails[0].id);
   mails = await Store.listNotifyEmails();
   t('메일 삭제', mails.length === 0);
 
-  const bulk = await Store.addNotifyEmails(['a@example.com', 'B@Example.com', 'a@example.com', '이상한값', '']);
+  const bulk = await Store.addNotifyEmails([
+    { name: '커밍쏜', email: 'a@example.com' },
+    { name: '책읽는고래', email: 'B@Example.com' },
+    { name: '중복', email: 'a@example.com' },
+    { name: '', email: '이상한값' },
+    { name: '', email: '' }
+  ]);
   t('일괄 등록: 등록 2건', bulk.added.length === 2, bulk.added.map(m => m.email));
+  t('일괄 등록: 이름도 함께 저장됨', bulk.added.every(m => m.name), bulk.added.map(m => m.name));
   t('일괄 등록: 중복 1건', bulk.skipped.length === 1 && bulk.skipped[0] === 'a@example.com', bulk.skipped);
   t('일괄 등록: 형식 오류 1건', bulk.invalid.length === 1, bulk.invalid);
   mails = await Store.listNotifyEmails();

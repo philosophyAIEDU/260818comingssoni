@@ -452,13 +452,13 @@
   /* ── 알림 메일 ───────────────────────── */
 
   // 운영진이 아직 한 번도 저장한 적 없을 때 쓰이는 기본 제목·본문.
-  // 본문의 {{APP_URL}}은 발송 시 CONFIG.appUrl로 치환됩니다.
+  // 본문의 {{NAME}}은 받는 분 이름으로, {{APP_URL}}은 CONFIG.appUrl로 발송 시 치환됩니다.
   function defaultNotifySubject() {
     return `[${CONFIG.title}] 오늘 인증하셨나요? 📖`;
   }
   function defaultNotifyBody() {
     return [
-      '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
+      '안녕하세요, {{NAME}}님! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
       '마감은 24시 정각이며 유예 시간은 없습니다.',
       '',
       '인증하러 가기 → {{APP_URL}}',
@@ -473,16 +473,19 @@
 
   function paintNotifyPreview() {
     const subject = $('notifySubjectInput').value || defaultNotifySubject();
-    const body = ($('notifyBodyInput').value || defaultNotifyBody()).split('{{APP_URL}}').join(CONFIG.appUrl);
-    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}`;
+    const body = ($('notifyBodyInput').value || defaultNotifyBody())
+      .split('{{APP_URL}}').join(CONFIG.appUrl)
+      .split('{{NAME}}').join('OO'); // 미리보기는 특정 수신자가 없으므로 예시 이름으로 대체 표시
+    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}\n\n※ 실제 발송 시 {{NAME}}은 받는 분 각자의 이름으로 바뀝니다.`;
   }
 
   function paintNotify() {
     $('notifyCount').textContent = `${notifyEmails.length}명`;
     const t = $('notifyTable');
     t.innerHTML = notifyEmails.length
-      ? `<thead><tr><th>메일 주소</th><th>등록일</th><th></th></tr></thead><tbody>${
+      ? `<thead><tr><th>이름</th><th>메일 주소</th><th>등록일</th><th></th></tr></thead><tbody>${
         notifyEmails.map((e) => `<tr>
+          <td>${e.name ? esc(e.name) : '<span class="muted">(이름 없음)</span>'}</td>
           <td>${esc(e.email)}</td>
           <td class="muted">${esc(U.stampLabel(e.createdAt))}</td>
           <td><button class="small danger" data-delmail="${esc(e.id)}">삭제</button></td>
@@ -537,13 +540,20 @@
     msg($('notifyTemplateMsg'), '기본값으로 채웠습니다. [저장]을 눌러야 실제로 반영됩니다.', 'warn');
   }
 
+  /** "이름, 메일" 한 줄씩(엑셀에서 두 열을 복사하면 탭으로도 구분됨)을 { name, email } 목록으로 변환 */
+  function parseNotifyLines(raw) {
+    return raw.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+      const parts = line.split(/\t|,/).map((s) => s.trim()).filter(Boolean);
+      return parts.length >= 2 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] || '' };
+    });
+  }
+
   async function addNotifyEmail() {
     const input = $('notifyEmailInput');
-    const raw = input.value;
-    const list = raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
-    if (!list.length) { msg($('notifyMsg'), '등록할 메일 주소를 입력해 주세요.', 'warn'); return; }
+    const entries = parseNotifyLines(input.value);
+    if (!entries.length) { msg($('notifyMsg'), '등록할 이름과 메일 주소를 입력해 주세요.', 'warn'); return; }
     try {
-      const { added, skipped, invalid } = await Store.addNotifyEmails(list);
+      const { added, skipped, invalid } = await Store.addNotifyEmails(entries);
       input.value = '';
       const parts = [`${added.length}건 등록 완료`];
       if (skipped.length) parts.push(`중복 ${skipped.length}건 건너뜀 (${esc(skipped.join(', '))})`);
@@ -564,7 +574,9 @@
       const res = await fetch('/.netlify/functions/send-daily-reminder-test', { method: 'POST' });
       if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
       const data = await res.json().catch(() => ({}));
-      msg($('notifyMsg'), `테스트 발송 완료 (${data.sent != null ? `${data.sent}건` : '완료'})`, 'ok');
+      const failedNote = data.failed ? ` · 실패 ${data.failed}건` : '';
+      msg($('notifyMsg'), `테스트 발송 완료 (${data.sent != null ? `${data.sent}건` : '완료'}${failedNote})`,
+        data.failed ? 'warn' : 'ok');
     } catch (e) {
       msg($('notifyMsg'),
         `테스트 발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정되어 있는지 확인해 주세요. (README 참고)`, 'bad');
