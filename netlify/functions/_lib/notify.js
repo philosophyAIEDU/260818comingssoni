@@ -1,7 +1,8 @@
 /* 인증 알림 메일 발송 공통 로직 (지메일 SMTP 사용 — 별도 발송 서비스 비용 없음)
  *
- * send-daily-reminder.js(매일 밤 22시 예약 실행)와
- * send-daily-reminder-test.js(운영진 화면의 "지금 테스트 발송" 버튼)가 함께 사용합니다.
+ * send-daily-reminder.js(매일 밤 22시 예약 실행),
+ * send-daily-reminder-test.js(운영진 화면의 "지금 테스트 발송" 버튼),
+ * send-custom-email.js(운영진 화면의 "특정 대상에게 1회성 안내 메일 보내기")가 함께 사용합니다.
  *
  * 필요한 환경 변수 (Netlify 사이트 설정 → Environment variables)
  *   GMAIL_USER          발신용 지메일 주소. 예) yourname@gmail.com
@@ -92,19 +93,21 @@ function buildEmail(template) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 지메일 SMTP로 등록된 수신자 전원에게 메일을 한 통씩 발송한다. */
-async function sendViaGmail(recipients) {
+/** GMAIL_USER / GMAIL_APP_PASSWORD 환경 변수를 확인하고 지메일 SMTP 전송기를 만든다. */
+function getTransporter() {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) {
     throw new Error('GMAIL_USER / GMAIL_APP_PASSWORD 환경 변수가 설정되어 있지 않습니다.');
   }
+  return { transporter: nodemailer.createTransport({ service: 'gmail', auth: { user, pass } }), user };
+}
+
+/** 지메일 SMTP로 등록된 수신자 전원에게 메일을 한 통씩 발송한다. */
+async function sendViaGmail(recipients) {
+  const { transporter, user } = getTransporter();
   if (!recipients.length) return { sent: 0, failed: 0 };
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass }
-  });
   const template = await fetchNotifyTemplate();
 
   let sent = 0;
@@ -133,4 +136,35 @@ async function runNotification() {
   return sendViaGmail(recipients);
 }
 
-module.exports = { runNotification, fetchNotifyEmails, buildEmail, fetchNotifyTemplate };
+/** 운영진이 [알림 메일] 탭에서 이름으로 검색해 고른 사람 한 명에게, 직접 적은 제목·본문으로
+ *  메일 1통을 보낸다. 매일 밤 자동 발송되는 인증 알림과는 별개의 1회성 안내용.
+ *  임의의 주소로 발송되는 것을 막기 위해, notifyEmails 컬렉션에 이미 등록된 주소로만 보낼 수 있다. */
+async function sendOneOffEmail({ email, subject, body }) {
+  const to = (email || '').trim();
+  const cleanSubject = (subject || '').trim();
+  const cleanBody = (body || '').trim();
+  if (!to || !cleanSubject || !cleanBody) {
+    throw new Error('받는 사람, 제목, 본문을 모두 입력해 주세요.');
+  }
+
+  const recipients = await fetchNotifyEmails();
+  const known = recipients.find((r) => r.email.toLowerCase() === to.toLowerCase());
+  if (!known) {
+    throw new Error('등록된 메일 주소 목록에서 찾을 수 없는 수신자입니다. [알림 메일] 탭에서 먼저 등록해 주세요.');
+  }
+
+  const { transporter, user } = getTransporter();
+  const html = cleanBody.split('\n').map((line) => `<p>${line || '&nbsp;'}</p>`).join('\n');
+  await transporter.sendMail({
+    from: `"${CHALLENGE_TITLE}" <${user}>`,
+    to: known.email,
+    subject: cleanSubject,
+    text: cleanBody,
+    html
+  });
+  return { sent: 1, email: known.email, name: known.name };
+}
+
+module.exports = {
+  runNotification, fetchNotifyEmails, buildEmail, fetchNotifyTemplate, sendOneOffEmail
+};

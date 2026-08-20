@@ -175,6 +175,26 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
   t('이름이 목록에 표시됨', (await page.textContent('#notifyTable')).includes('홍길동'));
   t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
+
+  // 특정 대상에게 1회성 안내 메일 — 이름 검색 + 선택
+  await page.fill('#customMailSearch', '홍길동');
+  await page.waitForTimeout(150);
+  t('이름 검색 결과에 대상 표시', (await page.textContent('#customMailResults')).includes('reader1@example.com'));
+  await page.click('#customMailResults [data-pickmail]');
+  await page.waitForTimeout(100);
+  t('대상 선택 시 폼 표시', await page.isVisible('#customMailForm'));
+  t('받는 사람에 이름·메일 표시', (await page.textContent('#customMailTarget')).includes('홍길동')
+    && (await page.textContent('#customMailTarget')).includes('reader1@example.com'));
+  t('본문에 받는 사람 이름 초안 채움', (await page.inputValue('#customMailBody')).includes('홍길동님'));
+  await page.click('#customMailCancelBtn');
+  await page.waitForTimeout(100);
+  t('취소 시 폼 다시 숨김', !(await page.isVisible('#customMailForm')));
+
+  await page.fill('#customMailSearch', '존재하지않는이름');
+  await page.waitForTimeout(150);
+  t('일치하는 이름 없을 때 안내', (await page.textContent('#customMailResults')).includes('일치하는 이름이 없습니다'));
+  await page.fill('#customMailSearch', '');
+
   await page.click('[data-delmail]');
   await page.waitForTimeout(300);
   t('메일 주소 삭제 후 1건 남음', /1명/.test(await page.textContent('#notifyCount')));
