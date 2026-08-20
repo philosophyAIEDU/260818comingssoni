@@ -218,7 +218,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
   t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
   const rulesLis = await page.locator('.wrap section.card:last-of-type ul.muted li').count();
-  t('규칙 목록 3개', rulesLis === 3, rulesLis);
+  t('규칙 목록 4개(지각 백필 안내 포함)', rulesLis === 4, rulesLis);
   t('전체 진행현황 3개 지표만 노출', (await page.locator('#overallStats .stat').count()) === 3);
 
   // ── 참가자 화면: 챌린지 시작 전(before) 상태의 안내 위치 ──
@@ -238,6 +238,56 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('시작 전: 안내가 책 소개 카드 안에 노출', /D-4/.test(await beforePage.textContent('#introPhaseNote')));
   t('시작 전: 상단 phaseNote는 비어 있음(중복 노출 없음)', (await beforePage.textContent('#phaseNote')).trim() === '');
   await beforeCtx.close();
+
+  // ── 참가자 화면: 인증할 날짜 드롭다운 & 지각 백필은 계속 미인증 ──
+  const dayCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await dayCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const dayPage = await dayCtx.newPage();
+
+  await dayPage.goto(BASE + '/admin.html');
+  await dayPage.waitForTimeout(400);
+  await dayPage.click('button[data-tab="roster"]');
+  await dayPage.fill('#bulkNames', '지각이');
+  await dayPage.click('#bulkAdd');
+  await dayPage.waitForTimeout(300);
+
+  await dayPage.goto(BASE + '/index.html');
+  await dayPage.waitForTimeout(400);
+  const dayOptCount = await dayPage.locator('#certifyDate option').count();
+  t('인증 날짜 드롭다운에 여러 날짜 존재', dayOptCount >= 5, dayOptCount);
+  t('날짜 드롭다운 기본값 = 오늘', (await dayPage.locator('#certifyDate option:checked').textContent()).includes('오늘'));
+  t('오늘 선택 시 지각 경고 숨김', await dayPage.isHidden('#certifyDateWarn'));
+
+  await dayPage.selectOption('#participant', { label: '지각이' });
+  await dayPage.waitForTimeout(300);
+
+  // 목록 맨 앞(가장 이른 날짜, 즉 과거)을 선택 → 지각 경고가 바로 보여야 함
+  await dayPage.selectOption('#certifyDate', { index: 0 });
+  await dayPage.waitForTimeout(200);
+  t('과거 날짜 선택 시 지각 경고 노출', await dayPage.isVisible('#certifyDateWarn'));
+  const pastDateValue = await dayPage.inputValue('#certifyDate');
+
+  await dayPage.fill('#sentence', '늦게라도 기록 남김');
+  await dayPage.fill('#reflection', '지각이지만 남겨봄');
+  await dayPage.click('#submitBtn');
+  await dayPage.waitForTimeout(400);
+  t('지각 제출 안내 메시지', /미인증\(X\)으로 집계/.test(await dayPage.textContent('#formMsg')));
+  t('피드에 지각 배지 노출', (await dayPage.textContent('#socialFeedList')).includes('지각'));
+
+  await dayPage.goto(BASE + '/admin.html');
+  await dayPage.waitForTimeout(500);
+  const lateRow = dayPage.locator('#matrix tbody tr', { hasText: '지각이' });
+  const lateCell = lateRow.locator(`.cell[data-date="${pastDateValue}"]`);
+  t('지각 백필은 운영진 매트릭스에서도 미인증(X)으로 집계',
+    (await lateCell.getAttribute('class')).includes('cell-x'));
+  await dayCtx.close();
 
   // 모바일 뷰포트에서 가로 스크롤 없는지
   const m = await ctx.newPage();
