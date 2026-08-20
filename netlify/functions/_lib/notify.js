@@ -21,7 +21,7 @@ const FIREBASE_PROJECT_ID = 'comingssoni-e7517';
 const CHALLENGE_TITLE = '퍼스널메이커스 독서 챌린지';
 const APP_URL = 'https://comingssoni.netlify.app/';
 
-/** Firestore REST API로 notifyEmails 컬렉션을 읽는다.
+/** Firestore REST API로 notifyEmails 컬렉션을 읽는다. { name, email } 목록을 반환한다.
  *  (별도 서비스 계정 없이 동작하려면 Firestore 보안 규칙에서 notifyEmails 컬렉션의
  *   읽기를 허용해 두어야 합니다.) */
 async function fetchNotifyEmails() {
@@ -33,7 +33,12 @@ async function fetchNotifyEmails() {
   const data = await res.json();
   const docs = data.documents || [];
   return docs
-    .map((d) => d.fields && d.fields.email && d.fields.email.stringValue)
+    .map((d) => {
+      const f = d.fields || {};
+      const email = f.email && f.email.stringValue;
+      const name = (f.name && f.name.stringValue) || '';
+      return email ? { name, email } : null;
+    })
     .filter(Boolean);
 }
 
@@ -44,7 +49,7 @@ function defaultSubject() {
 }
 function defaultBody() {
   return [
-    '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
+    '안녕하세요, {{NAME}}님! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
     '마감은 24시 정각이며 유예 시간은 없습니다.',
     '',
     '인증하러 가기 → {{APP_URL}}',
@@ -71,11 +76,14 @@ async function fetchNotifyTemplate() {
   return (subject && body) ? { subject, body } : null;
 }
 
-async function buildEmail() {
-  const custom = await fetchNotifyTemplate();
-  const subject = (custom && custom.subject) || defaultSubject();
-  const rawBody = (custom && custom.body) || defaultBody();
-  const text = rawBody.split('{{APP_URL}}').join(APP_URL);
+/** template({subject,body}|null)과 받는 분 이름으로 개인화된 메일 1통 분을 만든다. */
+function buildEmail(template, name) {
+  const subject = (template && template.subject) || defaultSubject();
+  const rawBody = (template && template.body) || defaultBody();
+  const displayName = (name && name.trim()) || '참여자';
+  const text = rawBody
+    .split('{{APP_URL}}').join(APP_URL)
+    .split('{{NAME}}').join(displayName);
   const html = text
     .split('\n')
     .map((line) => (line.includes(APP_URL)
@@ -85,30 +93,42 @@ async function buildEmail() {
   return { subject, text, html };
 }
 
-/** 지메일 SMTP로 발송. bcc 로 넣어 수신자끼리 서로의 메일 주소가 노출되지 않게 한다. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 지메일 SMTP로 수신자마다 이름이 들어간 개인화된 메일을 한 통씩 발송한다. */
 async function sendViaGmail(recipients) {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) {
     throw new Error('GMAIL_USER / GMAIL_APP_PASSWORD 환경 변수가 설정되어 있지 않습니다.');
   }
-  if (!recipients.length) return { sent: 0 };
+  if (!recipients.length) return { sent: 0, failed: 0 };
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user, pass }
   });
+  const template = await fetchNotifyTemplate();
 
-  const { subject, text, html } = await buildEmail();
-  await transporter.sendMail({
-    from: `"${CHALLENGE_TITLE}" <${user}>`,
-    to: user,
-    bcc: recipients,
-    subject,
-    text,
-    html
-  });
-  return { sent: recipients.length };
+  let sent = 0;
+  const failures = [];
+  for (const r of recipients) {
+    const { subject, text, html } = buildEmail(template, r.name);
+    try {
+      await transporter.sendMail({
+        from: `"${CHALLENGE_TITLE}" <${user}>`,
+        to: r.email,
+        subject,
+        text,
+        html
+      });
+      sent++;
+    } catch (err) {
+      failures.push({ email: r.email, error: err.message });
+    }
+    await sleep(300); // 지메일 발송 속도 제한을 배려한 짧은 간격
+  }
+  return { sent, failed: failures.length, failures };
 }
 
 async function runNotification() {
@@ -116,4 +136,4 @@ async function runNotification() {
   return sendViaGmail(recipients);
 }
 
-module.exports = { runNotification, fetchNotifyEmails, buildEmail };
+module.exports = { runNotification, fetchNotifyEmails, buildEmail, fetchNotifyTemplate };

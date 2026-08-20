@@ -160,10 +160,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const ec = await page.locator('#entryList .entry').count();
   t('검색어 필터 1건', ec === 1, ec);
 
-  // 알림 메일 탭 — 일괄 등록
+  // 알림 메일 탭 — 이름·메일 일괄 등록
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
-  await page.fill('#notifyEmailInput', 'reader1@example.com\nreader2@example.com, reader1@example.com\n안녕하세요');
+  await page.fill('#notifyEmailInput',
+    '홍길동, reader1@example.com\n김철수, reader2@example.com\n홍길동, reader1@example.com\n이상한값');
   await page.click('#notifyAddBtn');
   await page.waitForTimeout(300);
   t('일괄 등록 메시지(등록/중복/오류 구분)',
@@ -172,7 +173,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     /형식 오류 1건/.test(await page.textContent('#notifyMsg')),
     await page.textContent('#notifyMsg'));
   t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
+  t('이름이 목록에 표시됨', (await page.textContent('#notifyTable')).includes('홍길동'));
   t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
+  t('메일 미리보기에 예시 이름(OO) 포함', (await page.textContent('#notifyPreview')).includes('OO'));
   await page.click('[data-delmail]');
   await page.waitForTimeout(300);
   t('메일 주소 삭제 후 1건 남음', /1명/.test(await page.textContent('#notifyCount')));

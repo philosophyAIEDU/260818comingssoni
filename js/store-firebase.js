@@ -3,7 +3,7 @@
  * 컬렉션 구조
  *   participants/{id}  { nickname, status, joinDate, outDate, exemptDates[], note, createdAt }
  *   submissions/{id}   { participantId, nickname, date, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
- *   notifyEmails/{id}  { email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
+ *   notifyEmails/{id}  { name, email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
  *   meta/app           { ... }
  */
 window.CS = window.CS || {};
@@ -231,29 +231,29 @@ CS.FirebaseStore = (function () {
     return snap.docs.map(withId).sort((a, b) => a.email.localeCompare(b.email));
   }
 
-  async function addNotifyEmail(email) {
+  async function addNotifyEmail(name, email) {
     await init();
     const clean = String(email || '').trim().toLowerCase();
     if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
     const dup = await fs.getDocs(fs.query(col('notifyEmails'), fs.where('email', '==', clean)));
     if (!dup.empty) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
-    const body = { email: clean, createdAt: CS.U.nowStamp() };
+    const body = { name: CS.U.normalizeNick(name), email: clean, createdAt: CS.U.nowStamp() };
     const ref = await fs.addDoc(col('notifyEmails'), body);
     return Object.assign({ id: ref.id }, body);
   }
 
-  /** 줄바꿈/쉼표로 구분된 여러 메일 주소를 한 번에 등록한다. */
-  async function addNotifyEmails(emails) {
+  /** 줄바꿈으로 구분된 { name, email } 목록을 한 번에 등록한다. */
+  async function addNotifyEmails(entries) {
     const existing = new Set((await listNotifyEmails()).map((e) => e.email));
     const added = [];
     const skipped = [];
     const invalid = [];
-    for (const raw of emails) {
-      const clean = String(raw || '').trim().toLowerCase();
+    for (const entry of entries) {
+      const clean = String((entry && entry.email) || '').trim().toLowerCase();
       if (!clean) continue;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) { invalid.push(clean); continue; }
       if (existing.has(clean)) { skipped.push(clean); continue; }
-      added.push(await addNotifyEmail(clean));
+      added.push(await addNotifyEmail(entry && entry.name, clean));
       existing.add(clean);
     }
     return { added, skipped, invalid };
