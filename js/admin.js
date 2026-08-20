@@ -454,13 +454,13 @@
   /* ── 알림 메일 ───────────────────────── */
 
   // 운영진이 아직 한 번도 저장한 적 없을 때 쓰이는 기본 제목·본문.
-  // 본문의 {{NAME}}은 받는 분 이름으로, {{APP_URL}}은 CONFIG.appUrl로 발송 시 치환됩니다.
+  // 본문의 {{APP_URL}}은 CONFIG.appUrl로 발송 시 치환됩니다.
   function defaultNotifySubject() {
     return `[${CONFIG.title}] 오늘 인증하셨나요? 📖`;
   }
   function defaultNotifyBody() {
     return [
-      '안녕하세요, {{NAME}}님! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
+      '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
       '마감은 24시 정각이며 유예 시간은 없습니다.',
       '',
       '인증하러 가기 → {{APP_URL}}',
@@ -476,9 +476,8 @@
   function paintNotifyPreview() {
     const subject = $('notifySubjectInput').value || defaultNotifySubject();
     const body = ($('notifyBodyInput').value || defaultNotifyBody())
-      .split('{{APP_URL}}').join(CONFIG.appUrl)
-      .split('{{NAME}}').join('OO'); // 미리보기는 특정 수신자가 없으므로 예시 이름으로 대체 표시
-    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}\n\n※ 실제 발송 시 {{NAME}}은 받는 분 각자의 이름으로 바뀝니다.`;
+      .split('{{APP_URL}}').join(CONFIG.appUrl);
+    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}`;
   }
 
   function paintNotify() {
