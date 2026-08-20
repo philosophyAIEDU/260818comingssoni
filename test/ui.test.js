@@ -175,7 +175,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
   t('이름이 목록에 표시됨', (await page.textContent('#notifyTable')).includes('홍길동'));
   t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
-  t('메일 미리보기에 예시 이름(OO) 포함', (await page.textContent('#notifyPreview')).includes('OO'));
   await page.click('[data-delmail]');
   await page.waitForTimeout(300);
   t('메일 주소 삭제 후 1건 남음', /1명/.test(await page.textContent('#notifyCount')));

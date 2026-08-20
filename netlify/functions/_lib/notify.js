@@ -49,7 +49,7 @@ function defaultSubject() {
 }
 function defaultBody() {
   return [
-    '안녕하세요, {{NAME}}님! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
+    '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
     '마감은 24시 정각이며 유예 시간은 없습니다.',
     '',
     '인증하러 가기 → {{APP_URL}}',
@@ -76,14 +76,11 @@ async function fetchNotifyTemplate() {
   return (subject && body) ? { subject, body } : null;
 }
 
-/** template({subject,body}|null)과 받는 분 이름으로 개인화된 메일 1통 분을 만든다. */
-function buildEmail(template, name) {
+/** template({subject,body}|null)으로 메일 1통 분을 만든다. */
+function buildEmail(template) {
   const subject = (template && template.subject) || defaultSubject();
   const rawBody = (template && template.body) || defaultBody();
-  const displayName = (name && name.trim()) || '참여자';
-  const text = rawBody
-    .split('{{APP_URL}}').join(APP_URL)
-    .split('{{NAME}}').join(displayName);
+  const text = rawBody.split('{{APP_URL}}').join(APP_URL);
   const html = text
     .split('\n')
     .map((line) => (line.includes(APP_URL)
@@ -95,7 +92,7 @@ function buildEmail(template, name) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 지메일 SMTP로 수신자마다 이름이 들어간 개인화된 메일을 한 통씩 발송한다. */
+/** 지메일 SMTP로 등록된 수신자 전원에게 메일을 한 통씩 발송한다. */
 async function sendViaGmail(recipients) {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
@@ -113,7 +110,7 @@ async function sendViaGmail(recipients) {
   let sent = 0;
   const failures = [];
   for (const r of recipients) {
-    const { subject, text, html } = buildEmail(template, r.name);
+    const { subject, text, html } = buildEmail(template);
     try {
       await transporter.sendMail({
         from: `"${CHALLENGE_TITLE}" <${user}>`,
