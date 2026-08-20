@@ -63,12 +63,10 @@
     const p = U.phase();
     const box = $('phaseNote');
     const open = canSubmitToday();
-    const introNote = $('introPhaseNote');
 
     if (p === 'before') {
       const d = U.diffDays(U.today(), CONFIG.startDate);
-      msg(box, '');
-      msg(introNote, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
+      msg(box, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
         `OT는 ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시입니다. ` +
         (open
           ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
@@ -76,10 +74,8 @@
     } else if (p === 'after') {
       msg(box, `챌린지가 <strong>${U.longLabel(CONFIG.endDate)}</strong>에 종료되었습니다. ` +
         `4주간 고생 많으셨습니다! 🎉 아래에서 이름을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
-      msg(introNote, '');
     } else {
       msg(box, '');
-      msg(introNote, '');
     }
 
     if (!open) {
