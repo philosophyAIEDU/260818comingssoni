@@ -214,10 +214,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('브랜드 서브타이틀 제거됨', (await page.locator('#brandSub').count()) === 0);
   const sentencePh = await page.getAttribute('#sentence', 'placeholder');
   t('예시 placeholder에 중복 안내문 없음', sentencePh.startsWith('ex)'), sentencePh.slice(0, 30));
-  const rulesText = await page.textContent('.wrap section.card:last-of-type');
+  const rulesCard = page.locator('.wrap section.card', { hasText: '안내 · 챌린지 규칙' });
+  const rulesText = await rulesCard.textContent();
   t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
   t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
-  const rulesLis = await page.locator('.wrap section.card:last-of-type ul.muted li').count();
+  const rulesLis = await rulesCard.locator('ul.muted li').count();
   t('규칙 목록 5개(날짜 선택·지각 안내 포함)', rulesLis === 5, rulesLis);
   t('전체 진행현황 3개 지표만 노출', (await page.locator('#overallStats .stat').count()) === 3);
 
@@ -235,8 +236,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const beforePage = await beforeCtx.newPage();
   await beforePage.goto(BASE + '/index.html');
   await beforePage.waitForTimeout(400);
-  t('시작 전: 안내가 책 소개 카드 안에 노출', /D-4/.test(await beforePage.textContent('#introPhaseNote')));
-  t('시작 전: 상단 phaseNote는 비어 있음(중복 노출 없음)', (await beforePage.textContent('#phaseNote')).trim() === '');
+  t('시작 전: D-day 안내가 배너 아래 phaseNote에 노출', /D-4/.test(await beforePage.textContent('#phaseNote')));
+  t('안내 규칙 카드가 책 소개와 배너 사이에 위치',
+    await beforePage.evaluate(() => {
+      const intro = document.querySelector('section.intro');
+      const rules = [...document.querySelectorAll('main.wrap > section.card')]
+        .find((s) => s.textContent.includes('안내 · 챌린지 규칙'));
+      const banner = document.querySelector('section.banner');
+      if (!intro || !rules || !banner) return false;
+      const pos = (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
+      return !!(pos(intro, rules) && pos(rules, banner));
+    }));
   await beforeCtx.close();
 
   // ── 참가자 화면: 인증할 날짜 드롭다운 & 지각 백필은 계속 미인증 ──
