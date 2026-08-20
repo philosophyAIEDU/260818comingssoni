@@ -119,17 +119,18 @@
     const exempt = (p.exemptDates || []).includes(date);
     const box = $('cellDetail');
 
+    const late = sub && U.isLate(date, sub.createdAt);
     const body = sub ? `
       <dl>
         <dt>인상 깊은 내용</dt><dd class="quote">“${esc(sub.sentence)}”</dd>
         <dt>느낀 점</dt><dd>${esc(sub.reflection)}</dd>
-        <dt>제출 시각</dt><dd>${esc(U.stampLabel(sub.updatedAt || sub.createdAt))}</dd>
+        <dt>제출 시각</dt><dd>${esc(U.stampLabel(sub.updatedAt || sub.createdAt))}${late ? ' — 마감 이후 (지각)' : ''}</dd>
       </dl>` : '<p class="muted">제출된 인증이 없습니다.</p>';
 
     box.innerHTML = `<div class="entry">
       <h4>${esc(p.nickname)} · ${esc(U.longLabel(date))}
         ${exempt ? '<span class="tag info">면제일</span>' : ''}
-        ${sub ? '<span class="tag ok">인증</span>' : ''}
+        ${sub ? `<span class="tag ${late ? 'bad' : 'ok'}">${late ? '지각(미인증)' : '인증'}</span>` : ''}
       </h4>
       ${body}
       <div class="actions" style="margin-top:12px">
@@ -440,6 +441,7 @@
     $('entryList').innerHTML = rows.length ? rows.slice(0, 200).map((s) => `
       <div class="entry">
         <h4>${esc(s.nickname)} <span class="tag">${esc(U.shortLabel(s.date))}</span>
+          ${U.isLate(s.date, s.createdAt) ? '<span class="tag bad">지각</span>' : ''}
           <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span></h4>
         <dl>
           <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>

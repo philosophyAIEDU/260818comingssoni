@@ -88,6 +88,14 @@
         </div>
 
         <div class="field">
+          <label for="certifyDate">인증할 날짜 <span class="sub">보통은 오늘로 자동 선택됩니다</span></label>
+          <select id="certifyDate"></select>
+          <p class="hint bad" id="certifyDateWarn" hidden>
+            이 날짜는 이미 마감(24:00)이 지났습니다. 기록은 남길 수 있지만 <strong>미인증(X)으로 계속 집계</strong>됩니다.
+          </p>
+        </div>
+
+        <div class="field">
           <label for="sentence">오늘 읽은 챕터에서 가장 인상 깊었던 핵심 내용을 적어주세요</label>
           <textarea id="sentence" placeholder="ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. 흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. 그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 되어 응원해주는 것이다. - 185쪽" required></textarea>
         </div>
@@ -228,7 +236,8 @@
       <ul class="muted">
         <li>마감은 <strong>24시 정각</strong>입니다. 지각 시 누락으로 체크되니 유의해주세요.</li>
         <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
-        <li>같은 날 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.)</li>
+        <li>같은 날짜에 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.)</li>
+        <li>지난 날짜를 놓쳤다면 인증 폼에서 <strong>날짜를 선택</strong>해 기록을 남길 수 있지만, 마감을 넘긴 인증은 <strong>계속 미인증(X)으로 집계</strong>됩니다.</li>
       </ul>
     </section>
 

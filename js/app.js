@@ -176,7 +176,54 @@
     if (canSubmitToday()) $('submitBtn').disabled = false;
   }
 
-  /* ── 선택 시: 오늘 제출분 불러오기 + 현황 ─ */
+  /* ── 인증할 날짜 드롭다운 ─────────────── */
+  /** 참여자가 고를 수 있는 날짜 범위: (참가자의 합류일 또는 챌린지 시작일) ~ 오늘.
+   *  챌린지 시작 전(연습 기간)에는 오늘 하루만 보여준다. */
+  function populateCertifyDateOptions(p) {
+    const sel = $('certifyDate');
+    const today = U.today();
+    const start = (p && p.joinDate && p.joinDate > CONFIG.startDate) ? p.joinDate : CONFIG.startDate;
+    const from = start <= today ? start : today;
+    const dates = U.dateRange(from, today);
+    const keep = sel.value;
+    sel.innerHTML = dates.map((d) => {
+      const idx = U.dayIndex(d);
+      const label = idx ? `${idx}일차 (${U.shortLabel(d)})` : `${U.shortLabel(d)} (연습)`;
+      return `<option value="${d}">${label}${d === today ? ' · 오늘' : ''}</option>`;
+    }).join('');
+    sel.value = dates.includes(keep) ? keep : today;
+  }
+
+  /** 선택된 날짜가 이미 마감을 넘겼는지 안내 (오늘이 아니면 항상 마감 지남) */
+  function paintCertifyDateWarn(date) {
+    $('certifyDateWarn').hidden = date === U.today();
+  }
+
+  /* ── 선택된 참여자·날짜의 제출분 불러오기 + 현황 ─ */
+  async function loadEntryForm(pid, date) {
+    const existing = await Store.getSubmission(pid, date);
+
+    if (existing) {
+      $('sentence').value = existing.sentence || '';
+      $('reflection').value = existing.reflection || '';
+      if (canSubmitToday()) $('submitBtn').textContent = '인증 수정하기';
+      const lateNote = U.isLate(date, existing.createdAt) ? ' <strong class="bad">(지각 제출 — 미인증(X)으로 집계)</strong>' : '';
+      msg($('formMsg'),
+        `${U.shortLabel(date)} 인증은 <strong>제출 완료</strong> 상태입니다.${lateNote} ` +
+        `(${U.stampLabel(existing.updatedAt || existing.createdAt)}) 내용을 고치고 다시 제출하면 덮어씁니다.`,
+        U.isLate(date, existing.createdAt) ? 'warn' : 'ok');
+    } else {
+      const draft = loadDraft(pid, date);
+      $('sentence').value = draft.sentence || '';
+      $('reflection').value = draft.reflection || '';
+      if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
+      msg($('formMsg'), '');
+    }
+    autoGrow($('sentence'));
+    autoGrow($('reflection'));
+    paintCertifyDateWarn(date);
+  }
+
   async function onSelect() {
     const pid = $('participant').value;
     currentPid = pid;
@@ -188,29 +235,19 @@
       return;
     }
 
-    const today = U.today();
-    const existing = await Store.getSubmission(pid, today);
-
-    if (existing) {
-      $('sentence').value = existing.sentence || '';
-      $('reflection').value = existing.reflection || '';
-      if (canSubmitToday()) $('submitBtn').textContent = '인증 수정하기';
-      msg($('formMsg'),
-        `오늘(${U.shortLabel(today)}) 인증은 <strong>제출 완료</strong> 상태입니다. ` +
-        `(${U.stampLabel(existing.updatedAt || existing.createdAt)}) 내용을 고치고 다시 제출하면 덮어씁니다.`, 'ok');
-    } else {
-      const draft = loadDraft(pid);
-      $('sentence').value = draft.sentence || '';
-      $('reflection').value = draft.reflection || '';
-      if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
-      msg($('formMsg'), '');
-    }
-    autoGrow($('sentence'));
-    autoGrow($('reflection'));
+    const p = participants.find((x) => x.id === pid);
+    populateCertifyDateOptions(p);
+    await loadEntryForm(pid, $('certifyDate').value);
 
     await paintMine(pid);
     await refreshSocialFeed();
     await refreshAllFeed();
+  }
+
+  async function onCertifyDateChange() {
+    const pid = $('participant').value;
+    if (!pid) return;
+    await loadEntryForm(pid, $('certifyDate').value);
   }
 
   /** 입력한 만큼 textarea 높이가 자동으로 늘어나게 (min-height/max-height는 CSS가 담당) */
@@ -220,10 +257,10 @@
   }
 
   /* ── 임시 저장 (작성 중 이탈 대비) ────── */
-  function loadDraft(pid) {
+  function loadDraft(pid, date) {
     try {
       const all = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
-      const d = all[`${pid}|${U.today()}`];
+      const d = all[`${pid}|${date}`];
       if (d) $('draftNote').textContent = '작성 중이던 내용을 불러왔습니다.';
       return d || {};
     } catch (e) { return {}; }
@@ -234,17 +271,17 @@
     if (!pid) return;
     let all = {};
     try { all = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch (e) { all = {}; }
-    all[`${pid}|${U.today()}`] = {
+    all[`${pid}|${$('certifyDate').value}`] = {
       sentence: $('sentence').value,
       reflection: $('reflection').value
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(all));
   }
 
-  function clearDraft(pid) {
+  function clearDraft(pid, date) {
     try {
       const all = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
-      delete all[`${pid}|${U.today()}`];
+      delete all[`${pid}|${date}`];
       localStorage.setItem(DRAFT_KEY, JSON.stringify(all));
     } catch (e) { /* noop */ }
     $('draftNote').textContent = '';
@@ -298,9 +335,10 @@
   }
 
   function renderEntry(s) {
+    const late = U.isLate(s.date, s.createdAt);
     return `<div class="entry">
       <h4>${esc(U.shortLabel(s.date))}
-        <span class="tag ok">인증</span>
+        <span class="tag ${late ? 'bad' : 'ok'}">${late ? '미인증(지각)' : '인증'}</span>
         <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
       </h4>
       <dl>
@@ -377,11 +415,13 @@
 
   function renderFeedItem(s, isWinner, hasUpvoted) {
     const own = isOwnSubmission(s);
+    const late = U.isLate(s.date, s.createdAt);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
     const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-top">
         <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
+        ${late ? '<span class="tag bad">지각</span>' : ''}
         <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
@@ -455,12 +495,14 @@
   /* ── 인증 피드 전체 보기 ─────────────────────── */
   function renderAllFeedItem(s) {
     const own = isOwnSubmission(s);
+    const late = U.isLate(s.date, s.createdAt);
     const hasUpvoted = (s.upvotedBy || []).includes(clientId);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
     const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
     return `<article class="feed-item">
       <div class="feed-top">
         <span class="feed-nick">${esc(s.nickname)}</span>
+        ${late ? '<span class="tag bad">지각</span>' : ''}
         <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개">👍 ${s.upvotes || 0}</button>
@@ -608,10 +650,11 @@
     }
 
     const p = participants.find((x) => x.id === pid);
+    const date = $('certifyDate').value || U.today();
     const payload = {
       participantId: pid,
       nickname: p ? p.nickname : '',
-      date: U.today(),
+      date,
       sentence: $('sentence').value.trim(),
       reflection: $('reflection').value.trim()
     };
@@ -622,15 +665,21 @@
 
     $('submitBtn').disabled = true;
     try {
-      await Store.saveSubmission(payload);
-      clearDraft(pid);
+      const saved = await Store.saveSubmission(payload);
+      clearDraft(pid, date);
+      const late = U.isLate(date, saved.createdAt);
       msg($('formMsg'),
-        `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다. 오늘도 수고하셨어요! 📖`, 'ok');
+        `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다.` +
+        (late
+          ? ' <strong>다만 마감을 넘겨 미인증(X)으로 집계됩니다.</strong> 기록은 남았어요!'
+          : ' 오늘도 수고하셨어요! 📖'),
+        late ? 'warn' : 'ok');
       $('submitBtn').textContent = '인증 수정하기';
+      paintCertifyDateWarn(date);
 
       await paintMine(pid);
       await paintOverall();
-      feedDate = U.today();
+      feedDate = date;
       feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
       await refreshAllFeed();
@@ -650,6 +699,8 @@
     paintPhase();
     tickCountdown();
     setInterval(tickCountdown, 1000);
+    populateCertifyDateOptions(null);
+    paintCertifyDateWarn($('certifyDate').value);
     await loadParticipants();
     await refreshSocialFeed();
     await calculateRanksAndFame();
@@ -657,6 +708,7 @@
 
     $('participant').addEventListener('change', onSelect);
     $('participantSearch').addEventListener('input', renderParticipantOptions);
+    $('certifyDate').addEventListener('change', onCertifyDateChange);
     $('verifyForm').addEventListener('submit', onSubmit);
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));

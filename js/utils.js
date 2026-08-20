@@ -128,6 +128,18 @@ CS.U = (function () {
 
   function nowStamp() { return new Date().toISOString(); }
 
+  /** 특정 날짜의 마감 시각(그 날 24:00 KST = 다음날 00:00 KST)을 UTC ISO 문자열로.
+   *  createdAt(둘 다 new Date().toISOString() 형식이라 문자열 비교로 정확히 비교 가능)과 비교해
+   *  "그 날짜 안에 제출됐는지"를 판정하는 데 쓴다. */
+  function deadlineInstant(date) {
+    return `${date}T15:00:00.000Z`;
+  }
+
+  /** 해당 날짜의 제출이 마감을 넘겨 이뤄졌는지 (지각 여부) */
+  function isLate(date, createdAt) {
+    return !!createdAt && createdAt > deadlineInstant(date);
+  }
+
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   }
@@ -138,14 +150,20 @@ CS.U = (function () {
 
   /** 참가자 한 명의 날짜별 상태 계산
    *  'O' 인증 / 'X' 미인증 / 'P' 면제 / '-' 아직 안 지난 날 / '·' 참여 전·아웃 이후
+   *
+   *  참가자는 인증 폼에서 어떤 날짜로 제출할지 직접 고를 수 있어(지난 날짜 포함),
+   *  단순히 "그 날짜로 제출 기록이 있는지"만으로는 지각 여부를 가릴 수 없다.
+   *  그래서 제출 기록의 실제 생성 시각(createdAt)이 그 날짜의 마감(24:00 KST)
+   *  이전인지로 인증(O) 여부를 판정한다 — 마감을 넘긴 제출은 기록은 남지만 계속 'X'다.
    */
-  function statusFor(participant, date, submittedDates, todayISO) {
+  function statusFor(participant, date, submissionByDate, todayISO) {
     // 1) 참여 기간 밖 (합류 전 / 아웃 이후) — 집계 대상 자체가 아님
     if (participant.joinDate && date < participant.joinDate) return '·';
     if (participant.status === 'out' && participant.outDate && date > participant.outDate) return '·';
-    // 2) 실제 제출이 있으면 면제일이어도 인증으로 인정
-    if (submittedDates.has(date)) return 'O';
-    // 3) 운영진이 등록한 면제일
+    // 2) 마감 전에 제출된 기록이 있으면 면제일이어도 인증으로 인정
+    const sub = submissionByDate.get(date);
+    if (sub && !isLate(date, sub.createdAt)) return 'O';
+    // 3) 운영진이 등록한 면제일 (지각 제출로 기록만 남은 경우도 면제일이면 P)
     if ((participant.exemptDates || []).includes(date)) return 'P';
     // 4) 오늘은 24:00 마감 전이므로 아직 미확정, 미래도 마찬가지
     if (date >= todayISO) return '-';
@@ -158,13 +176,13 @@ CS.U = (function () {
     const dates = challengeDates();
     const byPid = new Map();
     for (const s of submissions) {
-      if (!byPid.has(s.participantId)) byPid.set(s.participantId, new Set());
-      byPid.get(s.participantId).add(s.date);
+      if (!byPid.has(s.participantId)) byPid.set(s.participantId, new Map());
+      byPid.get(s.participantId).set(s.date, s);
     }
 
     return participants.map((p) => {
-      const done = byPid.get(p.id) || new Set();
-      const cells = dates.map((d) => ({ date: d, status: statusFor(p, d, done, todayISO) }));
+      const subMap = byPid.get(p.id) || new Map();
+      const cells = dates.map((d) => ({ date: d, status: statusFor(p, d, subMap, todayISO) }));
       const missed = cells.filter((c) => c.status === 'X').length;
       const verified = cells.filter((c) => c.status === 'O').length;
       const exempt = cells.filter((c) => c.status === 'P').length;
@@ -174,7 +192,7 @@ CS.U = (function () {
       let streak = 0;
       const upto = dates.filter((d) => d <= todayISO).reverse();
       for (const d of upto) {
-        const st = statusFor(p, d, done, todayISO);
+        const st = statusFor(p, d, subMap, todayISO);
         if (st === 'O') streak++;
         else if (st === 'P' || (d === todayISO && st === '-')) continue;
         else break;
@@ -188,7 +206,7 @@ CS.U = (function () {
         exempt,
         rate: gradable ? Math.round((verified / gradable) * 100) : 0,
         streak,
-        submittedToday: done.has(todayISO),
+        submittedToday: subMap.has(todayISO),
         atRisk: missed >= CS.CONFIG.kickoutThreshold
       };
     });
@@ -198,6 +216,6 @@ CS.U = (function () {
     nowParts, today, secondsToMidnight, addDays, dateRange, diffDays,
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
-    normalizeNick, statusFor, buildStats, pad2
+    normalizeNick, deadlineInstant, isLate, statusFor, buildStats, pad2
   };
 })();

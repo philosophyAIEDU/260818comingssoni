@@ -57,13 +57,14 @@ function t(name, cond, extra) {
   t('중복 닉네임 거부', !!dupErr, dupErr);
 
   // 제출 데이터 심기: 소니는 8/24~8/26 인증, 8/27~9/1 미인증
+  // (createdAt을 명시적으로 그 날짜 마감 전으로 고정 — 실제 실행 시각과 무관하게 항상 정상 인증으로 판정되도록)
   for (const d of ['2026-08-24','2026-08-25','2026-08-26']) {
     await Store.saveSubmission({ participantId: sony.id, nickname: '소니', date: d,
-      sentence: '문장', reflection: '느낀 점' });
+      sentence: '문장', reflection: '느낀 점', createdAt: `${d}T10:00:00.000Z` });
   }
   t('제출 3건', (await Store.listSubmissions({ participantId: sony.id })).length === 3);
 
-  // 같은 날 재제출 → 덮어쓰기
+  // 같은 날 재제출 → 덮어쓰기 (createdAt은 그대로, updatedAt만 갱신)
   await Store.saveSubmission({ participantId: sony.id, nickname: '소니', date: '2026-08-24',
     sentence: '문장 수정', reflection: 'ㄷ' });
   const subs = await Store.listSubmissions({ participantId: sony.id });
@@ -95,7 +96,7 @@ function t(name, cond, extra) {
   // 연속 인증: 8/31, 9/1 인증 추가 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)
   for (const d of ['2026-08-31','2026-09-01']) {
     await Store.saveSubmission({ participantId: whale.id, nickname: '책읽는고래', date: d,
-      sentence: 's', reflection: 'r' });
+      sentence: 's', reflection: 'r', createdAt: `${d}T10:00:00.000Z` });
   }
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
     .find(s => s.participant.id === whale.id);
@@ -105,6 +106,43 @@ function t(name, cond, extra) {
   await Store.updateParticipant(whale.id, { nickname: '고래' });
   const wsubs = await Store.listSubmissions({ participantId: whale.id });
   t('닉네임 변경 전파', wsubs.every(s => s.nickname === '고래'), wsubs.map(s=>s.nickname));
+
+  console.log('— 지각 제출 판정 (참여자가 날짜를 골라도 마감을 넘기면 계속 X) —');
+  const ggomi = list.find(p => p.nickname === '커밍쏜');
+  // 8/24 마감(24:00 KST = 8/24 15:00 UTC) 전에 제출 → 정상 인증
+  await Store.saveSubmission({ participantId: ggomi.id, nickname: '커밍쏜', date: '2026-08-24',
+    sentence: '제때 냄', reflection: 'r', createdAt: '2026-08-24T10:00:00.000Z' });
+  // 8/25 마감을 넘겨(8/25 새벽, 즉 8/25 15:01 UTC) 8/25치를 제출 → 기록은 남지만 지각이라 X 유지
+  await Store.saveSubmission({ participantId: ggomi.id, nickname: '커밍쏜', date: '2026-08-25',
+    sentence: '늦게 냄', reflection: 'r', createdAt: '2026-08-25T15:01:00.000Z' });
+  // 참여자가 드롭다운으로 지난 날짜(8/26)를 골라 한참 뒤(8/28)에 뒤늦게 기록만 남긴 경우
+  await Store.saveSubmission({ participantId: ggomi.id, nickname: '커밍쏜', date: '2026-08-26',
+    sentence: '한참 뒤에 기록', reflection: 'r', createdAt: '2026-08-28T09:00:00.000Z' });
+
+  let lateSt = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === ggomi.id);
+  t('마감 전 제출은 인증(O)', lateSt.cells.find(c => c.date === '2026-08-24').status === 'O');
+  t('마감 넘긴 제출은 기록은 남아도 미인증(X)', lateSt.cells.find(c => c.date === '2026-08-25').status === 'X');
+  t('며칠 뒤 지난 날짜로 남긴 기록도 미인증(X) 유지', lateSt.cells.find(c => c.date === '2026-08-26').status === 'X');
+
+  // 제때 낸 인증을 나중에 오탈자만 고쳐도(같은 날짜 재제출) createdAt은 그대로라 여전히 O
+  await Store.saveSubmission({ participantId: ggomi.id, nickname: '커밍쏜', date: '2026-08-24',
+    sentence: '제때 냈고 나중에 오탈자만 고침', reflection: 'r' });
+  lateSt = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === ggomi.id);
+  t('제때 낸 인증을 나중에 수정해도 여전히 O (createdAt 유지)',
+    lateSt.cells.find(c => c.date === '2026-08-24').status === 'O');
+  t('수정된 내용 반영', (await Store.getSubmission(ggomi.id, '2026-08-24')).sentence.includes('오탈자만 고침'));
+
+  // 지각 제출이라도 그 날짜가 면제일로 등록되면 P로 처리
+  await Store.updateParticipant(ggomi.id, { exemptDates: ['2026-08-25'] });
+  lateSt = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === ggomi.id);
+  t('지각 제출이라도 면제일로 등록되면 P', lateSt.cells.find(c => c.date === '2026-08-25').status === 'P');
+
+  t('isLate: 마감 전이면 정상', U.isLate('2026-08-24', '2026-08-24T14:59:59.999Z') === false);
+  t('isLate: 마감 정각(24:00)까지는 정상', U.isLate('2026-08-24', '2026-08-24T15:00:00.000Z') === false);
+  t('isLate: 마감 1ms만 넘어도 지각', U.isLate('2026-08-24', '2026-08-24T15:00:00.001Z') === true);
 
   console.log('— 엄지척 추천/취소 —');
   const firstSub = (await Store.listSubmissions({ participantId: whale.id }))[0];
