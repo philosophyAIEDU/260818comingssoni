@@ -504,6 +504,79 @@
   async function refreshNotify() {
     notifyEmails = await Store.listNotifyEmails();
     paintNotify();
+    paintCustomMailResults();
+  }
+
+  /* ── 특정 대상에게 1회성 안내 메일 ─────── */
+
+  let customMailTarget = null; // 검색 결과에서 선택된 { name, email }
+
+  function paintCustomMailResults() {
+    const kw = $('customMailSearch').value.trim().toLowerCase();
+    const box = $('customMailResults');
+    if (!kw) { box.innerHTML = ''; return; }
+
+    const matches = notifyEmails.filter((e) => (e.name || '').toLowerCase().includes(kw));
+    box.innerHTML = matches.length
+      ? `<thead><tr><th>이름</th><th>메일 주소</th><th></th></tr></thead><tbody>${
+        matches.map((e) => `<tr>
+          <td>${e.name ? esc(e.name) : '<span class="muted">(이름 없음)</span>'}</td>
+          <td>${esc(e.email)}</td>
+          <td><button class="small" data-pickname="${esc(e.name || '')}" data-pickmail="${esc(e.email)}">선택</button></td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">일치하는 이름이 없습니다.</td></tr></tbody>';
+
+    box.querySelectorAll('[data-pickmail]').forEach((el) => {
+      el.addEventListener('click', () => selectCustomMailTarget(el.dataset.pickname, el.dataset.pickmail));
+    });
+  }
+
+  function selectCustomMailTarget(name, email) {
+    customMailTarget = { name, email };
+    $('customMailTarget').textContent = name ? `${name} (${email})` : email;
+    $('customMailSubject').value = `[${CONFIG.title}] 안내드립니다`;
+    $('customMailBody').value = name ? `안녕하세요, ${name}님,\n\n` : '안녕하세요,\n\n';
+    $('customMailMsg').innerHTML = '';
+    $('customMailForm').hidden = false;
+    $('customMailBody').focus();
+  }
+
+  function cancelCustomMail() {
+    customMailTarget = null;
+    $('customMailForm').hidden = true;
+    $('customMailSubject').value = '';
+    $('customMailBody').value = '';
+    $('customMailMsg').innerHTML = '';
+  }
+
+  async function sendCustomMail() {
+    if (!customMailTarget) return;
+    const subject = $('customMailSubject').value.trim();
+    const body = $('customMailBody').value.trim();
+    if (!subject || !body) {
+      msg($('customMailMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    const btn = $('customMailSendBtn');
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '보내는 중…';
+    try {
+      const res = await fetch('/.netlify/functions/send-custom-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: customMailTarget.email, subject, body })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `서버 응답 오류 (${res.status})`);
+      msg($('customMailMsg'), `${esc(customMailTarget.name || customMailTarget.email)}님께 발송했습니다.`, 'ok');
+    } catch (e) {
+      msg($('customMailMsg'),
+        `발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정되어 있는지 확인해 주세요. (README 참고)`, 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
   }
 
   /** 저장된 제목·본문을 불러와 입력창에 채운다. 편집 중(dirty)이면 덮어쓰지 않는다. */
@@ -692,6 +765,10 @@
 
     $('notifyAddBtn').addEventListener('click', addNotifyEmail);
     $('notifySendTest').addEventListener('click', sendNotifyTest);
+
+    $('customMailSearch').addEventListener('input', paintCustomMailResults);
+    $('customMailCancelBtn').addEventListener('click', cancelCustomMail);
+    $('customMailSendBtn').addEventListener('click', sendCustomMail);
 
     $('notifyTemplateSave').addEventListener('click', saveNotifyTemplate);
     $('notifyTemplateReset').addEventListener('click', resetNotifyTemplate);

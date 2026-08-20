@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102d84">
+  <meta name="color-scheme" content="light dark">
+  <title>퍼스널메이커스 독서 챌린지 · 인증 피드 전체 보기</title>
+  <meta name="description" content="지금까지 제출된 모든 인증글을 최신순으로 한눈에 볼 수 있는 페이지입니다.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+</head>
+
+<body>
+
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <img class="brand-logo" src="logo2.jpg" alt="퍼스널메이커스 로고">
+        <div class="brand-text">
+          <h1>인증 피드 전체 보기</h1>
+          <p>퍼스널메이커스 독서 챌린지</p>
+        </div>
+      </div>
+      <nav class="navlinks">
+        <a href="index.html">인증하기</a>
+        <a href="admin.html">운영진</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap wide">
+
+    <section class="card feed-card">
+      <div class="feed-head">
+        <h2>인증 피드 · 전체 보기 <span class="tag" id="feedCount">0건</span></h2>
+        <div class="feed-head-actions">
+          <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
+        </div>
+      </div>
+      <p class="hint">
+        지금까지 제출된 모든 인증글을 최신순으로 한눈에 볼 수 있습니다.
+        날짜별로 보고 싶다면 <a href="index.html">인증하기 페이지의 인증 피드</a>를 이용해 주세요.
+      </p>
+
+      <div id="allFeedList" class="all-feed-grid full">
+        <div class="empty">불러오는 중…</div>
+      </div>
+      <div class="feed-more-wrap" id="allFeedLoadMoreWrap" hidden>
+        <button type="button" id="allFeedLoadMoreBtn" class="small"></button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/store-firebase.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/feed-all.js"></script>
+</body>
+
+</html>

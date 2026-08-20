@@ -11,8 +11,6 @@
   let participants = [];
   let feedDate = U.today();
   let feedVisibleCount = FEED_PAGE_SIZE;
-  let allFeedVisibleCount = FEED_PAGE_SIZE;
-  let feedTab = 'date';
   let currentPid = '';
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
@@ -64,6 +62,7 @@
     const box = $('phaseNote');
     const open = canSubmitToday();
 
+    // 챌린지 시작 전(D-day 안내)에만 노출하고, 시작된 뒤로는(진행 중·종료 후 모두) 표시하지 않는다.
     if (p === 'before') {
       const d = U.diffDays(U.today(), CONFIG.startDate);
       msg(box, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
@@ -71,9 +70,6 @@
         (open
           ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
           : '인증은 시작일부터 제출할 수 있어요.'), 'info');
-    } else if (p === 'after') {
-      msg(box, `챌린지가 <strong>${U.longLabel(CONFIG.endDate)}</strong>에 종료되었습니다. ` +
-        `4주간 고생 많으셨습니다! 🎉 아래에서 이름을 선택하면 나의 최종 기록을 볼 수 있습니다.`, 'ok');
     } else {
       msg(box, '');
     }
@@ -184,7 +180,7 @@
     const keep = sel.value;
     sel.innerHTML = dates.map((d) => {
       const idx = U.dayIndex(d);
-      const label = idx ? `${idx}일차 (${U.shortLabel(d)})` : `${U.shortLabel(d)} (연습)`;
+      const label = idx ? `${idx}일차 (${U.shortLabel(d)})` : `연습 (${U.shortLabel(d)})`;
       return `<option value="${d}">${label}${d === today ? ' · 오늘' : ''}</option>`;
     }).join('');
     sel.value = dates.includes(keep) ? keep : today;
@@ -227,7 +223,6 @@
     if (!pid) {
       card.hidden = true; msg($('formMsg'), '');
       await refreshSocialFeed();
-      await refreshAllFeed();
       return;
     }
 
@@ -237,7 +232,6 @@
 
     await paintMine(pid);
     await refreshSocialFeed();
-    await refreshAllFeed();
   }
 
   async function onCertifyDateChange() {
@@ -399,7 +393,6 @@
             await Store.upvoteSubmission(btn.dataset.id, clientId);
           }
           await refreshSocialFeed();
-          await refreshAllFeed();
           await calculateRanksAndFame();
         } catch (err) {
           btn.disabled = false;
@@ -488,69 +481,7 @@
     }
   }
 
-  /* ── 인증 피드 전체 보기 ─────────────────────── */
-  function renderAllFeedItem(s) {
-    const own = isOwnSubmission(s);
-    const late = U.isLate(s.date, s.createdAt);
-    const hasUpvoted = (s.upvotedBy || []).includes(clientId);
-    const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
-    const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
-    return `<article class="feed-item">
-      <div class="feed-top">
-        <span class="feed-nick">${esc(s.nickname)}</span>
-        ${late ? '<span class="tag bad">지각</span>' : ''}
-        <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
-        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
-          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개">👍 ${s.upvotes || 0}</button>
-      </div>
-      <p class="feed-quote">“${esc(s.sentence)}”</p>
-      <details class="feed-more">
-        <summary>느낀 점 보기</summary>
-        <dl class="body">
-          <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-        </dl>
-      </details>
-    </article>`;
-  }
-
-  async function refreshAllFeed() {
-    if (feedTab !== 'all') return;
-    const all = (await Store.listSubmissions()).slice()
-      .sort((a, b) => (b.date === a.date
-        ? String(b.createdAt).localeCompare(String(a.createdAt))
-        : b.date.localeCompare(a.date)));
-
-    const list = $('allFeedList');
-    const moreWrap = $('allFeedLoadMoreWrap');
-    if (!all.length) {
-      list.innerHTML = '<div class="empty">제출된 인증글이 없습니다.</div>';
-      moreWrap.hidden = true;
-      return;
-    }
-    const visible = all.slice(0, allFeedVisibleCount);
-    list.innerHTML = visible.map(renderAllFeedItem).join('');
-    bindUpvoteButtons(list);
-
-    const remaining = all.length - visible.length;
-    if (remaining > 0) {
-      moreWrap.hidden = false;
-      $('allFeedLoadMoreBtn').textContent = `더 보기 (${remaining}건 더 남음)`;
-    } else {
-      moreWrap.hidden = true;
-    }
-  }
-
-  function switchFeedTab(tab) {
-    feedTab = tab;
-    $('feedTabs').querySelectorAll('button[data-feedtab]').forEach((b) =>
-      b.classList.toggle('on', b.dataset.feedtab === tab));
-    $('feedDateView').hidden = tab !== 'date';
-    $('feedAllView').hidden = tab !== 'all';
-    if (tab === 'all') {
-      allFeedVisibleCount = FEED_PAGE_SIZE;
-      refreshAllFeed();
-    }
-  }
+  // 인증 피드 "전체 보기"는 feed-all.html(새 창)에서 js/feed-all.js가 별도로 렌더링합니다.
 
   // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
   async function calculateRanksAndFame() {
@@ -589,6 +520,29 @@
   }
 
   /* ── 전체 진행현황 대시보드 (모든 참여자 공개) ─── */
+  // 통계 타일 클릭 시 아래에 펼쳐 보여줄 명단. paintOverall()이 매번 최신 내용으로 채운다.
+  let ovOpenKey = null; // 'done' | 'risk' | null(닫힘)
+  let ovLists = { done: [], risk: [] };
+
+  const byKo = (a, b) => a.localeCompare(b, 'ko');
+
+  function renderOvDetail() {
+    const box = $('ovDetail');
+    if (!ovOpenKey) { box.hidden = true; box.innerHTML = ''; return; }
+    const names = ovLists[ovOpenKey];
+    const title = ovOpenKey === 'done' ? '오늘 인증 완료' : '킥아웃 위험 인원';
+    box.hidden = false;
+    box.innerHTML = `<strong>${esc(title)} (${names.length}명)</strong><br>` +
+      (names.length ? names.map(esc).join(', ') : '<span class="muted">해당하는 사람이 없습니다.</span>');
+  }
+
+  function toggleOvDetail(key) {
+    ovOpenKey = ovOpenKey === key ? null : key;
+    $('ovDoneTile').setAttribute('aria-expanded', String(ovOpenKey === 'done'));
+    $('ovRiskTile').setAttribute('aria-expanded', String(ovOpenKey === 'risk'));
+    renderOvDetail();
+  }
+
   async function paintOverall() {
     if (!participants.length) {
       $('overallCount').textContent = '0명';
@@ -601,15 +555,21 @@
         || a.participant.nickname.localeCompare(b.participant.nickname, 'ko'));
 
     const active = stats.filter((s) => s.participant.status !== 'out');
-    const todayDone = active.filter((s) => s.submittedToday).length;
+    const doneToday = active.filter((s) => s.submittedToday);
     // 킥아웃 위험 인원: 아직 킥아웃 기준(missed>=kickoutThreshold)에는 못 미쳤지만
     // 누적 미인증이 3~4회로 임박한 사람 (실제 킥아웃 대상은 아래 표의 '킥아웃 대상' 태그 참고)
-    const riskZone = active.filter((s) => s.missed === 3 || s.missed === 4).length;
+    const riskZone = active.filter((s) => s.missed === 3 || s.missed === 4);
+
+    ovLists = {
+      done: doneToday.map((s) => s.participant.nickname).sort(byKo),
+      risk: riskZone.map((s) => s.participant.nickname).sort(byKo)
+    };
 
     $('overallCount').textContent = `${active.length}명`;
-    $('ovToday').textContent = active.length ? `${Math.round((todayDone / active.length) * 100)}%` : '0%';
-    $('ovActive').textContent = active.length;
-    $('ovRisk').textContent = riskZone;
+    $('ovToday').textContent = active.length ? `${Math.round((doneToday.length / active.length) * 100)}%` : '0%';
+    $('ovDone').textContent = doneToday.length;
+    $('ovRisk').textContent = riskZone.length;
+    renderOvDetail(); // 갱신 중에도 펼쳐 둔 명단이 있으면 최신 내용으로 다시 그린다
 
     const head = '<thead><tr><th>이름</th><th class="num">인증</th><th class="num">미인증</th>' +
       '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
@@ -678,7 +638,6 @@
       feedDate = date;
       feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
-      await refreshAllFeed();
       await calculateRanksAndFame();
       $('myCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
@@ -702,6 +661,15 @@
     await calculateRanksAndFame();
     await paintOverall();
 
+    // 전체 진행현황: "인증 완료 인원" · "킥아웃 위험 인원" 타일을 클릭하면 명단이 펼쳐짐
+    [['ovDoneTile', 'done'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
+      const tile = $(id);
+      tile.addEventListener('click', () => toggleOvDetail(key));
+      tile.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleOvDetail(key); }
+      });
+    });
+
     $('participant').addEventListener('change', onSelect);
     $('participantSearch').addEventListener('input', renderParticipantOptions);
     $('certifyDate').addEventListener('change', onCertifyDateChange);
@@ -720,17 +688,6 @@
     });
     bindFeedSwipe(document.querySelector('.feed-card'));
 
-    // 인증 피드: 날짜별 보기 / 전체 보기 탭
-    $('feedTabs').addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-feedtab]');
-      if (!btn) return;
-      switchFeedTab(btn.dataset.feedtab);
-    });
-    $('allFeedLoadMoreBtn').addEventListener('click', () => {
-      allFeedVisibleCount += FEED_PAGE_SIZE;
-      refreshAllFeed();
-    });
-
     // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
     // (명예의 전당은 전체 기록을 읽어야 해서 Firestore 읽기 비용이 크므로 자동 갱신에서 제외)
     $('feedRefresh').addEventListener('click', async (e) => {
@@ -738,7 +695,6 @@
       btn.disabled = true;
       try {
         await refreshSocialFeed();
-        await refreshAllFeed();
         await calculateRanksAndFame();
         await paintOverall();
       } finally { btn.disabled = false; }
@@ -758,7 +714,6 @@
         await loadParticipants();
         if (keep) { $('participant').value = keep; await onSelect(); }
         await refreshSocialFeed();
-        await refreshAllFeed();
         await calculateRanksAndFame();
         await paintOverall();
       }
