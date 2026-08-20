@@ -109,7 +109,7 @@ OT 안내, "지금 올리는 인증은 연습용" 문구가 배너 바로 아래
 index.html                        참가자 인증 화면
 feed-all.html                     인증 피드 전체 보기 (index.html의 [전체 보기]가 새 창으로 여는 페이지)
 admin.html                        운영진 대시보드
-logo2.jpg                         퍼스널메이커스 로고 (헤더에 사용)
+logo-header.jpg                   퍼스널메이커스 로고 (헤더에 사용, logo2.jpg를 헤더용으로 크롭)
 css/style.css                     공통 스타일 (라이트/다크 자동 대응)
 js/config.js                      챌린지 기간·킥아웃 기준·저장소 선택  ← 설정은 여기만 수정
 js/utils.js                       날짜(KST) 계산과 집계 로직
@@ -131,7 +131,7 @@ test/ui.test.js                   브라우저 시나리오 테스트
 
 ```js
 title: '퍼스널메이커스 독서 챌린지', // 좌측 상단 브랜드명
-logo: 'logo2.jpg',         // 좌측 상단 로고 이미지 경로
+logo: 'logo-header.jpg',         // 좌측 상단 로고 이미지 경로
 appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
 startDate: '2026-08-24',   // 시작일
 endDate:   '2026-09-20',   // 종료일
