@@ -54,7 +54,7 @@
         <li>마감은 <strong>24시 정각</strong>입니다. 지각 시 누락으로 체크되니 유의해주세요.</li>
         <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
         <li>같은 날짜에 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.)</li>
-        <li>인증할 날짜는 <strong>드롭다운에서 직접 선택</strong>합니다. 자정을 넘겨 늦게 제출하더라도, 원래 읽은 날짜를 선택해 기록을 남기면 오늘 것과 뒤섞이거나 덮어써지지 않습니다.</li>
+        <li>반드시 <strong>당일 일정을 드롭다운 박스에서 선택</strong>해서 인증해 주셔야 합니다. (예: 2일차 분량을 자정 넘겨 인증하는 경우, 3일차가 아닌 <strong>2일차</strong>로 선택)</li>
         <li>다만 <strong>마감(24:00)을 넘긴 제출은 어떤 날짜를 선택하든 계속 미인증(X)으로 집계</strong>됩니다. 지각으로 판정된 글에는 "지각" 표시가 함께 붙습니다.</li>
       </ul>
     </section>
@@ -129,13 +129,12 @@
         <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
         <div class="feed-head-actions">
           <div class="feed-tabs" id="feedTabs">
-            <button type="button" class="on" data-feedtab="date">날짜별 보기</button>
-            <button type="button" data-feedtab="all">전체 보기</button>
+            <a href="feed-all.html" target="_blank" rel="noopener" class="btn on">전체 보기 ↗</a>
           </div>
           <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침">↻ 새로고침</button>
         </div>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 확인할 수 있습니다. 전체보기를 통해 일자별 다른 분들의 인사이트를 한눈에 볼 수 있습니다.</p>
+      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 확인할 수 있습니다. <strong>전체 보기</strong>를 누르면 새 창에서 지금까지의 모든 인증글을 한눈에 볼 수 있습니다.</p>
 
       <div id="feedDateView">
         <div class="feed-datenav">
@@ -150,16 +149,6 @@
         </div>
         <div class="feed-more-wrap" id="feedLoadMoreWrap" hidden>
           <button type="button" id="feedLoadMoreBtn" class="small"></button>
-        </div>
-      </div>
-
-      <div id="feedAllView" hidden>
-        <p class="hint">지금까지 제출된 모든 인증글을 최신순으로 한눈에 볼 수 있습니다.</p>
-        <div id="allFeedList" class="all-feed-grid">
-          <div class="empty">제출된 인증글이 없습니다.</div>
-        </div>
-        <div class="feed-more-wrap" id="allFeedLoadMoreWrap" hidden>
-          <button type="button" id="allFeedLoadMoreBtn" class="small"></button>
         </div>
       </div>
     </section>
@@ -183,15 +172,16 @@
           <div class="n" id="ovToday">0%</div>
           <div class="k">오늘 인증률</div>
         </div>
-        <div class="stat">
-          <div class="n" id="ovActive">0</div>
-          <div class="k">참여중</div>
+        <div class="stat clickable" id="ovDoneTile" role="button" tabindex="0" aria-expanded="false">
+          <div class="n" id="ovDone">0</div>
+          <div class="k">인증 완료 인원</div>
         </div>
-        <div class="stat bad">
+        <div class="stat bad clickable" id="ovRiskTile" role="button" tabindex="0" aria-expanded="false">
           <div class="n" id="ovRisk">0</div>
           <div class="k">킥아웃 위험 인원</div>
         </div>
       </div>
+      <div id="ovDetail" class="ov-detail" hidden></div>
 
       <div class="scroll" style="margin-top:16px">
         <table id="overallTable"></table>

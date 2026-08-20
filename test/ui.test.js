@@ -97,16 +97,39 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('평균 인증률 타일 제거됨', (await page.locator('#ovAvgRate').count()) === 0);
   t('킥아웃 위험 인원 라벨로 변경', (await page.textContent('#overallStats')).includes('킥아웃 위험 인원'));
 
-  // ── 인증 피드: 전체 보기 탭 ──
-  await page.click('button[data-feedtab="all"]');
-  await page.waitForTimeout(300);
-  t('전체 보기 카드 노출', (await page.locator('#allFeedList .feed-item').count()) >= 2);
-  t('날짜별 보기 영역 숨김', await page.isHidden('#feedDateView'));
+  // ── 전체 진행현황: "인증 완료 인원" 타일 + 클릭 시 명단 펼치기 ──
+  t('참여중 → 인증 완료 인원으로 라벨 변경', (await page.textContent('#overallStats')).includes('인증 완료 인원'));
+  t('인증 완료 인원 수치 = 오늘 인증한 2명', (await page.textContent('#ovDone')) === '2');
+  await page.click('#ovDoneTile');
+  await page.waitForTimeout(150);
+  const ovDetailText = await page.textContent('#ovDetail');
+  t('완료 인원 타일 클릭 시 명단 노출', ovDetailText.includes('커밍쏜') && ovDetailText.includes('밤톨'));
+  await page.click('#ovDoneTile');
+  await page.waitForTimeout(150);
+  t('같은 타일 재클릭 시 명단 다시 숨김', await page.isHidden('#ovDetail'));
+  await page.click('#ovRiskTile');
+  await page.waitForTimeout(150);
+  t('킥아웃 위험 타일 클릭 시 명단 영역 노출(0명이어도 안내문 표시)',
+    (await page.textContent('#ovDetail')).includes('킥아웃 위험 인원'));
+  await page.click('#ovRiskTile');
+  await page.waitForTimeout(150);
 
-  // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (현재 선택: 밤톨) ──
-  const bamtolCard = page.locator('#allFeedList .feed-item', { hasText: '밤톨' });
+  // ── 인증 피드: "전체 보기"는 새 창(feed-all.html)으로 링크됨 ──
+  const feedAllLink = page.locator('#feedTabs a.on');
+  t('전체 보기 링크가 feed-all.html을 새 창으로 엶',
+    (await feedAllLink.getAttribute('href')) === 'feed-all.html'
+    && (await feedAllLink.getAttribute('target')) === '_blank');
+  const feedAllPage = await ctx.newPage();
+  await feedAllPage.goto(BASE + '/feed-all.html');
+  await feedAllPage.waitForTimeout(400);
+  t('전체 보기 페이지에 인증 카드 노출', (await feedAllPage.locator('#allFeedList .feed-item').count()) >= 2);
+  t('전체 보기 페이지 건수 표시', /\d+건/.test(await feedAllPage.textContent('#feedCount')));
+  await feedAllPage.close();
+
+  // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
+  const bamtolCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
   t('본인 글 엄지척 비활성', await bamtolCard.locator('.upvote-btn').isDisabled());
-  const otherCard = page.locator('#allFeedList .feed-item', { hasText: '커밍쏜' });
+  const otherCard = page.locator('#socialFeedList .feed-item', { hasText: '커밍쏜' });
   const upvoteBtn = otherCard.locator('.upvote-btn');
   await upvoteBtn.click();
   await page.waitForTimeout(400);
@@ -114,7 +137,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await upvoteBtn.click();
   await page.waitForTimeout(400);
   t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
-  await page.click('button[data-feedtab="date"]');
 
   // ── 운영진 화면: 현황/리포트 ──
   await page.goto(BASE + '/admin.html');
@@ -256,6 +278,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await beforePage.goto(BASE + '/index.html');
   await beforePage.waitForTimeout(400);
   t('시작 전: D-day 안내가 배너 아래 phaseNote에 노출', /D-4/.test(await beforePage.textContent('#phaseNote')));
+  t('연습 기간 날짜는 "연습 (날짜)" 형식으로 일자가 먼저 오지 않음(연습 라벨이 앞에 옴)',
+    /^연습 \(\d+\/\d+/.test((await beforePage.locator('#certifyDate option:checked').textContent()).trim()));
   t('안내 규칙 카드가 책 소개와 배너 사이에 위치',
     await beforePage.evaluate(() => {
       const intro = document.querySelector('section.intro');
@@ -267,6 +291,23 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       return !!(pos(intro, rules) && pos(rules, banner));
     }));
   await beforeCtx.close();
+
+  // ── 참가자 화면: 챌린지 종료 후(after)에는 phaseNote가 더 이상 노출되지 않음 ──
+  const afterCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await afterCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-30)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(-2)}'`)
+               .replace(/otAt: '[^']+'/, `otAt: '${shift(-31)}T10:00'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const afterPage = await afterCtx.newPage();
+  await afterPage.goto(BASE + '/index.html');
+  await afterPage.waitForTimeout(400);
+  t('종료 후: phaseNote 안내문 사라짐', (await afterPage.textContent('#phaseNote')).trim() === '');
+  await afterCtx.close();
 
   // ── 참가자 화면: 인증할 날짜 드롭다운 & 지각 백필은 계속 미인증 ──
   const dayCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
@@ -292,6 +333,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const dayOptCount = await dayPage.locator('#certifyDate option').count();
   t('인증 날짜 드롭다운에 여러 날짜 존재', dayOptCount >= 5, dayOptCount);
   t('날짜 드롭다운 기본값 = 오늘', (await dayPage.locator('#certifyDate option:checked').textContent()).includes('오늘'));
+  t('진행 중 날짜는 "N일차 (날짜)" 형식으로 일자가 먼저 옴',
+    /^\d+일차 \(\d+\/\d+/.test((await dayPage.locator('#certifyDate option:checked').textContent()).trim()));
   t('오늘 선택 시 지각 경고 숨김', await dayPage.isHidden('#certifyDateWarn'));
 
   await dayPage.selectOption('#participant', { label: '지각이' });
