@@ -218,7 +218,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
   t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
   const rulesLis = await page.locator('.wrap section.card:last-of-type ul.muted li').count();
-  t('규칙 목록 4개(지각 백필 안내 포함)', rulesLis === 4, rulesLis);
+  t('규칙 목록 5개(날짜 선택·지각 안내 포함)', rulesLis === 5, rulesLis);
   t('전체 진행현황 3개 지표만 노출', (await page.locator('#overallStats .stat').count()) === 3);
 
   // ── 참가자 화면: 챌린지 시작 전(before) 상태의 안내 위치 ──
