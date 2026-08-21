@@ -1,7 +1,7 @@
 /* Firebase(Firestore) 어댑터 - 로그인 없이 공용 읽기/쓰기 모드 + 관리자 인증 기능 탑재
  *
  * 컬렉션 구조
- *   participants/{id}  { nickname, status, joinDate, outDate, exemptDates[], note, createdAt }
+ *   participants/{id}  { nickname, email, status, joinDate, outDate, exemptDates[], note, createdAt }
  *   submissions/{id}   { participantId, nickname, date, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
  *   notifyEmails/{id}  { name, email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
  *   meta/app           { ... }
@@ -76,6 +76,7 @@ CS.FirebaseStore = (function () {
 
   const col = (name) => fs.collection(db, name);
   const withId = (snap) => Object.assign({ id: snap.id }, snap.data());
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   async function listParticipants() {
     await init();
@@ -92,6 +93,7 @@ CS.FirebaseStore = (function () {
     if (!dup.empty) throw new Error(`이미 등록된 닉네임입니다: ${nick}`);
     const body = Object.assign({
       nickname: nick,
+      email: '',
       status: 'active',
       joinDate: CS.CONFIG.startDate,
       outDate: null,
@@ -121,6 +123,11 @@ CS.FirebaseStore = (function () {
     await init();
     const body = Object.assign({}, patch);
     if (body.nickname) body.nickname = CS.U.normalizeNick(body.nickname);
+    if (body.email != null) {
+      const email = String(body.email).trim().toLowerCase();
+      if (email && !EMAIL_RE.test(email)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+      body.email = email;
+    }
     await fs.updateDoc(fs.doc(db, 'participants', id), body);
 
     if (body.nickname) {
@@ -225,16 +232,17 @@ CS.FirebaseStore = (function () {
   }
 
   /* ── 인증 알림 메일 수신자 목록 ───────── */
+  // [명단 관리] 탭과 마찬가지로 이름 기준 가나다순으로 보여준다(이름이 없으면 맨 앞).
   async function listNotifyEmails() {
     await init();
     const snap = await fs.getDocs(col('notifyEmails'));
-    return snap.docs.map(withId).sort((a, b) => a.email.localeCompare(b.email));
+    return snap.docs.map(withId).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
   }
 
   async function addNotifyEmail(name, email) {
     await init();
     const clean = String(email || '').trim().toLowerCase();
-    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+    if (!clean || !EMAIL_RE.test(clean)) throw new Error('올바른 메일 주소를 입력해 주세요.');
     const dup = await fs.getDocs(fs.query(col('notifyEmails'), fs.where('email', '==', clean)));
     if (!dup.empty) throw new Error(`이미 등록된 메일 주소입니다: ${clean}`);
     const body = { name: CS.U.normalizeNick(name), email: clean, createdAt: CS.U.nowStamp() };
@@ -251,7 +259,7 @@ CS.FirebaseStore = (function () {
     for (const entry of entries) {
       const clean = String((entry && entry.email) || '').trim().toLowerCase();
       if (!clean) continue;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) { invalid.push(clean); continue; }
+      if (!EMAIL_RE.test(clean)) { invalid.push(clean); continue; }
       if (existing.has(clean)) { skipped.push(clean); continue; }
       added.push(await addNotifyEmail(entry && entry.name, clean));
       existing.add(clean);
