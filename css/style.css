@@ -81,7 +81,7 @@ a { color: var(--accent); }
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
-.brand-logo { height: 48px; width: auto; border-radius: 8px; display: block; flex: 0 0 auto; }
+.brand-logo { height: 56px; width: auto; border-radius: 10px; display: block; flex: 0 0 auto; }
 .brand-text { display: flex; flex-direction: column; gap: 2px; }
 .brand h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: #ffffff; }
 .brand p { margin: 0; font-size: 13px; color: #ffe600; font-weight: 600; }
@@ -475,7 +475,7 @@ button.ghost { background: transparent; }
 
 @media (max-width: 640px) {
   .top { padding: 14px 0; margin-bottom: 18px; }
-  .brand-logo { height: 40px; }
+  .brand-logo { height: 44px; }
   .brand h1 { font-size: 17px; }
   .navlinks a { padding: 7px 13px; }
   .wrap { padding: 0 13px 56px; }
