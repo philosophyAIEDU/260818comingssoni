@@ -268,7 +268,13 @@
     await refresh();
   }
 
-  /* ── 명단 시트 업로드 (CSV: 이름, 이메일) ─────────── */
+  /* ── 명단 시트 업로드 (CSV/엑셀: 이름, 이메일) ─────── */
+
+  /** 한 행(셀 값 배열)을 { name, email }로 정리한다. 앞의 두 빈 칸 아닌 값을 이름·메일로 본다. */
+  function rowToEntry(cells) {
+    const parts = cells.map((c) => String(c == null ? '' : c).trim()).filter(Boolean);
+    return parts.length >= 2 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] || '' };
+  }
 
   /** CSV 한 줄을 "이름, 이메일"(또는 탭 구분)로 파싱한다. BOM·따옴표 감싼 값도 처리한다. */
   function parseRosterCsv(raw) {
@@ -278,10 +284,37 @@
       const t = s.trim();
       return (t.startsWith('"') && t.endsWith('"')) ? t.slice(1, -1).replace(/""/g, '"') : t;
     };
-    return text.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
-      const parts = line.split(/\t|,/).map(unquote).filter(Boolean);
-      return parts.length >= 2 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] || '' };
-    });
+    return text.split('\n').map((line) => line.trim()).filter(Boolean)
+      .map((line) => rowToEntry(line.split(/\t|,/).map(unquote)));
+  }
+
+  /** 엑셀 파일(.xlsx/.xls)의 첫 시트를 { name, email } 목록으로 변환한다. (SheetJS 필요) */
+  function parseRosterWorkbook(arrayBuffer) {
+    const wb = window.XLSX.read(arrayBuffer, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+    return rows.map(rowToEntry).filter((e) => e.name || e.email);
+  }
+
+  // 엑셀 업로드를 실제로 시도할 때만 SheetJS를 CDN에서 불러온다. 대부분의 방문에서는
+  // 이 라이브러리(수백 KB)를 아예 내려받지 않도록 admin.html에는 <script>로 고정 삽입하지 않았다.
+  const XLSX_CDN_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  let xlsxLoadPromise = null;
+  function loadXlsxLib() {
+    if (window.XLSX) return Promise.resolve();
+    if (!xlsxLoadPromise) {
+      xlsxLoadPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = XLSX_CDN_URL;
+        s.onload = () => resolve();
+        s.onerror = () => {
+          xlsxLoadPromise = null; // 실패하면 다음 시도 때 다시 불러와 보도록 초기화
+          reject(new Error('엑셀 파일을 읽는 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하거나, CSV로 저장해서 다시 올려주세요.'));
+        };
+        document.head.appendChild(s);
+      });
+    }
+    return xlsxLoadPromise;
   }
 
   /** 첫 줄이 "이름/성명/name" · "이메일/메일/email" 같은 제목 줄이면 건너뛴다. */
@@ -296,18 +329,25 @@
   async function uploadRosterCsv() {
     const input = $('rosterCsvInput');
     const file = input.files && input.files[0];
-    if (!file) { msg($('rosterCsvMsg'), '업로드할 CSV 파일을 선택해 주세요.', 'warn'); return; }
+    if (!file) { msg($('rosterCsvMsg'), '업로드할 파일을 선택해 주세요.', 'warn'); return; }
+    const isExcel = /\.xlsx?$/i.test(file.name);
 
     const btn = $('rosterCsvUploadBtn');
     btn.disabled = true;
     const old = btn.textContent;
     btn.textContent = '업로드 중…';
     try {
-      const text = await file.text();
-      const entries = stripCsvHeader(parseRosterCsv(text)).filter((e) => e.name || e.email);
+      let rawEntries;
+      if (isExcel) {
+        await loadXlsxLib();
+        rawEntries = parseRosterWorkbook(await file.arrayBuffer());
+      } else {
+        rawEntries = parseRosterCsv(await file.text());
+      }
+      const entries = stripCsvHeader(rawEntries).filter((e) => e.name || e.email);
       if (!entries.length) {
         msg($('rosterCsvMsg'),
-          '파일에서 이름·이메일 정보를 찾지 못했습니다. "이름, 이메일" 형식의 CSV인지 확인해 주세요.', 'bad');
+          '파일에서 이름·이메일 정보를 찾지 못했습니다. "이름, 이메일" 형식인지 확인해 주세요.', 'bad');
         return;
       }
 

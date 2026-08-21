@@ -403,6 +403,59 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(200);
   t('CSV로 올린 메일이 알림 메일 목록에도 추가됨', (await page.textContent('#notifyTable')).includes('csvreader1@example.com'));
 
+  await page.click('button[data-tab="roster"]');
+  await page.waitForTimeout(200);
+
+  // ── 엑셀(.xlsx) 업로드 — 라이브러리(SheetJS)가 없을 때도 안전하게 안내 메시지로 처리됨
+  //    (이 샌드박스는 CDN이 막혀 있어 실제로도 이 경로를 타지만, 어느 환경에서든 같은 결과가 나오도록
+  //    window.XLSX를 명시적으로 지워서 테스트한다. CDN 로드 실패는 이 시나리오에서 당연히
+  //    발생하는 네트워크 오류라 전체 "JS 오류" 집계에서는 제외한다) ──
+  const errsBeforeXlsxFail = errs.length;
+  await page.evaluate(() => { delete window.XLSX; });
+  await page.setInputFiles('#rosterCsvInput', {
+    name: 'roster.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from('dummy', 'utf-8')
+  });
+  await page.click('#rosterCsvUploadBtn');
+  // CDN 접속 시도 자체가 네트워크 타임아웃까지 걸릴 수 있어 넉넉히 폴링해서 기다린다.
+  await page.waitForFunction(
+    () => (document.getElementById('rosterCsvMsg').textContent || '').includes('라이브러리'),
+    { timeout: 15000 }
+  ).catch(() => {});
+  t('엑셀 라이브러리 미탑재 시 안내 메시지로 안전 처리', /라이브러리/.test(await page.textContent('#rosterCsvMsg')));
+  errs.length = errsBeforeXlsxFail;
+
+  // ── 엑셀(.xlsx) 업로드 — 라이브러리가 있을 때의 파싱·등록 로직 검증
+  //    (SheetJS 자체의 바이너리 파싱은 외부 라이브러리 영역이라 테스트하지 않고,
+  //    XLSX.read/sheet_to_json 결과를 흉내 내어 그 다음 처리 로직만 검증한다) ──
+  await page.evaluate(() => {
+    window.XLSX = {
+      read: () => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: {} } }),
+      utils: {
+        sheet_to_json: () => [
+          ['이름', '이메일'],
+          ['엑셀참여', 'excelreader1@example.com'],
+          ['엑셀모임', 'excelreader2@example.com']
+        ]
+      }
+    };
+  });
+  await page.setInputFiles('#rosterCsvInput', {
+    name: 'roster.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from('dummy', 'utf-8')
+  });
+  await page.click('#rosterCsvUploadBtn');
+  await page.waitForTimeout(400);
+  const xlsxMsg = await page.textContent('#rosterCsvMsg');
+  t('엑셀 업로드 결과 메시지(참여자·알림 메일 동시 등록)',
+    /참여자 2명 등록/.test(xlsxMsg) && /알림 메일 2건 등록/.test(xlsxMsg), xlsxMsg.trim());
+  const rosterNames2 = await page.locator('#rosterTable tbody tr td input[data-rename]').evaluateAll(
+    (els) => els.map((e) => e.value));
+  t('엑셀로 올린 이름이 명단 표에 추가됨(제목 줄 자동 건너뜀)',
+    rosterNames2.includes('엑셀참여') && rosterNames2.includes('엑셀모임'), rosterNames2);
+
   // 모바일 뷰포트에서 가로 스크롤 없는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 375, height: 780 });

@@ -103,11 +103,12 @@
     <p class="hint">
       <strong>이름, 이메일</strong> 두 열이 있는 시트를 올리면 <strong>참여자 명단</strong>(인증 화면 드롭다운에 표시)과
       <strong>알림 메일 수신자 목록</strong>([알림 메일] 탭)에 한 번에 등록됩니다. 이미 등록된 이름·메일 주소는
-      건너뜁니다. 구글 시트·엑셀에서 "쉼표로 구분된 값(.csv)"으로 다운로드해서 올려주세요.
+      건너뜁니다. 엑셀 파일(.xlsx, .xls)을 그대로 올리거나, 구글 시트에서 "쉼표로 구분된 값(.csv)"으로
+      다운로드해서 올려도 됩니다.
     </p>
     <div id="rosterCsvMsg"></div>
     <div class="actions">
-      <input type="file" id="rosterCsvInput" accept=".csv,text/csv">
+      <input type="file" id="rosterCsvInput" accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
       <button class="primary" id="rosterCsvUploadBtn">업로드</button>
       <span class="muted">첫 줄이 "이름, 이메일" 같은 제목 줄이어도 자동으로 건너뜁니다.</span>
     </div>
@@ -298,5 +299,9 @@
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
+<!-- 명단 시트 업로드에서 엑셀(.xlsx/.xls) 파일을 직접 읽기 위한 SheetJS는 여기서 미리 불러오지 않는다.
+     대부분의 방문에서는 쓰지 않는 수백 KB짜리 라이브러리라, 엑셀 업로드를 실제로 시도할 때만
+     js/admin.js의 loadXlsxLib()가 CDN에서 그때그때 불러온다(버전 고정: xlsx@0.18.5).
+     불러오지 못해도(오프라인 등) 나머지 화면·기능은 그대로 동작하고, 엑셀 업로드 시에만 안내 메시지가 뜬다. -->
 </body>
 </html>
