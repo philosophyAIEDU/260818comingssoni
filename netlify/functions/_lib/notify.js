@@ -18,9 +18,21 @@ const nodemailer = require('nodemailer');
 
 // js/config.js 의 CS.FIREBASE_CONFIG.projectId 와 동일해야 합니다.
 const FIREBASE_PROJECT_ID = 'comingssoni-e7517';
-// js/config.js 의 CS.CONFIG.title / appUrl 과 동일해야 합니다.
+// js/config.js 의 CS.CONFIG.title / appUrl / startDate / timezone 과 동일해야 합니다.
 const CHALLENGE_TITLE = '퍼스널메이커스 독서 챌린지';
 const APP_URL = 'https://comingssoni.netlify.app/';
+const START_DATE = '2026-08-24';
+const TIMEZONE = 'Asia/Seoul';
+
+/** 챌린지 기준 시간대(KST)의 오늘 날짜 (YYYY-MM-DD). js/utils.js today()와 동일한 방식. */
+function todayInChallengeTz() {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  const p = {};
+  for (const { type, value } of fmt.formatToParts(new Date())) p[type] = value;
+  return `${p.year}-${p.month}-${p.day}`;
+}
 
 /** Firestore REST API로 notifyEmails 컬렉션을 읽는다. { name, email } 목록을 반환한다.
  *  (별도 서비스 계정 없이 동작하려면 Firestore 보안 규칙에서 notifyEmails 컬렉션의
@@ -33,7 +45,7 @@ async function fetchNotifyEmails() {
   }
   const data = await res.json();
   const docs = data.documents || [];
-  return docs
+  const list = docs
     .map((d) => {
       const f = d.fields || {};
       const email = f.email && f.email.stringValue;
@@ -41,6 +53,16 @@ async function fetchNotifyEmails() {
       return email ? { name, email } : null;
     })
     .filter(Boolean);
+
+  // 같은 주소가 목록에 중복 등록돼 있으면 한 사람이 메일을 여러 통 받게 되므로,
+  // 실제 발송 전에 주소 기준으로 한 번 더 걸러낸다(대소문자 구분 없이).
+  const seen = new Set();
+  return list.filter((r) => {
+    const key = r.email.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // 운영진이 관리자 화면([알림 메일] 탭)에서 아직 저장한 적 없을 때 쓰이는 기본 제목·본문.
@@ -131,9 +153,62 @@ async function sendViaGmail(recipients) {
   return { sent, failed: failures.length, failures };
 }
 
+/** meta/app 문서의 notifyLastSentDate 필드에 오늘 날짜(KST)를 기록한다.
+ *  같은 날 예약 함수가 중복 실행되더라도(Netlify 재시도 등) 두 번째 실행은 이 값을 보고 건너뛴다. */
+async function markNotifySentToday(dateStr) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`
+    + '?updateMask.fieldPaths=notifyLastSentDate';
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { notifyLastSentDate: { stringValue: dateStr } } })
+  });
+  if (!res.ok) {
+    // 기록 실패는 발송 자체를 실패시키지 않는다 — 다음 실행 때 다시 시도된다.
+    console.error(`[notify] notifyLastSentDate 기록 실패 (${res.status})`);
+  }
+}
+
+/** 매일 밤 예약 발송(runNotification)을 실행해도 되는지 판단한다.
+ *  - 챌린지 시작일(START_DATE) 전이면 보내지 않는다.
+ *  - 오늘 이미 한 번 보냈으면(메타 문서 기록 기준) 다시 보내지 않는다 — 예약 함수가
+ *    같은 날 두 번 실행되어도(재시도, 배포 직후 중복 트리거 등) 중복 발송을 막는다. */
+async function shouldRunScheduledReminder() {
+  const today = todayInChallengeTz();
+  if (today < START_DATE) {
+    return { run: false, today, reason: `아직 챌린지 시작일(${START_DATE}) 전입니다.` };
+  }
+  const lastSent = await fetchNotifyLastSentDate();
+  if (lastSent === today) {
+    return { run: false, today, reason: '오늘은 이미 알림 메일을 발송했습니다.' };
+  }
+  return { run: true, today };
+}
+
+async function fetchNotifyLastSentDate() {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const f = data.fields || {};
+  return (f.notifyLastSentDate && f.notifyLastSentDate.stringValue) || null;
+}
+
 async function runNotification() {
   const recipients = await fetchNotifyEmails();
   return sendViaGmail(recipients);
+}
+
+/** 매일 밤 예약 함수(send-daily-reminder.js) 전용 진입점.
+ *  시작일 이전이거나 오늘 이미 발송했으면 건너뛰고, 아니면 발송 후 발송 기록을 남긴다. */
+async function runScheduledReminder() {
+  const check = await shouldRunScheduledReminder();
+  if (!check.run) {
+    return { sent: 0, skipped: true, reason: check.reason };
+  }
+  const result = await runNotification();
+  await markNotifySentToday(check.today);
+  return Object.assign({ skipped: false }, result);
 }
 
 /** 운영진이 [알림 메일] 탭에서 이름으로 검색해 고른 사람 한 명에게, 직접 적은 제목·본문으로
@@ -166,5 +241,5 @@ async function sendOneOffEmail({ email, subject, body }) {
 }
 
 module.exports = {
-  runNotification, fetchNotifyEmails, buildEmail, fetchNotifyTemplate, sendOneOffEmail
+  runNotification, runScheduledReminder, fetchNotifyEmails, buildEmail, fetchNotifyTemplate, sendOneOffEmail
 };

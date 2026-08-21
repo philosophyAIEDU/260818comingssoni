@@ -218,6 +218,18 @@ netlify/functions/_lib/notify.js               공통 로직 (수신자 조회 +
 >
 > 알림을 원하지 않는 참여자는 운영진에게 요청하면 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.
 
+**매일 밤 22시 자동 발송(`send-daily-reminder.js`)에는 두 가지 안전장치가 들어 있습니다.**
+- `js/config.js`의 `startDate`(챌린지 시작일)와 동일한 값을 `notify.js`의 `START_DATE`에 맞춰 두었고,
+  시작일 이전에는 예약 함수가 아예 발송을 건너뜁니다. (`[지금 테스트 발송]` 버튼과 1회성 안내 메일은
+  운영진이 언제든 미리 테스트할 수 있도록 이 제한을 받지 않습니다.)
+- 발송에 성공하면 Firestore `meta/app` 문서에 오늘 날짜(KST)를 `notifyLastSentDate`로 기록해 두고,
+  같은 날 예약 함수가 (배포 직후 중복 트리거 등으로) 다시 실행되더라도 이미 보낸 날이면 재발송하지 않습니다.
+- `notifyEmails`에 같은 메일 주소가 중복 등록돼 있어도 발송 직전에 한 번 걸러서 한 사람에게 두 통이
+  가지 않도록 합니다.
+
+> `CS.CONFIG.startDate`를 바꿀 때는 `netlify/functions/_lib/notify.js`의 `START_DATE` 상수도
+> 반드시 같이 맞춰 주세요 (Netlify 함수는 브라우저의 `js/config.js`를 직접 불러오지 않습니다).
+
 ---
 
 ## 테스트
