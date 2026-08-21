@@ -462,13 +462,21 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('엑셀로 올린 이름이 명단 표에 추가됨(제목 줄 자동 건너뜀)',
     rosterNames2.includes('엑셀참여') && rosterNames2.includes('엑셀모임'), rosterNames2);
 
-  // 모바일 뷰포트에서 가로 스크롤 없는지
+  // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
-  await m.setViewportSize({ width: 375, height: 780 });
+  await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
   await m.goto(BASE + '/index.html');
   await m.waitForTimeout(400);
   const overflow = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   t('모바일 가로 오버플로 없음', overflow <= 1, overflow);
+  t('본문 word-break: keep-all 적용(단어 중간이 아니라 띄어쓰기 기준 줄바꿈)',
+    (await m.evaluate(() => getComputedStyle(document.body).wordBreak)) === 'keep-all');
+  const feedNickWS = await m.evaluate(() => {
+    const el = document.querySelector('#socialFeedList .feed-nick');
+    return el && getComputedStyle(el).whiteSpace;
+  });
+  t('좁은 화면에서 피드 이름이 "커…" 처럼 뭉개지지 않고 한 줄을 다 씀(white-space: normal)',
+    feedNickWS === 'normal', feedNickWS);
 
   await page.screenshot({ path: (process.env.SHOT_DIR || '.') + '/admin.png', fullPage: true });
   await m.screenshot({ path: (process.env.SHOT_DIR || '.') + '/mobile.png', fullPage: true });
