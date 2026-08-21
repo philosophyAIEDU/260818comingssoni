@@ -158,10 +158,11 @@ adminEmails: [...],        // 운영진 구글 계정 화이트리스트
 컬렉션 구조는 localStorage 스키마와 1:1로 대응합니다.
 
 ```
-participants/{id}  { nickname, status, joinDate, outDate, exemptDates[], note, createdAt }
+participants/{id}  { nickname, email, status, joinDate, outDate, exemptDates[], note, createdAt }
 submissions/{id}   { participantId, nickname, date, sentence, reflection,
                      upvotes, upvotedBy[], createdAt, updatedAt }
 notifyEmails/{id}  { name, email, createdAt }   ← 야간 인증 알림 메일 수신자 목록
+notices/{date}     { text, updatedAt }          ← 날짜별로 미리 써 두는 공지문 초안
 meta/app           { ... }
 ```
 
@@ -169,6 +170,13 @@ meta/app           { ... }
 
 > `js/store-firebase.js`는 위 인터페이스에 맞춰 작성해 두었지만, 실제 Firebase 프로젝트에 연결해
 > 검증한 상태는 아닙니다. 전환할 때 보안 규칙(누가 읽고 쓸 수 있는지)을 함께 설정하세요.
+>
+> **컬렉션을 하나 늘렸다면(예: 이번에 추가된 `notices`) Firestore 보안 규칙에도 그 컬렉션의
+> 읽기·쓰기를 허용하는 규칙이 있는지 꼭 확인하세요.** 규칙이 `participants`·`submissions`처럼
+> 컬렉션 이름을 하나씩 나열해 허용하는 방식이라면, 새 컬렉션은 규칙을 추가하기 전까지
+> 권한 오류로 막힙니다 — 이 경우 [알림 메일] 탭처럼 그 기능과 무관한 다른 탭까지 함께
+> 먹통이 되지 않도록, 운영진 화면(`js/admin.js`)은 새 컬렉션을 읽어오는 부분만 따로
+> try/catch로 감싸 실패해도 나머지 탭은 정상 동작하게 되어 있습니다.
 
 ---
 
