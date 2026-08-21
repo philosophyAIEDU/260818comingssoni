@@ -268,6 +268,76 @@
     await refresh();
   }
 
+  /* ── 명단 시트 업로드 (CSV: 이름, 이메일) ─────────── */
+
+  /** CSV 한 줄을 "이름, 이메일"(또는 탭 구분)로 파싱한다. BOM·따옴표 감싼 값도 처리한다. */
+  function parseRosterCsv(raw) {
+    // 엑셀에서 저장한 CSV는 UTF-8 BOM(U+FEFF)으로 시작하는 경우가 있어 첫 글자로 걸러낸다.
+    const text = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
+    const unquote = (s) => {
+      const t = s.trim();
+      return (t.startsWith('"') && t.endsWith('"')) ? t.slice(1, -1).replace(/""/g, '"') : t;
+    };
+    return text.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+      const parts = line.split(/\t|,/).map(unquote).filter(Boolean);
+      return parts.length >= 2 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] || '' };
+    });
+  }
+
+  /** 첫 줄이 "이름/성명/name" · "이메일/메일/email" 같은 제목 줄이면 건너뛴다. */
+  function stripCsvHeader(entries) {
+    if (!entries.length) return entries;
+    const first = entries[0];
+    const isHeaderCell = (s) => /^(이름|성명|name)$/i.test((s || '').trim());
+    const isHeaderMail = (s) => /^(이메일|메일|메일\s*주소|e-?mail)$/i.test((s || '').trim());
+    return (isHeaderCell(first.name) || isHeaderMail(first.email)) ? entries.slice(1) : entries;
+  }
+
+  async function uploadRosterCsv() {
+    const input = $('rosterCsvInput');
+    const file = input.files && input.files[0];
+    if (!file) { msg($('rosterCsvMsg'), '업로드할 CSV 파일을 선택해 주세요.', 'warn'); return; }
+
+    const btn = $('rosterCsvUploadBtn');
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '업로드 중…';
+    try {
+      const text = await file.text();
+      const entries = stripCsvHeader(parseRosterCsv(text)).filter((e) => e.name || e.email);
+      if (!entries.length) {
+        msg($('rosterCsvMsg'),
+          '파일에서 이름·이메일 정보를 찾지 못했습니다. "이름, 이메일" 형식의 CSV인지 확인해 주세요.', 'bad');
+        return;
+      }
+
+      const names = entries.map((e) => e.name).filter(Boolean);
+      const { added: pAdded, skipped: pSkipped } = names.length
+        ? await Store.addParticipants(names)
+        : { added: [], skipped: [] };
+
+      const mailEntries = entries.filter((e) => e.email);
+      const { added: mAdded, skipped: mSkipped, invalid: mInvalid } = mailEntries.length
+        ? await Store.addNotifyEmails(mailEntries)
+        : { added: [], skipped: [], invalid: [] };
+
+      const parts = [
+        `참여자 ${pAdded.length}명 등록${pSkipped.length ? ` (중복 ${pSkipped.length}명 건너뜀)` : ''}`,
+        `알림 메일 ${mAdded.length}건 등록${mSkipped.length ? ` (중복 ${mSkipped.length}건 건너뜀)` : ''}` +
+          `${mInvalid.length ? ` (형식 오류 ${mInvalid.length}건 건너뜀)` : ''}`
+      ];
+      msg($('rosterCsvMsg'), parts.join(' · '), (pAdded.length || mAdded.length) ? 'ok' : 'warn');
+      input.value = '';
+      await refresh();
+      await refreshNotify();
+    } catch (e) {
+      msg($('rosterCsvMsg'), `업로드 실패: ${esc(e.message)}`, 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  }
+
   /* ── 리포트 / 공지문 ─────────────────── */
   function statusOn(date) {
     const active = stats.filter((s) => {
@@ -749,6 +819,7 @@
     $('fDate').max = CONFIG.endDate;
 
     $('bulkAdd').addEventListener('click', bulkAdd);
+    $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
     $('genReport').addEventListener('click', () => {
       $('reportOut').textContent = buildReport($('reportDate').value || U.today());
     });
