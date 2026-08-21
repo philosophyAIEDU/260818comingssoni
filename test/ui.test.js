@@ -296,6 +296,26 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   t('메일 주소 삭제 후 1건 남음', /1명/.test(await page.textContent('#notifyCount')));
 
+  // ── 회귀 테스트: 공지문(notices) 로딩이 실패해도 알림 메일 등 나머지 탭은 정상 동작해야 함
+  //    (공지문 기능을 추가하며 refresh()의 이 부분을 try/catch로 감싸지 않아, 여기서 예외가 나면
+  //    이후의 refreshNotify() 호출이 아예 실행되지 않아 알림 메일 목록이 통째로 사라졌던 회귀 버그) ──
+  const errsBeforeNoticeFail = errs.length;
+  await page.evaluate(() => {
+    CS.Store.listNotices = () => Promise.reject(new Error('테스트: 공지문 컬렉션 접근 실패 시뮬레이션'));
+  });
+  await page.click('button[data-tab="roster"]');
+  await page.waitForTimeout(200);
+  await page.locator('#rosterTable [data-exemptdate]').first().fill(shift(0));
+  await page.locator('#rosterTable [data-addexempt]').first().click();
+  await page.waitForTimeout(400); // 이 클릭이 refresh() 전체를 다시 실행시킨다
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  t('공지문 로딩이 실패해도 알림 메일 목록은 그대로 보임',
+    /1명/.test(await page.textContent('#notifyCount')) && (await page.textContent('#notifyTable')).includes('홍길동'));
+  t('공지문 로딩 실패 안내 메시지 표시', /공지문을 불러오지 못했습니다/.test(await page.textContent('#noticeMsg')));
+  // 방금 콘솔에 찍힌 console.error는 이 테스트가 의도적으로 유발한 것이라 전체 "JS 오류" 집계에서 제외한다.
+  errs.length = errsBeforeNoticeFail;
+
   // 알림 메일 제목·본문 편집
   t('기본 제목 자동 채움', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
   await page.fill('#notifySubjectInput', '테스트 제목입니다');

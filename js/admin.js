@@ -33,8 +33,18 @@
     paintRoster();
     paintParticipantFilter();
     paintEntries();
-    await refreshNotices();
-    loadNoticeForDate();
+    try {
+      // 공지문(notices) 컬렉션은 새로 추가된 기능이라, Firestore 보안 규칙에서 아직 읽기·쓰기가
+      // 막혀 있는 환경도 있을 수 있다. 여기서 실패해도 알림 메일 등 나머지 탭은 정상 동작해야
+      // 하므로, 이 섹션만 격리해서 실패가 refresh() 전체를 중단시키지 않게 한다.
+      await refreshNotices();
+      loadNoticeForDate();
+    } catch (e) {
+      console.error('[공지문] 불러오기 실패', e);
+      msg($('noticeMsg'),
+        `공지문을 불러오지 못했습니다: ${esc(e.message)}. Firestore 보안 규칙에서 notices 컬렉션의 ` +
+        '읽기·쓰기를 허용해 두었는지 확인해 주세요. (README 참고)', 'bad');
+    }
     await refreshNotify();
     await loadNotifyTemplate();
   }
