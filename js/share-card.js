@@ -150,6 +150,52 @@ CS.ShareCard = (function () {
     return 'downloaded';
   }
 
+  function isKakaoInApp() {
+    return /kakaotalk/i.test(navigator.userAgent || '');
+  }
+  function isAndroid() {
+    return /android/i.test(navigator.userAgent || '');
+  }
+  const KAKAO_NOTICE_KEY = `${(window.CS && CS.CONFIG && CS.CONFIG.storagePrefix) || 'cs'}.kakaoNoticeDismissed`;
+
+  /** 카카오톡 인앱 브라우저(채팅방 링크로 들어온 경우)에서 열렸으면, 이미지 저장이
+   *  제한될 수 있다는 안내와 — 안드로이드는 — 외부 브라우저로 한 번에 여는 버튼을 보여준다.
+   *  카카오톡 인앱 브라우저는 다운로드·새 창 등 표준 웹 기능이 일반 브라우저처럼 동작하지
+   *  않는 경우가 많아, 여기서는 코드로 우회하기보다 정확히 안내하는 쪽을 택했다. */
+  function paintKakaoNotice(elementId) {
+    const box = document.getElementById(elementId);
+    if (!box) return;
+    if (!isKakaoInApp() || localStorage.getItem(KAKAO_NOTICE_KEY) === '1') {
+      box.hidden = true;
+      return;
+    }
+
+    box.hidden = false;
+    box.innerHTML = `
+      <strong>카카오톡 안에서 열려 있어요.</strong> 이 상태에서는 인증글 이미지 다운로드·저장이 제한될 수 있습니다.
+      ${isAndroid()
+        ? '아래 버튼으로 외부 브라우저(크롬 등)에서 열면 정상적으로 저장할 수 있어요.'
+        : '오른쪽 위(또는 아래)의 <strong>···</strong> 메뉴에서 <strong>"다른 브라우저로 열기"</strong>(Safari 등)를 선택해 주세요.'}
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${isAndroid() ? '<button type="button" id="kakaoOpenExternal" class="small primary">외부 브라우저에서 열기</button>' : ''}
+        <button type="button" id="kakaoDismiss" class="small ghost">다시 보지 않기</button>
+      </div>
+    `;
+
+    const openBtn = document.getElementById('kakaoOpenExternal');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        // 특정 브라우저(패키지)를 지정하지 않아, 기기에 설정된 기본 브라우저로 열리게 한다.
+        const target = location.href.replace(/^https?:\/\//, '');
+        location.href = `intent://${target}#Intent;scheme=https;end`;
+      });
+    }
+    document.getElementById('kakaoDismiss').addEventListener('click', () => {
+      localStorage.setItem(KAKAO_NOTICE_KEY, '1');
+      box.hidden = true;
+    });
+  }
+
   function submissionFromDataset(ds) {
     return {
       nickname: ds.nickname || '',
@@ -170,13 +216,20 @@ CS.ShareCard = (function () {
         try {
           await share(submissionFromDataset(btn.dataset), meta);
           btn.textContent = '✅ 내려받기 완료';
-          // 다운로드 폴더는 카카오톡 "사진" 첨부(갤러리 기준)에는 안 보일 수 있어서,
-          // 갤러리에 확실히 저장되는 방법을 함께 안내한다.
-          alert('이미지를 다운로드했어요. 새 탭에도 이미지를 열어뒀어요.\n\n'
-            + '카카오톡으로 보내는 방법\n'
-            + '① (추천) 새로 열린 탭의 이미지를 길게 눌러(PC는 마우스 오른쪽 버튼) "이미지 저장"을 선택하면 '
-            + '갤러리에 저장되어, 카카오톡 사진 첨부로 바로 보낼 수 있어요.\n'
-            + '② 또는 카카오톡 채팅방 + 버튼 → "파일"에서 방금 다운로드된 이미지를 찾아 첨부해도 됩니다.');
+          if (isKakaoInApp()) {
+            // 카카오톡 인앱 브라우저에서는 다운로드·새 탭 열기 자체가 막히거나 조용히 실패하는
+            // 경우가 많아, 새 탭 안내 대신 외부 브라우저로 열어달라고 바로 안내한다.
+            alert('카카오톡 안에서는 이미지 다운로드·저장이 제한될 수 있어요.\n\n'
+              + '위쪽의 안내를 참고해서 외부 브라우저(크롬·Safari 등)로 열어 다시 시도해 주세요.');
+          } else {
+            // 다운로드 폴더는 카카오톡 "사진" 첨부(갤러리 기준)에는 안 보일 수 있어서,
+            // 갤러리에 확실히 저장되는 방법을 함께 안내한다.
+            alert('이미지를 다운로드했어요. 새 탭에도 이미지를 열어뒀어요.\n\n'
+              + '카카오톡으로 보내는 방법\n'
+              + '① (추천) 새로 열린 탭의 이미지를 길게 눌러(PC는 마우스 오른쪽 버튼) "이미지 저장"을 선택하면 '
+              + '갤러리에 저장되어, 카카오톡 사진 첨부로 바로 보낼 수 있어요.\n'
+              + '② 또는 카카오톡 채팅방 + 버튼 → "파일"에서 방금 다운로드된 이미지를 찾아 첨부해도 됩니다.');
+          }
         } catch (err) {
           alert('다운로드 중 문제가 발생했습니다: ' + err.message);
         } finally {
@@ -187,5 +240,5 @@ CS.ShareCard = (function () {
     });
   }
 
-  return { build, share, bindButtons };
+  return { build, share, bindButtons, paintKakaoNotice };
 })();

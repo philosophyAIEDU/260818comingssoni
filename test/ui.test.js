@@ -462,13 +462,59 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('엑셀로 올린 이름이 명단 표에 추가됨(제목 줄 자동 건너뜀)',
     rosterNames2.includes('엑셀참여') && rosterNames2.includes('엑셀모임'), rosterNames2);
 
-  // 모바일 뷰포트에서 가로 스크롤 없는지
+  // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
-  await m.setViewportSize({ width: 375, height: 780 });
+  await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
   await m.goto(BASE + '/index.html');
   await m.waitForTimeout(400);
   const overflow = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   t('모바일 가로 오버플로 없음', overflow <= 1, overflow);
+  t('본문 word-break: keep-all 적용(단어 중간이 아니라 띄어쓰기 기준 줄바꿈)',
+    (await m.evaluate(() => getComputedStyle(document.body).wordBreak)) === 'keep-all');
+  const feedNickWS = await m.evaluate(() => {
+    const el = document.querySelector('#socialFeedList .feed-nick');
+    return el && getComputedStyle(el).whiteSpace;
+  });
+  t('좁은 화면에서 피드 이름이 "커…" 처럼 뭉개지지 않고 한 줄을 다 씀(white-space: normal)',
+    feedNickWS === 'normal', feedNickWS);
+
+  // ── 카카오톡 인앱 브라우저 감지 배너 ──
+  const kakaoCtx = await browser.newContext({
+    locale: 'ko-KR', timezoneId: 'Asia/Seoul', viewport: { width: 360, height: 700 },
+    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S911N) AppleWebKit/537.36 (KHTML, like Gecko) '
+      + 'Version/4.0 Chrome/114.0.0.0 Mobile Safari/537.36 KAKAOTALK 10.9.5'
+  });
+  await kakaoCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const kakaoPage = await kakaoCtx.newPage();
+  await kakaoPage.goto(BASE + '/index.html');
+  await kakaoPage.waitForTimeout(400);
+  t('카카오톡 인앱 브라우저에서는 안내 배너 노출', !(await kakaoPage.isHidden('#kakaoWebviewNotice')));
+  t('안드로이드에서는 외부 브라우저로 여는 버튼 제공', await kakaoPage.isVisible('#kakaoOpenExternal'));
+  await kakaoPage.click('#kakaoDismiss');
+  await kakaoPage.waitForTimeout(100);
+  t('배너 닫기 클릭 시 바로 숨김', await kakaoPage.isHidden('#kakaoWebviewNotice'));
+  await kakaoPage.reload();
+  await kakaoPage.waitForTimeout(400);
+  t('닫기 선택은 새로고침 후에도 유지됨', await kakaoPage.isHidden('#kakaoWebviewNotice'));
+  await kakaoCtx.close();
+
+  const normalUACtx = await browser.newContext({ locale: 'ko-KR', viewport: { width: 375, height: 700 } });
+  await normalUACtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const normalPage = await normalUACtx.newPage();
+  await normalPage.goto(BASE + '/index.html');
+  await normalPage.waitForTimeout(400);
+  t('일반 브라우저에서는 배너가 보이지 않음', await normalPage.isHidden('#kakaoWebviewNotice'));
+  await normalUACtx.close();
 
   await page.screenshot({ path: (process.env.SHOT_DIR || '.') + '/admin.png', fullPage: true });
   await m.screenshot({ path: (process.env.SHOT_DIR || '.') + '/mobile.png', fullPage: true });

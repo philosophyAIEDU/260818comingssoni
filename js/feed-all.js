@@ -98,6 +98,7 @@
 
   async function boot() {
     await Store.init();
+    CS.ShareCard.paintKakaoNotice('kakaoWebviewNotice');
     await refreshAllFeed();
 
     $('allFeedLoadMoreBtn').addEventListener('click', () => {
