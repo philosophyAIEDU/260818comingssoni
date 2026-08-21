@@ -4,6 +4,7 @@
  *   participants/{id}  { nickname, email, status, joinDate, outDate, exemptDates[], note, createdAt }
  *   submissions/{id}   { participantId, nickname, date, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
  *   notifyEmails/{id}  { name, email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
+ *   notices/{date}     { text, updatedAt }         ← 날짜별로 미리 써 두는 공지문 초안
  *   meta/app           { ... }
  */
 window.CS = window.CS || {};
@@ -272,6 +273,31 @@ CS.FirebaseStore = (function () {
     await fs.deleteDoc(fs.doc(db, 'notifyEmails', id));
   }
 
+  /* ── 공지문 (날짜별로 미리 써 두는 초안) ─── */
+  async function getNotice(date) {
+    await init();
+    const snap = await fs.getDoc(fs.doc(db, 'notices', date));
+    return snap.exists() ? snap.data() : null;
+  }
+
+  /** text가 빈 값이면 그 날짜의 저장분을 지운다(다음부터 자동 생성 문구로 되돌아감). */
+  async function setNotice(date, text) {
+    await init();
+    const clean = String(text || '').trim();
+    if (!clean) {
+      await fs.deleteDoc(fs.doc(db, 'notices', date));
+      return;
+    }
+    await fs.setDoc(fs.doc(db, 'notices', date), { text: clean, updatedAt: CS.U.nowStamp() });
+  }
+
+  async function listNotices() {
+    await init();
+    const snap = await fs.getDocs(col('notices'));
+    return snap.docs.map((d) => Object.assign({ date: d.id }, d.data()))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   async function getMeta() {
     await init();
     const snap = await fs.getDoc(fs.doc(db, 'meta', 'app'));
@@ -324,6 +350,7 @@ CS.FirebaseStore = (function () {
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser,
-    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail
+    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
+    getNotice, setNotice, listNotices
   };
 })();

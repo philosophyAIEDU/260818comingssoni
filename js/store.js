@@ -24,12 +24,16 @@
  *   addNotifyEmail(name, email)           → Promise<NotifyEmail>
  *   addNotifyEmails({name,email}[])       → Promise<{added, skipped, invalid}>
  *   removeNotifyEmail(id)                 → Promise<void>
+ *   getNotice(date)                       → Promise<{text, updatedAt}|null>
+ *   setNotice(date, text)                 → Promise<void>  (text가 빈 값이면 저장분 삭제)
+ *   listNotices()                         → Promise<{date, text, updatedAt}[]>
  *
  *  Participant { id, nickname, email, status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
  *  NotifyEmail { id, name, email, createdAt }
+ *  Notice(날짜별 미리 써 두는 공지문) { date, text, updatedAt }
  * ───────────────────────────────────────────────────────────
  */
 window.CS = window.CS || {};
@@ -269,6 +273,28 @@ CS.LocalStore = (function () {
     write(N, read(N, []).filter((e) => e.id !== id));
   }
 
+  /* ── 공지문 (날짜별로 미리 써 두는 초안) ─── */
+  const NT = 'notices'; // { [date]: { text, updatedAt } }
+
+  async function getNotice(date) {
+    const all = read(NT, {});
+    return all[date] || null;
+  }
+
+  /** text가 빈 값이면 그 날짜의 저장분을 지운다(다음부터 자동 생성 문구로 되돌아감). */
+  async function setNotice(date, text) {
+    const all = read(NT, {});
+    const clean = String(text || '').trim();
+    if (!clean) delete all[date];
+    else all[date] = { text: clean, updatedAt: CS.U.nowStamp() };
+    write(NT, all);
+  }
+
+  async function listNotices() {
+    const all = read(NT, {});
+    return Object.keys(all).sort().map((date) => Object.assign({ date }, all[date]));
+  }
+
   async function exportAll() {
     return {
       exportedAt: CS.U.nowStamp(),
@@ -297,7 +323,8 @@ CS.LocalStore = (function () {
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
-    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail
+    listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
+    getNotice, setNotice, listNotices
   };
 })();
 

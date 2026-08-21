@@ -86,9 +86,10 @@ CS.U = (function () {
     return i >= 1 && i <= challengeDates().length ? i : null;
   }
 
-  /** 오늘이 챌린지 기간 중인지 */
-  function phase() {
-    const t = today();
+  /** 특정 날짜(기본은 오늘)가 챌린지 기간 중인지. 공지문을 미리 쓸 미래 날짜를
+   *  판정할 때는 iso를 넘겨서 그 날짜 기준으로 before/running/after를 가른다. */
+  function phase(iso) {
+    const t = iso || today();
     if (t < CS.CONFIG.startDate) return 'before';
     if (t > CS.CONFIG.endDate) return 'after';
     return 'running';

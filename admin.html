@@ -136,13 +136,27 @@
     <pre class="report" id="reportOut">날짜를 선택하고 [리포트 생성]을 누르세요.</pre>
     <div class="actions"><button id="copyReport">리포트 복사</button></div>
 
-    <h2 style="margin-top:26px">오늘 공지문 초안</h2>
-    <p class="hint">단톡방에 그대로 복사해 붙여 넣을 수 있는 공지문입니다.</p>
-    <pre class="report" id="noticeOut"></pre>
-    <div class="actions">
-      <button id="genNotice">공지문 다시 생성</button>
-      <button class="primary" id="copyNotice">공지문 복사</button>
+    <h2 style="margin-top:26px">공지문 (날짜별로 미리 작성 · 최대 30일치)</h2>
+    <p class="hint">매일 아침 단톡방에 보낼 공지문을 날짜별로 미리 써서 저장해 둘 수 있습니다.
+      저장하지 않은 날짜는 자동 생성된 초안이 대신 보입니다.</p>
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <label class="muted" for="noticeDate">대상 날짜</label>
+        <input type="date" id="noticeDate">
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button id="noticeRegen" style="width:100%">자동 생성 문구로 채우기</button>
+      </div>
     </div>
+    <textarea class="report" id="noticeOut" rows="16"></textarea>
+    <p class="muted" id="noticeStatus"></p>
+    <div class="actions">
+      <button class="primary" id="noticeSave">저장</button>
+      <button id="noticeDelete">저장한 공지 삭제</button>
+      <button id="copyNotice">공지문 복사</button>
+      <span class="muted" id="noticeSavedCount" style="margin-left:auto"></span>
+    </div>
+    <div id="noticeMsg"></div>
   </section>
 
   <!-- ── 제출 기록 ─────────────────────── -->

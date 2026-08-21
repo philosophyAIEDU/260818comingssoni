@@ -187,6 +187,21 @@ function t(name, cond, extra) {
   t('일괄 등록 후 목록 2건', mails.length === 2, mails.map(m => m.email));
   for (const m of mails) await Store.removeNotifyEmail(m.id);
 
+  console.log('— 공지문 (날짜별 미리 작성) —');
+  t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);
+  await Store.setNotice('2026-08-24', '  8/24 공지 초안입니다  ');
+  const notice1 = await Store.getNotice('2026-08-24');
+  t('저장한 내용을 그대로 불러옴(앞뒤 공백은 정리)',
+    notice1 && notice1.text === '8/24 공지 초안입니다', notice1);
+  await Store.setNotice('2026-08-25', '8/25 공지');
+  const noticeList = await Store.listNotices();
+  t('날짜순으로 2건', noticeList.length === 2
+    && noticeList[0].date === '2026-08-24' && noticeList[1].date === '2026-08-25', noticeList);
+  await Store.setNotice('2026-08-24', ''); // 빈 값으로 저장 = 삭제(자동 생성 문구로 되돌림)
+  t('빈 값으로 저장하면 삭제됨', (await Store.getNotice('2026-08-24')) === null);
+  t('삭제 후 목록 1건', (await Store.listNotices()).length === 1);
+  await Store.setNotice('2026-08-25', '');
+
   // 아웃 처리 후 이후 날짜는 '·'
   await Store.updateParticipant(whale.id, { status: 'out', outDate: '2026-09-01' });
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)

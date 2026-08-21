@@ -33,7 +33,8 @@
     paintRoster();
     paintParticipantFilter();
     paintEntries();
-    paintNotice();
+    await refreshNotices();
+    loadNoticeForDate();
     await refreshNotify();
     await loadNotifyTemplate();
   }
@@ -467,19 +468,24 @@
     return L.join('\n');
   }
 
-  function buildNotice() {
-    const today = U.today();
-    const idx = U.dayIndex(today);
+  /** date(기본 오늘) 하루치 공지문 초안을 자동으로 만든다.
+   *  아침에 미리 여러 날짜를 준비할 수 있도록 date를 인자로 받는다 — 이 경우 "어제 인증률"
+   *  섹션은 그 날짜가 실제로 마감을 지난 날짜(lastSettledDate 이내)일 때만 보여준다.
+   *  (미래 날짜는 아직 그 전날 데이터가 확정되지 않아 "전원 인증 완료"처럼 사실과
+   *  다른 문구가 나올 수 있어서다.) 킥아웃 위험 안내는 항상 "지금 시점" 기준이다. */
+  function buildNotice(date) {
+    date = date || U.today();
+    const idx = U.dayIndex(date);
     const total = U.challengeDates().length;
-    const yest = U.addDays(today, -1);
+    const yest = U.addDays(date, -1);
 
     const L = [];
     L.push(`📖 ${CONFIG.title} ${idx ? `${idx}일차` : ''} 공지`);
-    L.push(`${U.longLabel(today)}`);
+    L.push(`${U.longLabel(date)}`);
     L.push('');
 
-    if (U.phase() === 'before') {
-      const d = U.diffDays(today, CONFIG.startDate);
+    if (U.phase(date) === 'before') {
+      const d = U.diffDays(date, CONFIG.startDate);
       L.push(`챌린지 시작까지 D-${d} 입니다.`);
       L.push(`OT : ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시`);
       L.push(`기간 : ${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)} (4주)`);
@@ -489,7 +495,7 @@
       return L.join('\n');
     }
 
-    if (U.phase() === 'after') {
+    if (U.phase(date) === 'after') {
       const done = stats.reduce((n, s) => n + s.verified, 0);
       const perfect = stats.filter((s) => s.participant.status !== 'out' && s.missed === 0);
       L.push('4주간의 독서챌린지가 모두 끝났습니다. 🎉');
@@ -500,7 +506,8 @@
       return L.join('\n');
     }
 
-    if (yest >= CONFIG.startDate) {
+    const settled = U.lastSettledDate();
+    if (yest >= CONFIG.startDate && settled && yest <= settled) {
       const g = statusOn(yest);
       const rate = g.target.length ? Math.round((g.done.length / g.target.length) * 100) : 0;
       L.push(`■ 어제 ${U.shortLabel(yest)} 인증률 : ${rate}% (${g.done.length}/${g.target.length}명)`);
@@ -531,7 +538,65 @@
     return L.join('\n');
   }
 
-  function paintNotice() { $('noticeOut').textContent = buildNotice(); }
+  /* ── 공지문 (날짜별로 미리 써 두는 초안) ─────── */
+  let notices = [];
+  let noticeDirty = false; // 저장 안 한 편집 중인 내용을 다른 새로고침이 덮어쓰지 않도록
+
+  async function refreshNotices() {
+    notices = await Store.listNotices();
+    $('noticeSavedCount').textContent = notices.length
+      ? `저장된 공지 ${notices.length}일치`
+      : '저장된 공지 없음 (모두 자동 생성 문구)';
+  }
+
+  function paintNoticeStatus(date) {
+    const saved = notices.find((n) => n.date === date);
+    $('noticeStatus').textContent = saved
+      ? `저장됨 · 최근 수정 ${U.stampLabel(saved.updatedAt)}`
+      : '자동 생성된 초안입니다 (아직 저장하지 않음).';
+  }
+
+  /** 날짜 선택창에 맞춰 공지문을 불러온다. 저장된 내용이 있으면 그걸, 없으면
+   *  자동 생성 문구를 보여준다. 편집 중(dirty)이면 다른 화면 갱신이 덮어쓰지 않는다. */
+  function loadNoticeForDate() {
+    if (noticeDirty) return;
+    const date = $('noticeDate').value || U.today();
+    const saved = notices.find((n) => n.date === date);
+    $('noticeOut').value = saved ? saved.text : buildNotice(date);
+    paintNoticeStatus(date);
+  }
+
+  async function saveNotice() {
+    const date = $('noticeDate').value || U.today();
+    const text = $('noticeOut').value.trim();
+    if (!text) { msg($('noticeMsg'), '저장할 공지 내용을 입력해 주세요.', 'warn'); return; }
+    try {
+      await Store.setNotice(date, text);
+      noticeDirty = false;
+      await refreshNotices();
+      paintNoticeStatus(date);
+      msg($('noticeMsg'), `${U.longLabel(date)} 공지문을 저장했습니다.`, 'ok');
+    } catch (e) {
+      msg($('noticeMsg'), `저장 실패: ${esc(e.message)}`, 'bad');
+    }
+  }
+
+  function regenNotice() {
+    const date = $('noticeDate').value || U.today();
+    $('noticeOut').value = buildNotice(date);
+    noticeDirty = true; // 다시 채우기만 했을 뿐 저장 전이므로 다음 새로고침에 덮어써지지 않게
+    $('noticeStatus').textContent = '자동 생성 문구로 다시 채웠습니다 ([저장]을 눌러야 반영됩니다).';
+  }
+
+  async function deleteNotice() {
+    const date = $('noticeDate').value || U.today();
+    if (!confirm(`${U.longLabel(date)}에 저장해 둔 공지문을 삭제하고 자동 생성 문구로 되돌릴까요?`)) return;
+    await Store.setNotice(date, '');
+    noticeDirty = false;
+    await refreshNotices();
+    loadNoticeForDate();
+    msg($('noticeMsg'), '저장한 공지문을 삭제했습니다.', 'ok');
+  }
 
   async function copyText(text, el) {
     try {
@@ -882,14 +947,25 @@
     $('fDate').min = CONFIG.startDate;
     $('fDate').max = CONFIG.endDate;
 
+    // 공지문은 매일 아침 미리 준비할 수 있도록 시작일부터 최소 30일치(챌린지 기간이 더 길면 그만큼) 고른다.
+    const noticeMax = CONFIG.endDate > U.addDays(CONFIG.startDate, 29) ? CONFIG.endDate : U.addDays(CONFIG.startDate, 29);
+    $('noticeDate').min = CONFIG.startDate;
+    $('noticeDate').max = noticeMax;
+    $('noticeDate').value = (U.today() >= CONFIG.startDate && U.today() <= noticeMax) ? U.today() : CONFIG.startDate;
+
     $('bulkAdd').addEventListener('click', bulkAdd);
     $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
     $('genReport').addEventListener('click', () => {
       $('reportOut').textContent = buildReport($('reportDate').value || U.today());
     });
     $('copyReport').addEventListener('click', (e) => copyText($('reportOut').textContent, e.target));
-    $('genNotice').addEventListener('click', paintNotice);
-    $('copyNotice').addEventListener('click', (e) => copyText($('noticeOut').textContent, e.target));
+
+    $('noticeDate').addEventListener('change', () => { noticeDirty = false; loadNoticeForDate(); });
+    $('noticeOut').addEventListener('input', () => { noticeDirty = true; });
+    $('noticeRegen').addEventListener('click', regenNotice);
+    $('noticeSave').addEventListener('click', saveNotice);
+    $('noticeDelete').addEventListener('click', deleteNotice);
+    $('copyNotice').addEventListener('click', (e) => copyText($('noticeOut').value, e.target));
 
     $('applyFilter').addEventListener('click', paintEntries);
     $('fKeyword').addEventListener('keydown', (e) => { if (e.key === 'Enter') paintEntries(); });
