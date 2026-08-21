@@ -112,20 +112,41 @@ CS.ShareCard = (function () {
     return String(s || '').replace(/[^\w가-힣-]+/g, '') || 'card';
   }
 
-  /** 이미지로 만들어 브라우저의 표준 다운로드(다운로드 폴더)로 저장한다. */
+  /** 이미지로 만들어 (1) 다운로드 폴더에 저장하고, (2) 새 탭에도 열어 길게 눌러(또는 우클릭해)
+   *  갤러리에 저장할 수 있게 한다. 다운로드 폴더 파일은 기기·브라우저에 따라 카카오톡의
+   *  "사진" 첨부(갤러리 기준)에는 안 보일 수 있어서, 갤러리 저장 경로를 함께 제공한다. */
   async function share(submission, meta) {
-    const blob = await build(submission, meta);
-    if (!blob) throw new Error('이미지를 만들지 못했습니다.');
-    const fileName = `인증-${safeFileName(submission.nickname)}-${submission.date || ''}.png`;
+    // 팝업 차단을 피하려면 클릭과 같은 타이밍(비동기 작업 전)에 미리 빈 탭을 열어둬야 한다.
+    const previewWin = window.open('', '_blank');
 
+    let blob;
+    try {
+      blob = await build(submission, meta);
+    } catch (err) {
+      if (previewWin) previewWin.close();
+      throw err;
+    }
+    if (!blob) {
+      if (previewWin) previewWin.close();
+      throw new Error('이미지를 만들지 못했습니다.');
+    }
+    const fileName = `인증-${safeFileName(submission.nickname)}-${submission.date || ''}.png`;
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+    if (previewWin) {
+      previewWin.document.title = fileName;
+      previewWin.location.href = url;
+    }
+
+    // 새 탭에서도 봐야 하니 다운로드 링크보다 넉넉하게 유지한다.
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
     return 'downloaded';
   }
 
@@ -149,10 +170,13 @@ CS.ShareCard = (function () {
         try {
           await share(submissionFromDataset(btn.dataset), meta);
           btn.textContent = '✅ 내려받기 완료';
-          // 버튼 문구만으로는 놓치기 쉬워서, 어디에 저장됐는지 분명하게 안내한다.
-          alert('이미지를 다운로드 폴더에 저장했어요.\n'
-            + '(브라우저의 다운로드 목록이나 기기의 "다운로드/Download" 폴더에서 찾을 수 있어요.)\n\n'
-            + '카카오톡에서는 사진 첨부로 바로 보내면 됩니다.');
+          // 다운로드 폴더는 카카오톡 "사진" 첨부(갤러리 기준)에는 안 보일 수 있어서,
+          // 갤러리에 확실히 저장되는 방법을 함께 안내한다.
+          alert('이미지를 다운로드했어요. 새 탭에도 이미지를 열어뒀어요.\n\n'
+            + '카카오톡으로 보내는 방법\n'
+            + '① (추천) 새로 열린 탭의 이미지를 길게 눌러(PC는 마우스 오른쪽 버튼) "이미지 저장"을 선택하면 '
+            + '갤러리에 저장되어, 카카오톡 사진 첨부로 바로 보낼 수 있어요.\n'
+            + '② 또는 카카오톡 채팅방 + 버튼 → "파일"에서 방금 다운로드된 이미지를 찾아 첨부해도 됩니다.');
         } catch (err) {
           alert('다운로드 중 문제가 발생했습니다: ' + err.message);
         } finally {
