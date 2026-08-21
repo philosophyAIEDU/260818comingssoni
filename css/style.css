@@ -461,6 +461,13 @@ button.ghost { background: transparent; }
 }
 .upvote-btn.voted { background: var(--info-soft); border-color: var(--info); color: var(--info); }
 
+/* 인증글을 이미지로 공유하는 버튼 */
+.share-btn {
+  font-size: 14px; padding: 6px 10px; min-height: 34px;
+  border-radius: 999px; flex: 0 0 auto;
+}
+.share-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ── 반응형 ───────────────────────────── */
 @media (max-width: 900px) {
   .feed-scroll { max-height: 62vh; }

@@ -99,6 +99,19 @@
       <span class="muted">쉼표(,)로 구분해도 됩니다.</span>
     </div>
 
+    <h2 style="margin-top:26px">명단 시트 업로드</h2>
+    <p class="hint">
+      <strong>이름, 이메일</strong> 두 열이 있는 시트를 올리면 <strong>참여자 명단</strong>(인증 화면 드롭다운에 표시)과
+      <strong>알림 메일 수신자 목록</strong>([알림 메일] 탭)에 한 번에 등록됩니다. 이미 등록된 이름·메일 주소는
+      건너뜁니다. 구글 시트·엑셀에서 "쉼표로 구분된 값(.csv)"으로 다운로드해서 올려주세요.
+    </p>
+    <div id="rosterCsvMsg"></div>
+    <div class="actions">
+      <input type="file" id="rosterCsvInput" accept=".csv,text/csv">
+      <button class="primary" id="rosterCsvUploadBtn">업로드</button>
+      <span class="muted">첫 줄이 "이름, 이메일" 같은 제목 줄이어도 자동으로 건너뜁니다.</span>
+    </div>
+
     <h2 style="margin-top:26px">참가자 목록 <span class="tag" id="rosterCount"></span></h2>
     <p class="hint">상태 변경, 면제일 등록, 이름 수정, 삭제를 할 수 있습니다.</p>
     <div class="scroll">

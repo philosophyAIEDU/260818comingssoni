@@ -412,6 +412,11 @@
         <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
         ${late ? '<span class="tag bad">지각</span>' : ''}
         <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        <button type="button" class="share-btn" data-share
+          data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
+          data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
+          data-winner="${isWinner ? '1' : ''}"
+          aria-label="이미지로 공유" title="이미지로 공유">🔗</button>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
@@ -471,6 +476,7 @@
     feedList.innerHTML = visible.map((s) =>
       renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
     bindUpvoteButtons(feedList);
+    CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: U.shortLabel(date) });
 
     const remaining = daySubs.length - visible.length;
     if (remaining > 0) {

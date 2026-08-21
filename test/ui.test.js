@@ -138,6 +138,26 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
 
+  // ── 인증글 이미지로 공유(카카오톡 등) ──
+  const shareBtn = otherCard.locator('[data-share]');
+  t('공유 버튼에 인증 내용이 담겨 있음',
+    (await shareBtn.getAttribute('data-nickname')) === '커밍쏜'
+    && !!(await shareBtn.getAttribute('data-sentence')));
+  const cardBlobInfo = await page.evaluate(async () => {
+    const blob = await CS.ShareCard.build(
+      { nickname: '커밍쏜', date: '2026-08-20', sentence: '테스트 문장', reflection: '테스트 느낀 점', isWinner: true },
+      { title: '테스트 챌린지', dateLabel: '8/20(목)' }
+    );
+    return { size: blob.size, type: blob.type };
+  });
+  t('공유 이미지가 PNG로 생성됨', cardBlobInfo.type === 'image/png' && cardBlobInfo.size > 1000, cardBlobInfo);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    shareBtn.click()
+  ]);
+  t('공유 API 미지원 환경(데스크톱)에서는 이미지 파일 다운로드로 대체됨', download.url().startsWith('blob:'), download.url());
+
   // ── 운영진 화면: 현황/리포트 ──
   await page.goto(BASE + '/admin.html');
   await page.waitForTimeout(500);
@@ -360,6 +380,28 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('지각 백필은 운영진 매트릭스에서도 미인증(X)으로 집계',
     (await lateCell.getAttribute('class')).includes('cell-x'));
   await dayCtx.close();
+
+  // ── 운영진 화면: 명단 시트(CSV) 업로드 — 참가자 명단 + 알림 메일 수신자에 동시 등록
+  //    (참가자·메일 수는 이후 나오지 않으므로 마지막에 실행) ──
+  await page.goto(BASE + '/admin.html');
+  await page.waitForTimeout(400);
+  await page.click('button[data-tab="roster"]');
+  const csvContent = '이름,이메일\n글벗,csvreader1@example.com\n책모임,csvreader2@example.com\n';
+  await page.setInputFiles('#rosterCsvInput', {
+    name: 'roster.csv', mimeType: 'text/csv', buffer: Buffer.from(csvContent, 'utf-8')
+  });
+  await page.click('#rosterCsvUploadBtn');
+  await page.waitForTimeout(400);
+  const csvMsg = await page.textContent('#rosterCsvMsg');
+  t('CSV 업로드 결과 메시지(참여자·알림 메일 동시 등록)',
+    /참여자 2명 등록/.test(csvMsg) && /알림 메일 2건 등록/.test(csvMsg), csvMsg.trim());
+  // 이름 칸은 인라인 수정용 <input>이라 textContent에는 잡히지 않으므로 값을 직접 읽는다.
+  const rosterNames = await page.locator('#rosterTable tbody tr td input[data-rename]').evaluateAll(
+    (els) => els.map((e) => e.value));
+  t('CSV로 올린 이름이 명단 표에 추가됨', rosterNames.includes('글벗') && rosterNames.includes('책모임'), rosterNames);
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  t('CSV로 올린 메일이 알림 메일 목록에도 추가됨', (await page.textContent('#notifyTable')).includes('csvreader1@example.com'));
 
   // 모바일 뷰포트에서 가로 스크롤 없는지
   const m = await ctx.newPage();

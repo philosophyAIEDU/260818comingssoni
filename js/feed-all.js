@@ -30,6 +30,10 @@
         <span class="feed-nick">${esc(s.nickname)}</span>
         ${late ? '<span class="tag bad">지각</span>' : ''}
         <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        <button type="button" class="share-btn" data-share
+          data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
+          data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
+          aria-label="이미지로 공유" title="이미지로 공유">🔗</button>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
@@ -81,6 +85,7 @@
     const visible = all.slice(0, visibleCount);
     list.innerHTML = visible.map(renderItem).join('');
     bindUpvoteButtons(list);
+    CS.ShareCard.bindButtons(list, { title: CS.CONFIG.title });
 
     const remaining = all.length - visible.length;
     if (remaining > 0) {
