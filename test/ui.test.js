@@ -32,6 +32,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
+  // 삭제 등 confirm() 대화상자는 기본적으로 수락(승인)해서 실제 동작을 검증한다.
+  page.on('dialog', (d) => d.accept());
 
   // ── 운영진 화면: 명단 등록 ──
   await page.goto(BASE + '/admin.html');
@@ -193,11 +195,49 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('면제 등록 반영', (await page.locator('#matrix .cell-p').count()) >= 0);
 
-  // 공지문
+  // 공지문 — 날짜별로 미리 작성/저장 (최대 30일치)
   await page.click('button[data-tab="report"]');
   await page.waitForTimeout(300);
-  const notice = await page.textContent('#noticeOut');
-  t('공지문 생성됨', notice.length > 60 && notice.includes('퍼스널메이커스 독서 챌린지'), notice.slice(0, 80));
+  const notice = await page.inputValue('#noticeOut');
+  t('공지문 자동 생성됨', notice.length > 60 && notice.includes('퍼스널메이커스 독서 챌린지'), notice.slice(0, 80));
+  t('저장 전에는 자동 생성 상태 표시', /자동 생성/.test(await page.textContent('#noticeStatus')));
+
+  const noticeDateVal = await page.inputValue('#noticeDate');
+  const tomorrow = await page.evaluate((d) => {
+    const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + 1); return dt.toISOString().slice(0, 10);
+  }, noticeDateVal);
+
+  await page.fill('#noticeOut', '내일은 아침 일찍 인증해 주세요! (미리 써 둔 공지)');
+  await page.click('#noticeSave');
+  await page.waitForTimeout(300);
+  t('공지문 저장 완료 메시지', /저장했습니다/.test(await page.textContent('#noticeMsg')));
+  t('저장 후 상태가 저장됨으로 바뀜', /저장됨/.test(await page.textContent('#noticeStatus')));
+  t('저장된 공지 1일치로 표시', /저장된 공지 1일치/.test(await page.textContent('#noticeSavedCount')));
+
+  // 다른 날짜로 옮기면 그 날짜는 아직 자동 생성 문구(저장 안 한 상태)
+  await page.fill('#noticeDate', tomorrow);
+  await page.dispatchEvent('#noticeDate', 'change');
+  await page.waitForTimeout(200);
+  t('다른 날짜는 자동 생성 문구로 표시', /자동 생성/.test(await page.textContent('#noticeStatus')));
+
+  // 다시 저장했던 날짜로 돌아오면 저장한 내용이 그대로 보임(새로고침 없이도 유지)
+  await page.fill('#noticeDate', noticeDateVal);
+  await page.dispatchEvent('#noticeDate', 'change');
+  await page.waitForTimeout(200);
+  t('저장했던 날짜로 돌아오면 내용 유지',
+    (await page.inputValue('#noticeOut')).includes('미리 써 둔 공지'));
+
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.click('button[data-tab="report"]');
+  await page.waitForTimeout(300);
+  t('새로고침 후에도 저장한 공지 유지',
+    (await page.inputValue('#noticeOut')).includes('미리 써 둔 공지'));
+
+  await page.click('#noticeDelete');
+  await page.waitForTimeout(300);
+  t('삭제 후 자동 생성 문구로 되돌아감', /자동 생성/.test(await page.textContent('#noticeStatus')));
+  t('삭제 후 저장된 공지 0건', /저장된 공지 없음/.test(await page.textContent('#noticeSavedCount')));
 
   await page.click('#genReport');
   await page.waitForTimeout(300);
