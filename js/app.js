@@ -658,6 +658,7 @@
     await Store.init();
     paintHeader();
     paintPhase();
+    CS.ShareCard.paintKakaoNotice('kakaoWebviewNotice');
     tickCountdown();
     setInterval(tickCountdown, 1000);
     populateCertifyDateOptions(null);
