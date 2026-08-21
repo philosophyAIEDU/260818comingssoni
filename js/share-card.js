@@ -155,10 +155,10 @@ CS.ShareCard = (function () {
       const original = btn.textContent;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = '⏳';
+        btn.textContent = '⏳ 만드는 중…';
         try {
           const result = await share(submissionFromDataset(btn.dataset), meta);
-          btn.textContent = result === 'downloaded' ? '✅' : original;
+          btn.textContent = result === 'downloaded' ? '✅ 내려받기 완료' : original;
           if (result === 'downloaded') setTimeout(() => { btn.textContent = original; }, 1500);
         } catch (err) {
           if (err && err.name !== 'AbortError') { // 사용자가 공유 시트를 취소한 경우는 오류가 아님
