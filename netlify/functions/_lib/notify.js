@@ -18,10 +18,11 @@ const nodemailer = require('nodemailer');
 
 // js/config.js 의 CS.FIREBASE_CONFIG.projectId 와 동일해야 합니다.
 const FIREBASE_PROJECT_ID = 'comingssoni-e7517';
-// js/config.js 의 CS.CONFIG.title / appUrl / startDate / timezone 과 동일해야 합니다.
+// js/config.js 의 CS.CONFIG.title / appUrl / startDate / endDate / timezone 과 동일해야 합니다.
 const CHALLENGE_TITLE = '퍼스널메이커스 독서 챌린지';
 const APP_URL = 'https://comingssoni.netlify.app/';
 const START_DATE = '2026-08-24';
+const END_DATE = '2026-09-20'; // 챌린지 종료일(포함) — 종료일 다음 날부터는 발송하지 않음
 const TIMEZONE = 'Asia/Seoul';
 
 /** 챌린지 기준 시간대(KST)의 오늘 날짜 (YYYY-MM-DD). js/utils.js today()와 동일한 방식. */
@@ -170,13 +171,16 @@ async function markNotifySentToday(dateStr) {
 }
 
 /** 매일 밤 예약 발송(runNotification)을 실행해도 되는지 판단한다.
- *  - 챌린지 시작일(START_DATE) 전이면 보내지 않는다.
+ *  - 챌린지 기간(START_DATE ~ END_DATE, 양 끝 포함) 밖이면 보내지 않는다.
  *  - 오늘 이미 한 번 보냈으면(메타 문서 기록 기준) 다시 보내지 않는다 — 예약 함수가
  *    같은 날 두 번 실행되어도(재시도, 배포 직후 중복 트리거 등) 중복 발송을 막는다. */
 async function shouldRunScheduledReminder() {
   const today = todayInChallengeTz();
   if (today < START_DATE) {
     return { run: false, today, reason: `아직 챌린지 시작일(${START_DATE}) 전입니다.` };
+  }
+  if (today > END_DATE) {
+    return { run: false, today, reason: `챌린지 종료일(${END_DATE})이 지났습니다.` };
   }
   const lastSent = await fetchNotifyLastSentDate();
   if (lastSent === today) {
