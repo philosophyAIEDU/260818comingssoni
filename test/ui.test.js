@@ -152,11 +152,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   });
   t('공유 이미지가 PNG로 생성됨', cardBlobInfo.type === 'image/png' && cardBlobInfo.size > 1000, cardBlobInfo);
 
-  const [download] = await Promise.all([
+  const [download, popup] = await Promise.all([
     page.waitForEvent('download'),
+    ctx.waitForEvent('page'),
     shareBtn.click()
   ]);
-  t('공유 API 미지원 환경(데스크톱)에서는 이미지 파일 다운로드로 대체됨', download.url().startsWith('blob:'), download.url());
+  t('다운로드 폴더에 이미지 파일로 저장됨', download.url().startsWith('blob:'), download.url());
+  // 빈 탭을 먼저 열고 이미지가 준비되면 그 탭을 blob: URL로 이동시키므로, 이동이 끝날 때까지 기다린다.
+  await popup.waitForURL(/^blob:/, { timeout: 5000 }).catch(() => {});
+  t('새 탭에도 같은 이미지가 열려 길게 눌러(우클릭) 갤러리에 저장할 수 있음',
+    popup.url().startsWith('blob:'), popup.url());
+  await popup.close();
 
   // ── 운영진 화면: 현황/리포트 ──
   await page.goto(BASE + '/admin.html');
