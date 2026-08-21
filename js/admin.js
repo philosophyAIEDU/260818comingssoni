@@ -176,6 +176,7 @@
         `<span class="chip">${U.shortLabel(d)}<button data-unexempt="${p.id}" data-date="${d}" title="면제 해제">×</button></span>`).join('');
       return `<tr>
         <td><input type="text" value="${esc(p.nickname)}" data-rename="${p.id}" style="min-width:120px"></td>
+        <td><input type="email" value="${esc(p.email || '')}" data-editemail="${p.id}" placeholder="이메일 (선택)" style="min-width:160px"></td>
         <td>${p.status === 'out'
           ? '<span class="tag bad">아웃</span>'
           : (st.missed >= CONFIG.kickoutThreshold ? '<span class="tag bad">킥아웃 대상</span>' : '<span class="tag ok">참여중</span>')}</td>
@@ -199,7 +200,7 @@
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>이름</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>이메일</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -208,6 +209,15 @@
         try {
           await Store.updateParticipant(el.dataset.rename, { nickname: el.value });
           msg($('rosterMsg'), '이름을 수정했습니다.', 'ok');
+        } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
+        await refresh();
+      });
+    });
+    t.querySelectorAll('[data-editemail]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        try {
+          await Store.updateParticipant(el.dataset.editemail, { email: el.value });
+          msg($('rosterMsg'), '이메일을 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refresh();
       });
@@ -360,6 +370,20 @@
       const { added: mAdded, skipped: mSkipped, invalid: mInvalid } = mailEntries.length
         ? await Store.addNotifyEmails(mailEntries)
         : { added: [], skipped: [], invalid: [] };
+
+      // 이름+이메일이 함께 있는 행은 [명단 관리] 표의 이메일 칸에도 채워 넣는다.
+      // 이미 이메일이 등록돼 있는 참가자는(수동으로 고쳐둔 값을 덮어쓰지 않도록) 건드리지 않는다.
+      const nameToEmail = new Map(
+        entries.filter((e) => e.name && e.email).map((e) => [CS.U.normalizeNick(e.name), e.email]));
+      if (nameToEmail.size) {
+        const roster = await Store.listParticipants();
+        for (const p of roster) {
+          const email = nameToEmail.get(p.nickname);
+          if (email && !p.email) {
+            await Store.updateParticipant(p.id, { email }).catch(() => {});
+          }
+        }
+      }
 
       const parts = [
         `참여자 ${pAdded.length}명 등록${pSkipped.length ? ` (중복 ${pSkipped.length}명 건너뜀)` : ''}`,

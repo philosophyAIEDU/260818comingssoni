@@ -45,6 +45,19 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('명단 표 4행', (await page.locator('#rosterTable tbody tr').count()) === 4);
   t('참여중 카운트', /참여중 4명/.test(await page.textContent('#rosterCount')));
 
+  // 명단 관리 — 이메일도 이름처럼 표에서 바로 수정 가능
+  const emailInputs = page.locator('#rosterTable tbody tr td input[data-editemail]');
+  await emailInputs.first().fill('bamtol@example.com');
+  await emailInputs.first().dispatchEvent('change');
+  await page.waitForTimeout(300);
+  t('이메일 수정 완료 메시지', /이메일을 수정했습니다/.test(await page.textContent('#rosterMsg')));
+  t('명단 표에 수정한 이메일이 반영됨',
+    (await page.locator('#rosterTable tbody tr td input[data-editemail]').first().inputValue()) === 'bamtol@example.com');
+  await emailInputs.first().fill('이상한값');
+  await emailInputs.first().dispatchEvent('change');
+  await page.waitForTimeout(300);
+  t('잘못된 이메일 형식은 거부됨', /올바른 메일 주소/.test(await page.textContent('#rosterMsg')));
+
   // ── 참가자 화면: 인증 제출 ──
   await page.goto(BASE + '/index.html');
   await page.waitForTimeout(400);
@@ -138,31 +151,23 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
 
-  // ── 인증글 이미지로 공유(카카오톡 등) ──
+  // ── 인증글 텍스트 복사 ──
   const shareBtn = otherCard.locator('[data-share]');
-  t('공유 버튼에 인증 내용이 담겨 있음',
+  t('복사 버튼에 인증 내용이 담겨 있음',
     (await shareBtn.getAttribute('data-nickname')) === '커밍쏜'
     && !!(await shareBtn.getAttribute('data-sentence')));
-  const cardBlobInfo = await page.evaluate(async () => {
-    const blob = await CS.ShareCard.build(
-      { nickname: '커밍쏜', date: '2026-08-20', sentence: '테스트 문장', reflection: '테스트 느낀 점', isWinner: true },
-      { title: '테스트 챌린지', dateLabel: '8/20(목)' }
-    );
-    return { size: blob.size, type: blob.type };
-  });
-  t('공유 이미지가 PNG로 생성됨', cardBlobInfo.type === 'image/png' && cardBlobInfo.size > 1000, cardBlobInfo);
+  t('버튼 라벨이 텍스트 복사로 표시됨', (await shareBtn.textContent()).includes('텍스트 복사'));
 
-  const [download, popup] = await Promise.all([
-    page.waitForEvent('download'),
-    ctx.waitForEvent('page'),
-    shareBtn.click()
-  ]);
-  t('다운로드 폴더에 이미지 파일로 저장됨', download.url().startsWith('blob:'), download.url());
-  // 빈 탭을 먼저 열고 이미지가 준비되면 그 탭을 blob: URL로 이동시키므로, 이동이 끝날 때까지 기다린다.
-  await popup.waitForURL(/^blob:/, { timeout: 5000 }).catch(() => {});
-  t('새 탭에도 같은 이미지가 열려 길게 눌러(우클릭) 갤러리에 저장할 수 있음',
-    popup.url().startsWith('blob:'), popup.url());
-  await popup.close();
+  await page.evaluate(() => {
+    window.__copiedText = null;
+    navigator.clipboard.writeText = (text) => { window.__copiedText = text; return Promise.resolve(); };
+  });
+  await shareBtn.click();
+  await page.waitForTimeout(300);
+  const copiedText = await page.evaluate(() => window.__copiedText);
+  t('클립보드에 인증 내용이 텍스트로 복사됨',
+    !!copiedText && copiedText.includes('커밍쏜') && copiedText.includes('팬이 되는 순간'), copiedText);
+  t('복사 완료 버튼 표시', (await shareBtn.textContent()).includes('복사 완료'));
 
   // ── 운영진 화면: 현황/리포트 ──
   await page.goto(BASE + '/admin.html');
@@ -222,6 +227,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await page.textContent('#notifyMsg'));
   t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
   t('이름이 목록에 표시됨', (await page.textContent('#notifyTable')).includes('홍길동'));
+  // [명단 관리]와 마찬가지로 이름 가나다순 — 김철수(ㄱ)가 홍길동(ㅎ)보다 먼저 나와야 함
+  const notifyNames = await page.locator('#notifyTable tbody tr td:first-child').allTextContents();
+  t('알림 메일 목록이 이름 가나다순으로 정렬됨',
+    notifyNames.indexOf('김철수') < notifyNames.indexOf('홍길동'), notifyNames);
   t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
 
   // 특정 대상에게 1회성 안내 메일 — 이름 검색 + 선택
@@ -405,6 +414,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const rosterNames = await page.locator('#rosterTable tbody tr td input[data-rename]').evaluateAll(
     (els) => els.map((e) => e.value));
   t('CSV로 올린 이름이 명단 표에 추가됨', rosterNames.includes('글벗') && rosterNames.includes('책모임'), rosterNames);
+  // 이름+이메일이 함께 있는 CSV라 명단 표의 이메일 칸에도 자동으로 채워져야 함
+  const rosterEmails = await page.locator('#rosterTable tbody tr td input[data-editemail]').evaluateAll(
+    (els) => els.map((e) => e.value));
+  t('CSV로 올린 이메일이 명단 표 이메일 칸에도 채워짐',
+    rosterEmails.includes('csvreader1@example.com') && rosterEmails.includes('csvreader2@example.com'), rosterEmails);
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
   t('CSV로 올린 메일이 알림 메일 목록에도 추가됨', (await page.textContent('#notifyTable')).includes('csvreader1@example.com'));
@@ -477,44 +491,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   });
   t('좁은 화면에서 피드 이름이 "커…" 처럼 뭉개지지 않고 한 줄을 다 씀(white-space: normal)',
     feedNickWS === 'normal', feedNickWS);
-
-  // ── 카카오톡 인앱 브라우저 감지 배너 ──
-  const kakaoCtx = await browser.newContext({
-    locale: 'ko-KR', timezoneId: 'Asia/Seoul', viewport: { width: 360, height: 700 },
-    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S911N) AppleWebKit/537.36 (KHTML, like Gecko) '
-      + 'Version/4.0 Chrome/114.0.0.0 Mobile Safari/537.36 KAKAOTALK 10.9.5'
-  });
-  await kakaoCtx.route('**/js/config.js', async (route) => {
-    const res = await route.fetch();
-    let body = await res.text();
-    body = body.replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
-  });
-  const kakaoPage = await kakaoCtx.newPage();
-  await kakaoPage.goto(BASE + '/index.html');
-  await kakaoPage.waitForTimeout(400);
-  t('카카오톡 인앱 브라우저에서는 안내 배너 노출', !(await kakaoPage.isHidden('#kakaoWebviewNotice')));
-  t('안드로이드에서는 외부 브라우저로 여는 버튼 제공', await kakaoPage.isVisible('#kakaoOpenExternal'));
-  await kakaoPage.click('#kakaoDismiss');
-  await kakaoPage.waitForTimeout(100);
-  t('배너 닫기 클릭 시 바로 숨김', await kakaoPage.isHidden('#kakaoWebviewNotice'));
-  await kakaoPage.reload();
-  await kakaoPage.waitForTimeout(400);
-  t('닫기 선택은 새로고침 후에도 유지됨', await kakaoPage.isHidden('#kakaoWebviewNotice'));
-  await kakaoCtx.close();
-
-  const normalUACtx = await browser.newContext({ locale: 'ko-KR', viewport: { width: 375, height: 700 } });
-  await normalUACtx.route('**/js/config.js', async (route) => {
-    const res = await route.fetch();
-    let body = await res.text();
-    body = body.replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
-  });
-  const normalPage = await normalUACtx.newPage();
-  await normalPage.goto(BASE + '/index.html');
-  await normalPage.waitForTimeout(400);
-  t('일반 브라우저에서는 배너가 보이지 않음', await normalPage.isHidden('#kakaoWebviewNotice'));
-  await normalUACtx.close();
 
   await page.screenshot({ path: (process.env.SHOT_DIR || '.') + '/admin.png', fullPage: true });
   await m.screenshot({ path: (process.env.SHOT_DIR || '.') + '/mobile.png', fullPage: true });

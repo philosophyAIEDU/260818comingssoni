@@ -25,7 +25,7 @@
  *   addNotifyEmails({name,email}[])       → Promise<{added, skipped, invalid}>
  *   removeNotifyEmail(id)                 → Promise<void>
  *
- *  Participant { id, nickname, status:'active'|'out', joinDate, outDate,
+ *  Participant { id, nickname, email, status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
@@ -56,6 +56,7 @@ CS.LocalStore = (function () {
   const P = 'participants';
   const S = 'submissions';
   const M = 'meta';
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   async function init() {
     if (!localStorage.getItem(key(P))) write(P, []);
@@ -71,6 +72,7 @@ CS.LocalStore = (function () {
     return Object.assign({
       id: CS.U.uid('p'),
       nickname: CS.U.normalizeNick(nickname),
+      email: '',
       status: 'active',
       joinDate: CS.CONFIG.startDate,
       outDate: null,
@@ -119,6 +121,11 @@ CS.LocalStore = (function () {
         throw new Error(`이미 등록된 닉네임입니다: ${nick}`);
       }
       patch = Object.assign({}, patch, { nickname: nick });
+    }
+    if (patch.email != null) {
+      const email = String(patch.email).trim().toLowerCase();
+      if (email && !EMAIL_RE.test(email)) throw new Error('올바른 메일 주소를 입력해 주세요.');
+      patch = Object.assign({}, patch, { email });
     }
     all[i] = Object.assign({}, all[i], patch);
     write(P, all);
@@ -217,10 +224,10 @@ CS.LocalStore = (function () {
 
   /* ── 인증 알림 메일 수신자 목록 ───────── */
   const N = 'notifyEmails';
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  // [명단 관리] 탭과 마찬가지로 이름 기준 가나다순으로 보여준다(이름이 없으면 맨 앞).
   async function listNotifyEmails() {
-    return read(N, []).slice().sort((a, b) => a.email.localeCompare(b.email));
+    return read(N, []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
   }
 
   async function addNotifyEmail(name, email) {
