@@ -1,9 +1,10 @@
-/* 인증글을 이미지 카드로 만들어 공유(주로 카카오톡)할 수 있게 한다.
+/* 인증글을 이미지 카드로 만들어 다운로드할 수 있게 한다.
  * index.html(js/app.js)과 feed-all.html(js/feed-all.js)이 함께 사용한다.
  *
- * 모바일 브라우저의 OS 공유 시트(navigator.share)를 이용해 이미지 파일을 바로 카카오톡 등으로
- * 보낼 수 있게 하고, 지원하지 않는 환경(주로 데스크톱)에서는 이미지를 다운로드해
- * 직접 첨부하도록 안내한다. 별도 외부 서비스·API 키 없이 캔버스로 이미지를 그린다. */
+ * 처음엔 모바일에서 OS 공유 시트(navigator.share)로 바로 보내도록 만들었는데, 기기에 따라
+ * 공유 시트가 어디로 갔는지 알기 어렵다는 피드백이 있어 — 모든 환경에서 항상 브라우저의
+ * 표준 다운로드(다운로드 폴더에 저장)로 동작하도록 통일했다. 저장한 이미지는 카카오톡 등에서
+ * 사진 첨부로 바로 보내면 된다. 별도 외부 서비스·API 키 없이 캔버스로 이미지를 그린다. */
 window.CS = window.CS || {};
 
 CS.ShareCard = (function () {
@@ -111,23 +112,12 @@ CS.ShareCard = (function () {
     return String(s || '').replace(/[^\w가-힣-]+/g, '') || 'card';
   }
 
-  /** 이미지로 만들어 가능하면 OS 공유 시트(카카오톡 포함)로, 아니면 다운로드로 공유한다. */
+  /** 이미지로 만들어 브라우저의 표준 다운로드(다운로드 폴더)로 저장한다. */
   async function share(submission, meta) {
     const blob = await build(submission, meta);
     if (!blob) throw new Error('이미지를 만들지 못했습니다.');
     const fileName = `인증-${safeFileName(submission.nickname)}-${submission.date || ''}.png`;
-    const file = new File([blob], fileName, { type: 'image/png' });
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: meta && meta.title,
-        text: `참여자 ${submission.nickname || ''}님의 인사이트`
-      });
-      return 'shared';
-    }
-
-    // navigator.share(파일)을 지원하지 않는 환경(주로 데스크톱): 다운로드해서 직접 카톡에 첨부하도록 안내
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -149,23 +139,24 @@ CS.ShareCard = (function () {
     };
   }
 
-  /** container 안의 [data-share] 버튼들에 공유 동작을 연결한다. */
+  /** container 안의 [data-share] 버튼들에 다운로드 동작을 연결한다. */
   function bindButtons(container, meta) {
     container.querySelectorAll('[data-share]').forEach((btn) => {
       const original = btn.textContent;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = '⏳';
+        btn.textContent = '⏳ 만드는 중…';
         try {
-          const result = await share(submissionFromDataset(btn.dataset), meta);
-          btn.textContent = result === 'downloaded' ? '✅' : original;
-          if (result === 'downloaded') setTimeout(() => { btn.textContent = original; }, 1500);
+          await share(submissionFromDataset(btn.dataset), meta);
+          btn.textContent = '✅ 내려받기 완료';
+          // 버튼 문구만으로는 놓치기 쉬워서, 어디에 저장됐는지 분명하게 안내한다.
+          alert('이미지를 다운로드 폴더에 저장했어요.\n'
+            + '(브라우저의 다운로드 목록이나 기기의 "다운로드/Download" 폴더에서 찾을 수 있어요.)\n\n'
+            + '카카오톡에서는 사진 첨부로 바로 보내면 됩니다.');
         } catch (err) {
-          if (err && err.name !== 'AbortError') { // 사용자가 공유 시트를 취소한 경우는 오류가 아님
-            alert('공유 중 문제가 발생했습니다: ' + err.message);
-          }
-          btn.textContent = original;
+          alert('다운로드 중 문제가 발생했습니다: ' + err.message);
         } finally {
+          btn.textContent = original;
           btn.disabled = false;
         }
       });
