@@ -134,11 +134,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('전체 보기 링크가 feed-all.html을 새 창으로 엶',
     (await feedAllLink.getAttribute('href')) === 'feed-all.html'
     && (await feedAllLink.getAttribute('target')) === '_blank');
+  t('인증 피드(날짜별 보기)에 카톡방 공유 안내 문구 노출',
+    (await page.locator('.feed-card .hint').allTextContents())
+      .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
   const feedAllPage = await ctx.newPage();
   await feedAllPage.goto(BASE + '/feed-all.html');
   await feedAllPage.waitForTimeout(400);
   t('전체 보기 페이지에 인증 카드 노출', (await feedAllPage.locator('#allFeedList .feed-item').count()) >= 2);
   t('전체 보기 페이지 건수 표시', /\d+건/.test(await feedAllPage.textContent('#feedCount')));
+  t('전체 보기 페이지에도 카톡방 공유 안내 문구 노출',
+    (await feedAllPage.locator('.feed-card .hint').allTextContents())
+      .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
   await feedAllPage.close();
 
   // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
