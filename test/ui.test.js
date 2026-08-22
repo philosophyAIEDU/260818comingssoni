@@ -169,6 +169,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const copiedText = await page.evaluate(() => window.__copiedText);
   t('클립보드에 인증 내용이 텍스트로 복사됨',
     !!copiedText && copiedText.includes('커밍쏜') && copiedText.includes('팬이 되는 순간'), copiedText);
+  t('복사된 텍스트가 요청한 형식(참여자/인상 깊었던 내용/책을 읽고 느낀 점)을 따름',
+    !!copiedText
+    && /참여자\s*:\s*커밍쏜님/.test(copiedText)
+    && copiedText.includes('인상 깊었던 내용 : 팬이 되는 순간')
+    && copiedText.includes('책을 읽고 느낀 점 :'), copiedText);
   t('복사 완료 버튼 표시', (await shareBtn.textContent()).includes('복사 완료'));
 
   // ── 운영진 화면: 현황 ──
