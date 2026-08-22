@@ -186,9 +186,14 @@
       const rt = U.riskTag(st);
       const chips = (p.exemptDates || []).sort().map((d) =>
         `<span class="chip">${U.shortLabel(d)}<button data-unexempt="${p.id}" data-date="${d}" title="면제 해제">×</button></span>`).join('');
+      const kakao = p.kakaoJoined || '';
+      const kakaoOpt = (v, label) => `<option value="${v}"${kakao === v ? ' selected' : ''}>${label}</option>`;
       return `<tr>
         <td><input type="text" value="${esc(p.nickname)}" data-rename="${p.id}" style="min-width:120px"></td>
         <td><input type="email" value="${esc(p.email || '')}" data-editemail="${p.id}" placeholder="이메일 (선택)" style="min-width:160px"></td>
+        <td><select data-editkakao="${p.id}">
+          ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
+        </select></td>
         <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
         <td class="num">${st.missed}</td>
@@ -210,7 +215,7 @@
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>이름</th><th>이메일</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>이메일</th><th>카톡방</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -228,6 +233,15 @@
         try {
           await Store.updateParticipant(el.dataset.editemail, { email: el.value });
           msg($('rosterMsg'), '이메일을 수정했습니다.', 'ok');
+        } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
+        await refresh();
+      });
+    });
+    t.querySelectorAll('[data-editkakao]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        try {
+          await Store.updateParticipant(el.dataset.editkakao, { kakaoJoined: el.value });
+          msg($('rosterMsg'), '카톡방 참여 여부를 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refresh();
       });

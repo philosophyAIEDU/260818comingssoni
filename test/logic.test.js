@@ -52,6 +52,11 @@ function t(name, cond, extra) {
   const sony = list.find(p => p.nickname === '소니');
   const whale = list.find(p => p.nickname === '책읽는고래');
 
+  t('카톡방 참여 여부 기본값은 미정("")', sony.kakaoJoined === '', sony.kakaoJoined);
+  await Store.updateParticipant(sony.id, { kakaoJoined: 'O' });
+  t('카톡방 참여 여부 저장(O)',
+    (await Store.listParticipants()).find(p => p.id === sony.id).kakaoJoined === 'O');
+
   let dupErr = null;
   try { await Store.addParticipant('커밍쏜'); } catch (e) { dupErr = e.message; }
   t('중복 닉네임 거부', !!dupErr, dupErr);

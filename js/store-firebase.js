@@ -1,7 +1,7 @@
 /* Firebase(Firestore) 어댑터 - 로그인 없이 공용 읽기/쓰기 모드 + 관리자 인증 기능 탑재
  *
  * 컬렉션 구조
- *   participants/{id}  { nickname, email, status, joinDate, outDate, exemptDates[], note, createdAt }
+ *   participants/{id}  { nickname, email, kakaoJoined, status, joinDate, outDate, exemptDates[], note, createdAt }
  *   submissions/{id}   { participantId, nickname, date, sentence, reflection, upvotes, upvotedBy[], createdAt, updatedAt }
  *   notifyEmails/{id}  { name, email, createdAt }  ← 야간 인증 알림 메일 수신자 목록
  *   notices/{date}     { text, updatedAt }         ← 날짜별로 미리 써 두는 공지문 초안
@@ -95,6 +95,7 @@ CS.FirebaseStore = (function () {
     const body = Object.assign({
       nickname: nick,
       email: '',
+      kakaoJoined: '',  // '' 미정 | 'O' 참여 | 'X' 미참여
       status: 'active',
       joinDate: CS.CONFIG.startDate,
       outDate: null,
