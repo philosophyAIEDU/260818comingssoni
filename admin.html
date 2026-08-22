@@ -120,6 +120,17 @@
       <span class="muted">이름이 같은 사람을 찾아, 아직 이메일이 비어 있는 참가자에게만 채워 넣습니다.</span>
     </div>
     <div id="syncEmailMsg"></div>
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <label class="muted" for="rosterKakaoFilter">카톡방 참여 여부로 보기</label>
+        <select id="rosterKakaoFilter">
+          <option value="">전체 보기</option>
+          <option value="X">미참여(X)만 보기</option>
+          <option value="O">참여(O)만 보기</option>
+          <option value="unset">미정만 보기</option>
+        </select>
+      </div>
+    </div>
     <div class="scroll">
       <table id="rosterTable"></table>
     </div>
