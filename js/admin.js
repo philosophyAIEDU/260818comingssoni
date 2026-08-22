@@ -360,6 +360,44 @@
     return (isHeaderCell(first.name) || isHeaderMail(first.email)) ? entries.slice(1) : entries;
   }
 
+  /** 이름 → 이메일 매칭표를 받아, 아직 이메일이 비어 있는 참가자에게만 채워 넣는다.
+   *  이미 이메일이 등록돼 있는 참가자는(수동으로 고쳐둔 값을 덮어쓰지 않도록) 건드리지 않는다.
+   *  명단 시트 업로드와 [알림 메일] 목록에서 채우기 버튼이 함께 쓰는 공통 로직. */
+  async function fillMissingEmails(nameToEmail) {
+    if (!nameToEmail.size) return 0;
+    const roster = await Store.listParticipants();
+    let filled = 0;
+    for (const p of roster) {
+      const email = nameToEmail.get(p.nickname);
+      if (email && !p.email) {
+        await Store.updateParticipant(p.id, { email }).catch(() => {});
+        filled++;
+      }
+    }
+    return filled;
+  }
+
+  /** [알림 메일] 탭에 등록된 이름·메일 목록을 그대로 이용해, 아직 이메일이 비어 있는
+   *  참가자의 이메일 칸을 채운다. 이미 이름·메일이 등록돼 있는 상태를 그대로 활용하는
+   *  용도라 별도 파일 업로드 없이 버튼 한 번으로 동기화할 수 있다. */
+  async function syncEmailFromNotify() {
+    const btn = $('syncEmailFromNotify');
+    btn.disabled = true;
+    try {
+      const nameToEmail = new Map(
+        notifyEmails.filter((e) => e.name && e.email).map((e) => [e.name, e.email]));
+      const filled = await fillMissingEmails(nameToEmail);
+      msg($('syncEmailMsg'),
+        filled ? `${filled}명의 이메일을 채웠습니다.` : '채울 대상이 없습니다(이미 이메일이 있거나, 이름이 일치하는 항목이 없습니다).',
+        filled ? 'ok' : 'warn');
+      await refresh();
+    } catch (e) {
+      msg($('syncEmailMsg'), `실패: ${esc(e.message)}`, 'bad');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function uploadRosterCsv() {
     const input = $('rosterCsvInput');
     const file = input.files && input.files[0];
@@ -396,18 +434,9 @@
         : { added: [], skipped: [], invalid: [] };
 
       // 이름+이메일이 함께 있는 행은 [명단 관리] 표의 이메일 칸에도 채워 넣는다.
-      // 이미 이메일이 등록돼 있는 참가자는(수동으로 고쳐둔 값을 덮어쓰지 않도록) 건드리지 않는다.
       const nameToEmail = new Map(
         entries.filter((e) => e.name && e.email).map((e) => [CS.U.normalizeNick(e.name), e.email]));
-      if (nameToEmail.size) {
-        const roster = await Store.listParticipants();
-        for (const p of roster) {
-          const email = nameToEmail.get(p.nickname);
-          if (email && !p.email) {
-            await Store.updateParticipant(p.id, { email }).catch(() => {});
-          }
-        }
-      }
+      await fillMissingEmails(nameToEmail);
 
       const parts = [
         `참여자 ${pAdded.length}명 등록${pSkipped.length ? ` (중복 ${pSkipped.length}명 건너뜀)` : ''}`,
@@ -927,6 +956,7 @@
 
     $('bulkAdd').addEventListener('click', bulkAdd);
     $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
+    $('syncEmailFromNotify').addEventListener('click', syncEmailFromNotify);
 
     $('noticeDate').addEventListener('change', () => { noticeDirty = false; loadNoticeForDate(); });
     $('noticeOut').addEventListener('input', () => { noticeDirty = true; });
