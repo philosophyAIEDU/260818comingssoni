@@ -180,7 +180,17 @@
       return;
     }
 
-    const rows = participants.map((p) => {
+    // 카톡방 참여 여부로 보기 필터: '' 전체, 'unset' 미정, 'O'/'X' 그대로 일치
+    const kakaoFilter = $('rosterKakaoFilter').value;
+    const visible = kakaoFilter
+      ? participants.filter((p) => (kakaoFilter === 'unset' ? !p.kakaoJoined : p.kakaoJoined === kakaoFilter))
+      : participants;
+    if (!visible.length) {
+      t.innerHTML = '<tbody><tr><td class="empty">조건에 맞는 참가자가 없습니다.</td></tr></tbody>';
+      return;
+    }
+
+    const rows = visible.map((p) => {
       const st = stats.find((s) => s.participant.id === p.id)
         || { participant: p, missed: 0, verified: 0, rate: 0, atRisk: false, kickoutEligible: false };
       const rt = U.riskTag(st);
@@ -957,6 +967,7 @@
     $('bulkAdd').addEventListener('click', bulkAdd);
     $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
     $('syncEmailFromNotify').addEventListener('click', syncEmailFromNotify);
+    $('rosterKakaoFilter').addEventListener('change', paintRoster);
 
     $('noticeDate').addEventListener('change', () => { noticeDirty = false; loadNoticeForDate(); });
     $('noticeOut').addEventListener('input', () => { noticeDirty = true; });

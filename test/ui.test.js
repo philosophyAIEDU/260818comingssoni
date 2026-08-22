@@ -69,6 +69,28 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('명단 표에 수정한 카톡방 참여 여부가 반영됨(새로고침 후에도 유지)',
     (await page.locator('#rosterTable tbody tr td select[data-editkakao]').first().inputValue()) === 'O');
 
+  // 명단 관리 — 카톡방 참여 여부로 필터링(미참여자만 보기 등)
+  await kakaoSelects.nth(1).selectOption('X'); // 두 번째 사람(소니)을 미참여로 표시
+  await page.waitForTimeout(300);
+
+  await page.selectOption('#rosterKakaoFilter', 'X');
+  await page.waitForTimeout(200);
+  t('미참여(X) 필터 적용 시 1명만 표시', (await page.locator('#rosterTable tbody tr').count()) === 1);
+  t('미참여 필터로 걸러진 사람이 실제로 X로 표시해 둔 사람',
+    (await page.locator('#rosterTable tbody tr td input[data-rename]').first().inputValue()) === '소니');
+
+  await page.selectOption('#rosterKakaoFilter', 'O');
+  await page.waitForTimeout(200);
+  t('참여(O) 필터 적용 시 1명만 표시', (await page.locator('#rosterTable tbody tr').count()) === 1);
+
+  await page.selectOption('#rosterKakaoFilter', 'unset');
+  await page.waitForTimeout(200);
+  t('미정 필터 적용 시 나머지 2명 표시', (await page.locator('#rosterTable tbody tr').count()) === 2);
+
+  await page.selectOption('#rosterKakaoFilter', '');
+  await page.waitForTimeout(200);
+  t('필터를 전체 보기로 되돌리면 4명 모두 표시', (await page.locator('#rosterTable tbody tr').count()) === 4);
+
   // ── 참가자 화면: 인증 제출 ──
   await page.goto(BASE + '/index.html');
   await page.waitForTimeout(400);
