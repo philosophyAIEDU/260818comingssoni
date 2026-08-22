@@ -28,7 +28,7 @@
  *   setNotice(date, text)                 → Promise<void>  (text가 빈 값이면 저장분 삭제)
  *   listNotices()                         → Promise<{date, text, updatedAt}[]>
  *
- *  Participant { id, nickname, email, status:'active'|'out', joinDate, outDate,
+ *  Participant { id, nickname, email, kakaoJoined:''|'O'|'X', status:'active'|'out', joinDate, outDate,
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
@@ -77,6 +77,7 @@ CS.LocalStore = (function () {
       id: CS.U.uid('p'),
       nickname: CS.U.normalizeNick(nickname),
       email: '',
+      kakaoJoined: '',  // '' 미정 | 'O' 참여 | 'X' 미참여 — 카톡방 참여 여부(운영진이 [명단 관리]에서 직접 표시)
       status: 'active',
       joinDate: CS.CONFIG.startDate,
       outDate: null,

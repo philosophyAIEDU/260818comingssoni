@@ -60,6 +60,15 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   t('잘못된 이메일 형식은 거부됨', /올바른 메일 주소/.test(await page.textContent('#rosterMsg')));
 
+  // 명단 관리 — 카톡방 참여 여부를 드롭다운(미정/O/X)으로 표시
+  const kakaoSelects = page.locator('#rosterTable tbody tr td select[data-editkakao]');
+  t('카톡방 참여 여부 드롭다운 기본값은 미정', (await kakaoSelects.first().inputValue()) === '');
+  await kakaoSelects.first().selectOption('O');
+  await page.waitForTimeout(300);
+  t('카톡방 참여 여부 수정 완료 메시지', /카톡방 참여 여부를 수정했습니다/.test(await page.textContent('#rosterMsg')));
+  t('명단 표에 수정한 카톡방 참여 여부가 반영됨(새로고침 후에도 유지)',
+    (await page.locator('#rosterTable tbody tr td select[data-editkakao]').first().inputValue()) === 'O');
+
   // ── 참가자 화면: 인증 제출 ──
   await page.goto(BASE + '/index.html');
   await page.waitForTimeout(400);
