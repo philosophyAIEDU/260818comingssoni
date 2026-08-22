@@ -102,10 +102,9 @@
 
     const body = stats.map((s) => {
       const p = s.participant;
-      const risk = s.atRisk && p.status !== 'out';
-      const nameTag = p.status === 'out'
-        ? ' <span class="tag bad">아웃</span>'
-        : (risk ? ' <span class="tag bad">킥아웃</span>' : '');
+      const risk = s.atRisk && p.status !== 'out'; // 위험(4회~) 또는 킥아웃 대상(6회~) 모두 포함 — 행 강조용
+      const rt = U.riskTag(s);
+      const nameTag = p.status === 'out' || risk ? ` <span class="tag ${rt.cls}">${rt.label}</span>` : '';
       const cells = s.cells.map((c) =>
         `<td><span class="cell ${CELL_CLASS[c.status]}" data-pid="${p.id}" data-date="${c.date}" ` +
         `title="${esc(p.nickname)} · ${U.shortLabel(c.date)} · ${LABEL[c.status]}" style="cursor:pointer">` +
@@ -182,15 +181,15 @@
     }
 
     const rows = participants.map((p) => {
-      const st = stats.find((s) => s.participant.id === p.id) || { missed: 0, verified: 0, rate: 0 };
+      const st = stats.find((s) => s.participant.id === p.id)
+        || { participant: p, missed: 0, verified: 0, rate: 0, atRisk: false, kickoutEligible: false };
+      const rt = U.riskTag(st);
       const chips = (p.exemptDates || []).sort().map((d) =>
         `<span class="chip">${U.shortLabel(d)}<button data-unexempt="${p.id}" data-date="${d}" title="면제 해제">×</button></span>`).join('');
       return `<tr>
         <td><input type="text" value="${esc(p.nickname)}" data-rename="${p.id}" style="min-width:120px"></td>
         <td><input type="email" value="${esc(p.email || '')}" data-editemail="${p.id}" placeholder="이메일 (선택)" style="min-width:160px"></td>
-        <td>${p.status === 'out'
-          ? '<span class="tag bad">아웃</span>'
-          : (st.missed >= CONFIG.kickoutThreshold ? '<span class="tag bad">킥아웃 대상</span>' : '<span class="tag ok">참여중</span>')}</td>
+        <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
         <td class="num">${st.missed}</td>
         <td class="num">${st.rate}%</td>
@@ -413,7 +412,7 @@
     }
   }
 
-  /* ── 리포트 / 공지문 ─────────────────── */
+  /* ── 공지문 ───────────────────────────── */
   function statusOn(date) {
     const active = stats.filter((s) => {
       const p = s.participant;
@@ -430,52 +429,6 @@
       missed: rows.filter((r) => r.status === 'X'),
       exempt: rows.filter((r) => r.status === 'P')
     };
-  }
-
-  function buildReport(date) {
-    if (date < CONFIG.startDate || date > CONFIG.endDate) {
-      return `${U.longLabel(date)}은(는) 챌린지 기간(${CONFIG.startDate} ~ ${CONFIG.endDate}) 밖입니다.`;
-    }
-    if (date >= U.today()) {
-      return `${U.longLabel(date)}은(는) 아직 마감(24:00) 전이라 미인증이 확정되지 않았습니다.\n` +
-        `마감이 지난 날짜를 선택해 주세요. (가장 최근 확정일: ${U.lastSettledDate() ? U.longLabel(U.lastSettledDate()) : '없음'})`;
-    }
-
-    const g = statusOn(date);
-    const rate = g.target.length ? Math.round((g.done.length / g.target.length) * 100) : 0;
-    const risk = stats.filter((s) => s.participant.status !== 'out' && s.atRisk);
-    const near = stats.filter((s) => s.participant.status !== 'out'
-      && !s.atRisk && s.missed === CONFIG.kickoutThreshold - 1);
-
-    const L = [];
-    L.push(`[${CONFIG.title}] ${U.longLabel(date)} 인증 리포트`);
-    L.push(`(${U.dayIndex(date)}일차 / 총 ${U.challengeDates().length}일)`);
-    L.push('');
-    L.push(`■ 인증률 : ${rate}%  (${g.done.length}/${g.target.length}명)`);
-    L.push(`■ 면제   : ${g.exempt.length}명`);
-    L.push('');
-    L.push(`■ 미인증자 (${g.missed.length}명)`);
-    L.push(g.missed.length
-      ? g.missed
-        .sort((a, b) => b.stat.missed - a.stat.missed)
-        .map((r) => `   - ${r.stat.participant.nickname} (누적 ${r.stat.missed}회)`).join('\n')
-      : '   없음 — 전원 인증 완료 👏');
-    L.push('');
-    L.push(`■ 킥아웃 대상 (누적 ${CONFIG.kickoutThreshold}회 이상, ${risk.length}명)`);
-    L.push(risk.length
-      ? risk.map((s) => `   - ${s.participant.nickname} (누적 ${s.missed}회)`).join('\n')
-      : '   없음');
-    L.push('');
-    L.push(`■ 경고 대상 (누적 ${CONFIG.kickoutThreshold - 1}회, ${near.length}명)`);
-    L.push(near.length
-      ? near.map((s) => `   - ${s.participant.nickname}`).join('\n')
-      : '   없음');
-    L.push('');
-    L.push(`■ 면제 처리 (${g.exempt.length}명)`);
-    L.push(g.exempt.length
-      ? g.exempt.map((r) => `   - ${r.stat.participant.nickname}`).join('\n')
-      : '   없음');
-    return L.join('\n');
   }
 
   /** date(기본 오늘) 하루치 공지문 초안을 자동으로 만든다.
@@ -530,10 +483,9 @@
       L.push('');
     }
 
-    const risk = stats.filter((s) => s.participant.status !== 'out'
-      && s.missed >= CONFIG.kickoutThreshold - 1);
+    const risk = stats.filter((s) => s.participant.status !== 'out' && s.atRisk);
     if (risk.length) {
-      L.push(`⚠️ 누적 미인증 ${CONFIG.kickoutThreshold - 1}회 이상 : ` +
+      L.push(`⚠️ 누적 미인증 ${CONFIG.riskThreshold}회 이상 : ` +
         risk.map((s) => `${s.participant.nickname}(${s.missed}회)`).join(', '));
       L.push(`   누적 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 대상입니다.`);
       L.push('');
@@ -895,7 +847,7 @@
     const head = ['이름', '상태', '인증', '미인증', '면제', '인증률'].concat(dates.map(U.shortLabel));
     const lines = [head.map(csvCell).join(',')].concat(stats.map((s) => [
       s.participant.nickname,
-      s.participant.status === 'out' ? '아웃' : (s.atRisk ? '킥아웃 대상' : '참여중'),
+      U.riskTag(s).label,
       s.verified, s.missed, s.exempt, `${s.rate}%`
     ].concat(s.cells.map((c) => c.status)).map(csvCell).join(',')));
     download(`일일현황_${U.today()}.csv`, lines.join('\n'), 'text/csv');
@@ -950,10 +902,6 @@
     setInterval(tick, 1000);
     initTabs();
 
-    const last = U.lastSettledDate();
-    $('reportDate').value = last || CONFIG.startDate;
-    $('reportDate').min = CONFIG.startDate;
-    $('reportDate').max = CONFIG.endDate;
     $('fDate').min = CONFIG.startDate;
     $('fDate').max = CONFIG.endDate;
 
@@ -965,10 +913,6 @@
 
     $('bulkAdd').addEventListener('click', bulkAdd);
     $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
-    $('genReport').addEventListener('click', () => {
-      $('reportOut').textContent = buildReport($('reportDate').value || U.today());
-    });
-    $('copyReport').addEventListener('click', (e) => copyText($('reportOut').textContent, e.target));
 
     $('noticeDate').addEventListener('change', () => { noticeDirty = false; loadNoticeForDate(); });
     $('noticeOut').addEventListener('input', () => { noticeDirty = true; });
@@ -1036,7 +980,6 @@
             $('adminAuthHeader').style.display = 'flex';
             $('adminEmailLabel').textContent = `${email} (운영진)`;
             await refresh();
-            if (last) $('reportOut').textContent = buildReport(last);
           } else {
             $('adminAuthGate').style.display = 'block';
             $('adminDashboard').style.display = 'none';
@@ -1057,7 +1000,6 @@
       $('adminAuthGate').style.display = 'none';
       $('adminDashboard').style.display = 'block';
       await refresh();
-      if (last) $('reportOut').textContent = buildReport(last);
     }
   }
 

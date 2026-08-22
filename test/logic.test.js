@@ -79,7 +79,8 @@ function t(name, cond, extra) {
   t('인증 3', st.verified === 3, st.verified);
   // 8/24~9/1 = 9일, 그중 3일 인증 → 미인증 6, 오늘(9/2)은 미확정
   t('미인증 6', st.missed === 6, st.missed);
-  t('킥아웃 대상(>=5)', st.atRisk === true);
+  t('위험군(riskThreshold=4 이상)', st.atRisk === true);
+  t('킥아웃 대상(kickoutThreshold=6 이상)', st.kickoutEligible === true);
   t('인증률 33%', st.rate === 33, st.rate);
   t('오늘 셀은 미확정', st.cells.find(c => c.date === '2026-09-02').status === '-');
   t('미래 셀은 미확정', st.cells.find(c => c.date === '2026-09-10').status === '-');
@@ -90,7 +91,8 @@ function t(name, cond, extra) {
   st = U.buildStats(all, await Store.listSubmissions(), T).find(s => s.participant.id === sony.id);
   t('면제 2일 반영', st.exempt === 2, st.exempt);
   t('면제 후 미인증 4', st.missed === 4, st.missed);
-  t('면제 후 킥아웃 해제', st.atRisk === false);
+  t('면제 후에도 위험군은 유지(4회 = riskThreshold)', st.atRisk === true);
+  t('면제 후 킥아웃 대상에서는 해제(4 < kickoutThreshold=6)', st.kickoutEligible === false);
   t('면제는 인증률 계산에서 제외', st.rate === Math.round(3/7*100), st.rate);
 
   // 연속 인증: 8/31, 9/1 인증 추가 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)

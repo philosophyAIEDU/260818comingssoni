@@ -292,9 +292,9 @@
     $('stRate').textContent = `${stat.rate}%`;
 
     const tag = $('myStatusTag');
-    if (p.status === 'out') { tag.className = 'tag bad'; tag.textContent = '아웃'; }
-    else if (stat.atRisk) { tag.className = 'tag bad'; tag.textContent = '킥아웃 대상'; }
-    else { tag.className = 'tag ok'; tag.textContent = '참여중'; }
+    const rt = U.riskTag(stat);
+    tag.className = `tag ${rt.cls}`;
+    tag.textContent = rt.label;
 
     const left = CONFIG.kickoutThreshold - stat.missed;
     $('myHint').innerHTML = p.status === 'out'
@@ -562,9 +562,9 @@
 
     const active = stats.filter((s) => s.participant.status !== 'out');
     const doneToday = active.filter((s) => s.submittedToday);
-    // 킥아웃 위험 인원: 아직 킥아웃 기준(missed>=kickoutThreshold)에는 못 미쳤지만
-    // 누적 미인증이 3~4회로 임박한 사람 (실제 킥아웃 대상은 아래 표의 '킥아웃 대상' 태그 참고)
-    const riskZone = active.filter((s) => s.missed === 3 || s.missed === 4);
+    // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
+    // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
+    const riskZone = active.filter((s) => s.atRisk);
 
     ovLists = {
       done: doneToday.map((s) => s.participant.nickname).sort(byKo),
@@ -581,9 +581,8 @@
       '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
     const body = stats.map((s) => {
       const p = s.participant;
-      const statusTag = p.status === 'out'
-        ? '<span class="tag bad">아웃</span>'
-        : (s.atRisk ? '<span class="tag bad">킥아웃 대상</span>' : '<span class="tag ok">참여중</span>');
+      const rt = U.riskTag(s);
+      const statusTag = `<span class="tag ${rt.cls}">${rt.label}</span>`;
       const todayTag = s.submittedToday ? '<span class="tag ok">인증</span>' : '<span class="tag">-</span>';
       return `<tr>
         <td>${esc(p.nickname)}</td>
