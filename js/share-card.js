@@ -13,15 +13,15 @@ CS.ShareCard = (function () {
    *  meta: { title, dateLabel } */
   function buildText(submission, meta) {
     meta = meta || {};
-    const heading = (submission.isWinner ? '👑 ' : '') + `참여자 ${submission.nickname || ''}님의 인사이트`;
+    const who = (submission.isWinner ? '👑 ' : '') + `참여자 : ${submission.nickname || ''}님`;
     return [
       `📖 ${meta.title || '독서 챌린지'} · ${meta.dateLabel || submission.date || ''}`,
-      heading,
       '',
-      `“${submission.sentence || ''}”`,
+      who,
       '',
-      '느낀 점',
-      submission.reflection || ''
+      `인상 깊었던 내용 : ${submission.sentence || ''}`,
+      '',
+      `책을 읽고 느낀 점 : ${submission.reflection || ''}`
     ].join('\n');
   }
 
