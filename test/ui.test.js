@@ -553,6 +553,31 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('엑셀로 올린 이름이 명단 표에 추가됨(제목 줄 자동 건너뜀)',
     rosterNames2.includes('엑셀참여') && rosterNames2.includes('엑셀모임'), rosterNames2);
 
+  // ── [명단 관리]: [알림 메일] 목록의 이름·메일을 이용해 비어 있는 이메일 칸 채우기 ──
+  await page.click('button[data-tab="notify"]');
+  await page.waitForTimeout(200);
+  await page.fill('#notifyEmailInput', '소니, sony-sync@example.com');
+  await page.click('#notifyAddBtn');
+  await page.waitForTimeout(300);
+
+  await page.click('button[data-tab="roster"]');
+  await page.waitForTimeout(200);
+  const nickInputsBeforeSync = page.locator('#rosterTable tbody tr td input[data-rename]');
+  const nickValuesBeforeSync = await nickInputsBeforeSync.evaluateAll((els) => els.map((e) => e.value));
+  const sonyIdx = nickValuesBeforeSync.indexOf('소니');
+  const emailInputsAll = page.locator('#rosterTable tbody tr td input[data-editemail]');
+  t('동기화 전에는 소니 이메일이 비어 있음', (await emailInputsAll.nth(sonyIdx).inputValue()) === '');
+
+  await page.click('#syncEmailFromNotify');
+  await page.waitForTimeout(400);
+  t('이메일 채우기 완료 메시지', /명의 이메일을 채웠습니다/.test(await page.textContent('#syncEmailMsg')));
+  const nickValuesAfterSync = await page.locator('#rosterTable tbody tr td input[data-rename]').evaluateAll(
+    (els) => els.map((e) => e.value));
+  const sonyIdxAfter = nickValuesAfterSync.indexOf('소니');
+  t('[알림 메일] 목록의 이메일이 명단 관리 이메일 칸에 채워짐',
+    (await page.locator('#rosterTable tbody tr td input[data-editemail]').nth(sonyIdxAfter).inputValue())
+      === 'sony-sync@example.com');
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
