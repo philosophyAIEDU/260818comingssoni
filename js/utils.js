@@ -208,15 +208,28 @@ CS.U = (function () {
         rate: gradable ? Math.round((verified / gradable) * 100) : 0,
         streak,
         submittedToday: subMap.has(todayISO),
-        atRisk: missed >= CS.CONFIG.kickoutThreshold
+        // atRisk(위험군, riskThreshold 이상)와 kickoutEligible(실제 킥아웃 대상, kickoutThreshold 이상)을
+        // 분리해서, "위험" 단계를 킥아웃보다 먼저 경고로 보여줄 수 있게 한다. kickoutEligible이면
+        // atRisk도 항상 true다(더 심한 상태를 포함).
+        atRisk: missed >= CS.CONFIG.riskThreshold,
+        kickoutEligible: missed >= CS.CONFIG.kickoutThreshold
       };
     });
+  }
+
+  /** 참가자 한 명의 상태 뱃지 { cls, label } — 심한 순서로 아웃 > 킥아웃 대상 > 위험 > 참여중.
+   *  admin.js·app.js의 명단/매트릭스/전체현황/나의현황 화면이 공통으로 사용한다. */
+  function riskTag(stat) {
+    if (stat.participant.status === 'out') return { cls: 'bad', label: '아웃' };
+    if (stat.kickoutEligible) return { cls: 'bad', label: '킥아웃 대상' };
+    if (stat.atRisk) return { cls: 'warn', label: '위험' };
+    return { cls: 'ok', label: '참여중' };
   }
 
   return {
     nowParts, today, secondsToMidnight, addDays, dateRange, diffDays,
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
-    normalizeNick, deadlineInstant, isLate, statusFor, buildStats, pad2
+    normalizeNick, deadlineInstant, isLate, statusFor, buildStats, riskTag, pad2
   };
 })();

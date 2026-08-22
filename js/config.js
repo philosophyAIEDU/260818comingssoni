@@ -16,7 +16,8 @@ CS.CONFIG = {
   // 운영 기준
   timezone: 'Asia/Seoul',         // 마감/날짜 판정 기준 시간대
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
-  kickoutThreshold: 5,            // 누적 미인증 N회 → 킥아웃 대상
+  kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 실제 킥아웃 대상
+  riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"으로 분류(아직 킥아웃 대상은 아님)
 
   // 챌린지 기간(startDate~endDate) 밖에서도 인증 제출을 허용할지
   //  true  : 시작 전·종료 후에도 제출 가능 (시연/테스트용, 집계에는 반영되지 않음)

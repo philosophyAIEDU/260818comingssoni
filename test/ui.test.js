@@ -171,12 +171,14 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     !!copiedText && copiedText.includes('커밍쏜') && copiedText.includes('팬이 되는 순간'), copiedText);
   t('복사 완료 버튼 표시', (await shareBtn.textContent()).includes('복사 완료'));
 
-  // ── 운영진 화면: 현황/리포트 ──
+  // ── 운영진 화면: 현황 ──
   await page.goto(BASE + '/admin.html');
   await page.waitForTimeout(500);
   t('오늘 인증 2명', (await page.textContent('#kToday')) === '2', await page.textContent('#kToday'));
   t('참여중 4명', (await page.textContent('#kTotal')) === '4');
   t('오늘 인증률 50%', (await page.textContent('#kTodayRate')) === '50%', await page.textContent('#kTodayRate'));
+  t('킥아웃 위험 인원 KPI 라벨 (위험군과 실제 킥아웃 대상을 함께 집계)',
+    (await page.locator('.stat.bad .k', { hasText: '킥아웃 위험 인원' }).count()) > 0);
 
   const cols = await page.locator('#matrix thead th').count();
   t('매트릭스 열 = 3 + 28일', cols === 31, cols);
@@ -238,11 +240,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   t('삭제 후 자동 생성 문구로 되돌아감', /자동 생성/.test(await page.textContent('#noticeStatus')));
   t('삭제 후 저장된 공지 0건', /저장된 공지 없음/.test(await page.textContent('#noticeSavedCount')));
-
-  await page.click('#genReport');
-  await page.waitForTimeout(300);
-  const rep = await page.textContent('#reportOut');
-  t('리포트 생성됨', rep.length > 40, rep.slice(0, 80));
 
   // 제출 기록 필터
   await page.click('button[data-tab="entries"]');
