@@ -411,7 +411,6 @@
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
-      <p class="feed-quote">“${esc(s.sentence)}”</p>
       <details class="feed-more">
         <summary>느낀 점 보기</summary>
         <dl class="body">
