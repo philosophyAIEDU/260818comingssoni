@@ -160,6 +160,26 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.click('#ovRiskTile');
   await page.waitForTimeout(150);
 
+  // ── 전체 진행현황: 참여자별 상세는 접혔다 펼 수 있고, 이름순/역순/인증률순 정렬 가능 ──
+  t('참여자별 상세는 기본적으로 접혀 있음', !(await page.locator('#overallTableFold').evaluate((el) => el.open)));
+  await page.click('#overallTableFold summary');
+  await page.waitForTimeout(150);
+  t('클릭하면 펼쳐짐', await page.locator('#overallTableFold').evaluate((el) => el.open));
+
+  const overallNames = () => page.locator('#overallTable tbody tr td:first-child').allTextContents();
+  t('기본 정렬(인증률순)', JSON.stringify(await overallNames()) === JSON.stringify(['밤톨', '커밍쏜', '소니', '책읽는고래']),
+    await overallNames());
+  await page.selectOption('#ovSortSelect', 'name-asc');
+  await page.waitForTimeout(150);
+  t('이름순 정렬', JSON.stringify(await overallNames()) === JSON.stringify(['밤톨', '소니', '책읽는고래', '커밍쏜']),
+    await overallNames());
+  await page.selectOption('#ovSortSelect', 'name-desc');
+  await page.waitForTimeout(150);
+  t('이름 역순 정렬', JSON.stringify(await overallNames()) === JSON.stringify(['커밍쏜', '책읽는고래', '소니', '밤톨']),
+    await overallNames());
+  await page.selectOption('#ovSortSelect', 'rate');
+  await page.waitForTimeout(150);
+
   // ── 인증 피드: "전체 보기"는 새 창(feed-all.html)으로 링크됨 ──
   const feedAllLink = page.locator('#feedTabs a.on');
   t('전체 보기 링크가 feed-all.html을 새 창으로 엶',
@@ -176,6 +196,12 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('전체 보기 페이지에도 카톡방 공유 안내 문구 노출',
     (await feedAllPage.locator('.feed-card .hint').allTextContents())
       .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
+  t('날짜별 그룹 헤더 노출', (await feedAllPage.locator('.all-feed-date-heading').count()) >= 1);
+  // 회귀 테스트: 그리드 카드 안에서도(넓은 화면이어도 카드 자체가 좁아서) 작성자 이름이
+  // 폭 0으로 눌려 안 보이던 문제가 있었다 — 첫 카드의 이름이 실제로 보이는 너비를 갖는지 확인.
+  const firstNickBox = await feedAllPage.locator('#allFeedList .feed-nick').first().boundingBox();
+  t('전체 보기 그리드 카드에서도 작성자 이름이 보임(너비 0으로 눌리지 않음)',
+    !!firstNickBox && firstNickBox.width > 10, firstNickBox);
   await feedAllPage.close();
 
   // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
@@ -189,6 +215,26 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await upvoteBtn.click();
   await page.waitForTimeout(400);
   t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
+
+  // ── 명예의 전당: 이름을 클릭하면 1등 했던 날의 인사이트가 펼쳐짐 ──
+  await upvoteBtn.click(); // 커밍쏜을 다시 추천해 오늘의 1등으로 만든다
+  await page.waitForTimeout(400);
+  t('엄지척 다시 1로(명예의 전당 테스트 준비)', (await upvoteBtn.textContent()).includes('👍 1'));
+  await page.click('#feedRefresh'); // 명예의 전당은 자동 갱신 대상이 아니라 수동으로 재집계
+  await page.waitForTimeout(400);
+  const fameNames = await page.locator('#hallOfFameList .who').allTextContents();
+  t('명예의 전당에 오늘의 1등이 표시됨', fameNames.includes('커밍쏜'), fameNames);
+
+  const fameItem = page.locator('#hallOfFameList li[data-fame="커밍쏜"]');
+  t('명예의 전당 항목이 클릭 가능하게(role=button) 표시됨', await fameItem.getAttribute('role') === 'button');
+  await fameItem.click();
+  await page.waitForTimeout(200);
+  const fameDetailText = await page.textContent('#fameDetail');
+  t('이름 클릭 시 1등 했던 날의 인상 깊은 내용이 보임', fameDetailText.includes('팬이 되는 순간'), fameDetailText);
+  t('이름 클릭 시 느낀 점도 함께 보임', fameDetailText.includes('결과가 나오기 전에도'), fameDetailText);
+  await fameItem.click();
+  await page.waitForTimeout(200);
+  t('다시 클릭하면 접힘', await page.isHidden('#fameDetail'));
 
   // ── 인증글 텍스트 복사 ──
   const shareBtn = otherCard.locator('[data-share]');
@@ -493,6 +539,30 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const lateCell = lateRow.locator(`.cell[data-date="${pastDateValue}"]`);
   t('지각 백필은 운영진 매트릭스에서도 미인증(X)으로 집계',
     (await lateCell.getAttribute('class')).includes('cell-x'));
+
+  // ── 전체 보기: 날짜별 그룹핑 + 추천(👍) 많은순 정렬 (이 컨텍스트엔 과거·오늘 두 날짜가 있음) ──
+  await dayPage.goto(BASE + '/index.html');
+  await dayPage.waitForTimeout(400);
+  await dayPage.selectOption('#participant', { label: '지각이' });
+  await dayPage.waitForTimeout(300); // certifyDate 기본값은 오늘 — 그대로 제출
+  await dayPage.fill('#sentence', '오늘은 제때 제출');
+  await dayPage.fill('#reflection', '늦지 않게 남겼다');
+  await dayPage.click('#submitBtn');
+  await dayPage.waitForTimeout(400);
+
+  await dayPage.goto(BASE + '/feed-all.html');
+  await dayPage.waitForTimeout(400);
+  const dateHeadings = await dayPage.locator('.all-feed-date-heading').allTextContents();
+  t('전체 보기에서 날짜별로(최소 2개) 그룹으로 나뉨', dateHeadings.length >= 2, dateHeadings);
+
+  const todayCard = dayPage.locator('#allFeedList .feed-item', { hasText: '오늘은 제때 제출' });
+  await todayCard.locator('.upvote-btn').click();
+  await dayPage.waitForTimeout(300);
+  await dayPage.selectOption('#allFeedSort', 'likes');
+  await dayPage.waitForTimeout(300);
+  const firstCardText = await dayPage.locator('#allFeedList .feed-item').first().textContent();
+  t('추천(👍) 많은순 정렬 시 추천받은 글이 맨 위로', firstCardText.includes('오늘은 제때 제출'), firstCardText);
+
   await dayCtx.close();
 
   // ── 운영진 화면: 명단 시트(CSV) 업로드 — 참가자 명단 + 알림 메일 수신자에 동시 등록

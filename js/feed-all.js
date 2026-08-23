@@ -1,4 +1,4 @@
-/* 인증 피드 전체 보기 (feed-all.html 전용) — 지금까지 제출된 모든 인증글을 최신순으로 보여준다.
+/* 인증 피드 전체 보기 (feed-all.html 전용) — 지금까지 제출된 모든 인증글을 날짜별로 묶어 보여준다.
  * index.html의 "전체 보기" 링크가 새 창으로 이 페이지를 연다. */
 (function () {
   const { U, Store } = CS;
@@ -7,6 +7,7 @@
   const FEED_PAGE_SIZE = 30;
   const CLIENT_KEY = `${CS.CONFIG.storagePrefix}.clientId`;
   let visibleCount = FEED_PAGE_SIZE;
+  let feedSort = 'recent'; // 'recent' 최신순 | 'likes' 추천(👍) 많은순
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성 (index.html과 동일한 키를 써서 기기별로 통일)
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -66,11 +67,30 @@
     });
   }
 
+  /** mode: 'recent'(최신순, 기본) | 'likes'(추천 많은순) */
+  function sortByMode(list, mode) {
+    if (mode === 'likes') {
+      return list.slice().sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0)
+        || String(b.createdAt).localeCompare(String(a.createdAt)));
+    }
+    return list.slice().sort((a, b) => (b.date === a.date
+      ? String(b.createdAt).localeCompare(String(a.createdAt))
+      : b.date.localeCompare(a.date)));
+  }
+
+  /** 정렬된 목록을 날짜별로 묶는다. 그룹 자체는 항상 최신 날짜가 먼저 오고,
+   *  그룹 안의 순서는 넘겨받은 정렬(최신순/추천순)을 그대로 유지한다. */
+  function groupByDate(list) {
+    const groups = new Map();
+    for (const s of list) {
+      if (!groups.has(s.date)) groups.set(s.date, []);
+      groups.get(s.date).push(s);
+    }
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
   async function refreshAllFeed() {
-    const all = (await Store.listSubmissions()).slice()
-      .sort((a, b) => (b.date === a.date
-        ? String(b.createdAt).localeCompare(String(a.createdAt))
-        : b.date.localeCompare(a.date)));
+    const all = sortByMode(await Store.listSubmissions(), feedSort);
 
     $('feedCount').textContent = `${all.length}건`;
 
@@ -83,7 +103,11 @@
     }
 
     const visible = all.slice(0, visibleCount);
-    list.innerHTML = visible.map(renderItem).join('');
+    list.innerHTML = groupByDate(visible).map(([date, items]) => `
+      <div class="all-feed-date-group">
+        <h3 class="all-feed-date-heading">${esc(U.longLabel(date))} <span class="tag">${items.length}건</span></h3>
+        <div class="all-feed-grid full">${items.map(renderItem).join('')}</div>
+      </div>`).join('');
     bindUpvoteButtons(list);
     CS.ShareCard.bindButtons(list, { title: CS.CONFIG.title });
 
@@ -102,6 +126,11 @@
 
     $('allFeedLoadMoreBtn').addEventListener('click', () => {
       visibleCount += FEED_PAGE_SIZE;
+      refreshAllFeed();
+    });
+    $('allFeedSort').addEventListener('change', (e) => {
+      feedSort = e.target.value;
+      visibleCount = FEED_PAGE_SIZE; // 정렬 기준이 바뀌면 페이지도 처음부터 다시 본다
       refreshAllFeed();
     });
     $('feedRefresh').addEventListener('click', async (e) => {
