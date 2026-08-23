@@ -338,6 +338,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const ec = await page.locator('#entryList .entry').count();
   t('검색어 필터 1건', ec === 1, ec);
 
+  // 제출 기록 삭제 — 확인창(confirm)을 거쳐 해당 건만 지워지고 목록에서 사라짐
+  t('삭제 버튼 노출', (await page.locator('#entryList [data-delentry]').count()) === 1);
+  await page.click('#entryList [data-delentry]');
+  await page.waitForTimeout(300);
+  t('삭제 후 검색 결과 0건(빈 목록 안내)',
+    (await page.textContent('#entryList')).includes('조건에 맞는 제출 기록이 없습니다'));
+  await page.fill('#fKeyword', '');
+  await page.click('#applyFilter');
+  await page.waitForTimeout(300);
+  t('필터 해제 후에도 삭제된 건은 다시 나타나지 않음',
+    !(await page.textContent('#entryList')).includes('버티는'));
+
   // 알림 메일 탭 — 이름·메일 일괄 등록
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
@@ -457,7 +469,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const beforePage = await beforeCtx.newPage();
   await beforePage.goto(BASE + '/index.html');
   await beforePage.waitForTimeout(400);
-  t('시작 전: D-day 안내가 배너 아래 phaseNote에 노출', /D-4/.test(await beforePage.textContent('#phaseNote')));
+  t('시작 전: D-day/OT 안내 배너는 더 이상 노출되지 않음(요청에 따라 제거)',
+    (await beforePage.textContent('#phaseNote')).trim() === '');
   t('연습 기간 날짜는 "연습 (날짜)" 형식으로 일자가 먼저 오지 않음(연습 라벨이 앞에 옴)',
     /^연습 \(\d+\/\d+/.test((await beforePage.locator('#certifyDate option:checked').textContent()).trim()));
   t('안내 규칙 카드가 책 소개와 배너 사이에 위치',

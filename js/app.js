@@ -58,21 +58,12 @@
 
 
   function paintPhase() {
-    const p = U.phase();
     const box = $('phaseNote');
     const open = canSubmitToday();
 
-    // 챌린지 시작 전(D-day 안내)에만 노출하고, 시작된 뒤로는(진행 중·종료 후 모두) 표시하지 않는다.
-    if (p === 'before') {
-      const d = U.diffDays(U.today(), CONFIG.startDate);
-      msg(box, `챌린지는 <strong>${U.longLabel(CONFIG.startDate)}</strong>에 시작합니다. (D-${d}) ` +
-        `OT는 ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시입니다. ` +
-        (open
-          ? '지금 올리는 인증은 <strong>연습용</strong>이며 집계에는 반영되지 않습니다.'
-          : '인증은 시작일부터 제출할 수 있어요.'), 'info');
-    } else {
-      msg(box, '');
-    }
+    // 시작 전 D-day/OT 안내 배너는 더 이상 보여주지 않는다(요청에 따라 제거).
+    // 제출 가능 여부에 따른 버튼 잠금 동작은 그대로 유지한다.
+    msg(box, '');
 
     if (!open) {
       $('submitBtn').disabled = true;

@@ -652,17 +652,35 @@
         .join(' ').toLowerCase().includes(kw));
     }
 
-    $('entryList').innerHTML = rows.length ? rows.slice(0, 200).map((s) => `
+    const list = $('entryList');
+    list.innerHTML = rows.length ? rows.slice(0, 200).map((s) => `
       <div class="entry">
         <h4>${esc(s.nickname)} <span class="tag">${esc(U.shortLabel(s.date))}</span>
           ${U.isLate(s.date, s.createdAt) ? '<span class="tag bad">지각</span>' : ''}
-          <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span></h4>
+          <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
+          <button type="button" class="small danger" data-delentry="${esc(s.id)}" style="margin-left:auto">삭제</button></h4>
         <dl>
           <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
           <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
         </dl>
       </div>`).join('') + (rows.length > 200 ? '<p class="muted">최근 200건만 표시합니다.</p>' : '')
       : '<div class="empty">조건에 맞는 제출 기록이 없습니다.</div>';
+
+    list.querySelectorAll('[data-delentry]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        const s = submissions.find((x) => x.id === el.dataset.delentry);
+        if (!s) return;
+        if (!confirm(`${s.nickname} 님의 ${U.shortLabel(s.date)} 인증 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+        el.disabled = true;
+        try {
+          await Store.removeSubmission(s.id);
+          await refresh();
+        } catch (e) {
+          el.disabled = false;
+          alert(`삭제 실패: ${e.message}`);
+        }
+      });
+    });
   }
 
   /* ── 알림 메일 ───────────────────────── */
