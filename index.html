@@ -161,6 +161,7 @@
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
       </ol>
+      <div id="fameDetail" class="fame-detail" hidden></div>
     </section>
 
     <!-- 전체 진행현황 -->
@@ -184,9 +185,22 @@
       </div>
       <div id="ovDetail" class="ov-detail" hidden></div>
 
-      <div class="scroll" style="margin-top:16px">
-        <table id="overallTable"></table>
-      </div>
+      <details class="fold" id="overallTableFold">
+        <summary>참여자별 상세 보기</summary>
+        <div class="row" style="margin-bottom:12px">
+          <div>
+            <label class="muted" for="ovSortSelect">정렬</label>
+            <select id="ovSortSelect">
+              <option value="rate">인증률순</option>
+              <option value="name-asc">이름순</option>
+              <option value="name-desc">이름 역순</option>
+            </select>
+          </div>
+        </div>
+        <div class="scroll">
+          <table id="overallTable"></table>
+        </div>
+      </details>
     </section>
 
     <!-- 나의 진행 현황 -->

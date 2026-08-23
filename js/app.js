@@ -489,6 +489,24 @@
 
   // 인증 피드 "전체 보기"는 feed-all.html(새 창)에서 js/feed-all.js가 별도로 렌더링합니다.
 
+  // 명예의 전당에서 이름을 클릭하면 그 사람이 1등 했던 날의 인사이트를 펼쳐 보여준다.
+  let fameOpenName = null; // 현재 펼쳐진 이름 (null이면 닫힘)
+  let fameWinSubs = {};    // 닉네임 → 1등 했던 날의 제출 목록 [{date, sentence, reflection}]
+
+  function renderFameDetail() {
+    const box = $('fameDetail');
+    if (!fameOpenName) { box.hidden = true; box.innerHTML = ''; return; }
+    const subs = (fameWinSubs[fameOpenName] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    box.hidden = false;
+    box.innerHTML = `<strong>${esc(fameOpenName)}님의 1등 인사이트</strong>` +
+      subs.map((s) => `
+        <div class="fame-entry">
+          <div class="fame-entry-date">${esc(U.shortLabel(s.date))}</div>
+          <p class="quote">“${esc(s.sentence)}”</p>
+          <p>${esc(s.reflection)}</p>
+        </div>`).join('');
+  }
+
   // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
   async function calculateRanksAndFame() {
     const allSubs = await Store.listSubmissions();
@@ -501,11 +519,16 @@
     }
 
     const winsMap = {}; // 닉네임 → 1등 횟수
+    fameWinSubs = {};   // 닉네임 → 1등 했던 날의 제출 내용
     for (const daySubs of byDate.values()) {
       const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
       if (maxVotes <= 0) continue;
       for (const s of daySubs) {
-        if ((s.upvotes || 0) === maxVotes) winsMap[s.nickname] = (winsMap[s.nickname] || 0) + 1;
+        if ((s.upvotes || 0) === maxVotes) {
+          winsMap[s.nickname] = (winsMap[s.nickname] || 0) + 1;
+          (fameWinSubs[s.nickname] = fameWinSubs[s.nickname] || [])
+            .push({ date: s.date, sentence: s.sentence, reflection: s.reflection });
+        }
       }
     }
 
@@ -514,15 +537,34 @@
       .sort((a, b) => b.wins - a.wins || a.nickname.localeCompare(b.nickname, 'ko'))
       .slice(0, 5);
 
+    // 순위가 바뀌면서 펼쳐 두었던 사람이 목록에서 사라질 수 있으니 닫아 준다.
+    if (fameOpenName && !sortedFame.some((u) => u.nickname === fameOpenName)) fameOpenName = null;
+
     const fameList = $('hallOfFameList');
     fameList.innerHTML = sortedFame.length
       ? sortedFame.map((user, idx) => {
         const medal = ['🥇', '🥈', '🥉'][idx] || '⭐';
-        return `<li><span class="medal">${medal}</span>` +
+        return `<li class="clickable" data-fame="${esc(user.nickname)}" role="button" tabindex="0"
+            aria-expanded="${fameOpenName === user.nickname}" title="클릭하면 1등 했던 날의 인사이트를 볼 수 있어요">
+          <span class="medal">${medal}</span>` +
           `<span class="who">${esc(user.nickname)}</span>` +
           `<span class="cnt">1등 ${user.wins}회</span></li>`;
       }).join('')
       : '<li class="none">집계된 순위가 없습니다.</li>';
+
+    fameList.querySelectorAll('[data-fame]').forEach((el) => {
+      const open = () => {
+        fameOpenName = fameOpenName === el.dataset.fame ? null : el.dataset.fame;
+        fameList.querySelectorAll('[data-fame]').forEach((li) =>
+          li.setAttribute('aria-expanded', String(li.dataset.fame === fameOpenName)));
+        renderFameDetail();
+      };
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+    renderFameDetail();
   }
 
   /* ── 전체 진행현황 대시보드 (모든 참여자 공개) ─── */
@@ -549,6 +591,39 @@
     renderOvDetail();
   }
 
+  let overallStats = [];       // paintOverall()이 채워 두는 원본 통계(정렬 전) — 정렬만 바꿀 때 재사용
+  let overallSort = 'rate';    // 'rate' 인증률순 | 'name-asc' 이름순 | 'name-desc' 이름 역순
+
+  function sortOverallStats(stats, sort) {
+    const byNameAsc = (a, b) => a.participant.nickname.localeCompare(b.participant.nickname, 'ko');
+    if (sort === 'name-asc') return stats.slice().sort(byNameAsc);
+    if (sort === 'name-desc') return stats.slice().sort((a, b) => byNameAsc(b, a));
+    return stats.slice().sort((a, b) => (b.rate - a.rate) || (b.streak - a.streak) || byNameAsc(a, b));
+  }
+
+  /** 정렬 선택만 바뀌었을 때는 데이터를 다시 불러오지 않고 표만 다시 그린다. */
+  function renderOverallTable() {
+    const sorted = sortOverallStats(overallStats, overallSort);
+    const head = '<thead><tr><th>이름</th><th class="num">인증</th><th class="num">미인증</th>' +
+      '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
+    const body = sorted.map((s) => {
+      const p = s.participant;
+      const rt = U.riskTag(s);
+      const statusTag = `<span class="tag ${rt.cls}">${rt.label}</span>`;
+      const todayTag = s.submittedToday ? '<span class="tag ok">인증</span>' : '<span class="tag">-</span>';
+      return `<tr>
+        <td>${esc(p.nickname)}</td>
+        <td class="num">${s.verified}</td>
+        <td class="num">${s.missed}</td>
+        <td class="num">${s.rate}%</td>
+        <td class="num">${s.streak}</td>
+        <td>${todayTag}</td>
+        <td>${statusTag}</td>
+      </tr>`;
+    }).join('');
+    $('overallTable').innerHTML = `${head}<tbody>${body}</tbody>`;
+  }
+
   async function paintOverall() {
     if (!participants.length) {
       $('overallCount').textContent = '0명';
@@ -556,11 +631,9 @@
       return;
     }
     const allSubs = await Store.listSubmissions();
-    const stats = U.buildStats(participants, allSubs)
-      .sort((a, b) => (b.rate - a.rate) || (b.streak - a.streak)
-        || a.participant.nickname.localeCompare(b.participant.nickname, 'ko'));
+    overallStats = U.buildStats(participants, allSubs);
 
-    const active = stats.filter((s) => s.participant.status !== 'out');
+    const active = overallStats.filter((s) => s.participant.status !== 'out');
     const doneToday = active.filter((s) => s.submittedToday);
     // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
     // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
@@ -577,25 +650,7 @@
     $('ovRisk').textContent = riskZone.length;
     renderOvDetail(); // 갱신 중에도 펼쳐 둔 명단이 있으면 최신 내용으로 다시 그린다
 
-    const head = '<thead><tr><th>이름</th><th class="num">인증</th><th class="num">미인증</th>' +
-      '<th class="num">인증률</th><th class="num">연속 인증</th><th>오늘</th><th>상태</th></tr></thead>';
-    const body = stats.map((s) => {
-      const p = s.participant;
-      const rt = U.riskTag(s);
-      const statusTag = `<span class="tag ${rt.cls}">${rt.label}</span>`;
-      const todayTag = s.submittedToday ? '<span class="tag ok">인증</span>' : '<span class="tag">-</span>';
-      return `<tr>
-        <td>${esc(p.nickname)}</td>
-        <td class="num">${s.verified}</td>
-        <td class="num">${s.missed}</td>
-        <td class="num">${s.rate}%</td>
-        <td class="num">${s.streak}</td>
-        <td>${todayTag}</td>
-        <td>${statusTag}</td>
-      </tr>`;
-    }).join('');
-
-    $('overallTable').innerHTML = `${head}<tbody>${body}</tbody>`;
+    renderOverallTable();
   }
 
   /* ── 제출 ────────────────────────────── */
@@ -673,6 +728,10 @@
       tile.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleOvDetail(key); }
       });
+    });
+    $('ovSortSelect').addEventListener('change', (e) => {
+      overallSort = e.target.value;
+      renderOverallTable();
     });
 
     $('participant').addEventListener('change', onSelect);

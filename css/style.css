@@ -374,6 +374,21 @@ footer.foot {
 .fame .who { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fame .cnt { margin-left: auto; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
+.fame li.clickable { cursor: pointer; transition: border-color .15s, background .15s; }
+.fame li.clickable:hover, .fame li.clickable:focus-visible { border-color: var(--accent); background: var(--surface); }
+.fame li.clickable[aria-expanded="true"] { border-color: var(--accent); }
+
+/* 명예의 전당: 이름 클릭 시 1등 했던 날의 인사이트를 펼쳐 보여주는 영역 */
+.fame-detail {
+  margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 13px; line-height: 1.6;
+}
+.fame-detail[hidden] { display: none; }
+.fame-entry { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.fame-entry:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
+.fame-entry-date { font-size: 11.5px; color: var(--text-faint); font-weight: 700; }
+.fame-entry .quote { font-style: italic; color: var(--accent); margin: 4px 0; }
 
 /* ── 인증 피드 ────────────────────────── */
 .feed-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -411,6 +426,14 @@ button.ghost { background: transparent; }
 /* feed-all.html 전용: 카드 안에 갇힌 스크롤 대신 페이지 자체가 스크롤되는 전체 페이지 버전 */
 .all-feed-grid.full { max-height: none; overflow-y: visible; padding-right: 0; }
 
+/* 전체 보기: 날짜별로 묶어서 보여주는 바깥 컨테이너(각 날짜 그룹 안에 .all-feed-grid를 둔다) */
+.all-feed-groups { display: flex; flex-direction: column; gap: 22px; }
+.all-feed-date-heading {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-size: 14.5px; font-weight: 700; color: var(--text-dim);
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+
 .upvote-btn.self { opacity: .5; cursor: not-allowed; }
 
 /* 날짜 넘기기 */
@@ -441,8 +464,11 @@ button.ghost { background: transparent; }
   background: var(--surface-2); padding: 12px 13px;
 }
 .feed-item.win { border-color: var(--warn); background: var(--warn-soft); }
-.feed-top { display: flex; align-items: center; gap: 8px; }
-.feed-nick { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 이름 + 지각 배지 + 시간 + 텍스트 복사 + 엄지척이 한 줄에 다 들어가기엔 좁을 수 있어(전체 보기의
+   그리드 카드는 화면이 넓어도 카드 폭 자체가 좁다) 넘치면 줄바꿈한다. 이름은 항상 한 줄을 통째로 쓰고
+   나머지(배지·시간·버튼들)는 그 아래 줄로 넘긴다 — 이름이 "커…" 처럼 뭉개지는 문제 방지. */
+.feed-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; }
+.feed-nick { flex: 1 1 100%; font-size: 14px; font-weight: 700; white-space: normal; overflow: visible; text-overflow: clip; }
 .feed-time { font-size: 11.5px; color: var(--text-faint); margin-left: auto; white-space: nowrap; }
 .feed-quote {
   margin: 7px 0 0; font-size: 13px; line-height: 1.55; font-style: italic; color: var(--accent);
@@ -514,10 +540,4 @@ button.ghost { background: transparent; }
   .entry-list { max-height: 60vh; }
   .feed-scroll { max-height: 70vh; }
   .upvote-btn { min-height: 38px; padding: 7px 13px; }
-
-  /* 이름 + 지각 배지 + 시간 + 내려받기 + 엄지척이 한 줄에 다 들어가기엔 좁아서,
-     이름이 "커…" 처럼 뭉개지는 문제가 있었다. 이름을 한 줄 통째로 쓰게 하고
-     나머지(배지·시간·버튼들)는 그 아래 줄로 넘긴다. */
-  .feed-top { flex-wrap: wrap; row-gap: 6px; }
-  .feed-nick { flex: 1 1 100%; white-space: normal; overflow: visible; text-overflow: clip; }
 }

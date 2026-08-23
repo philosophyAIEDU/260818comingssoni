@@ -41,12 +41,22 @@
         </div>
       </div>
       <p class="hint">
-        지금까지 제출된 모든 인증글을 최신순으로 한눈에 볼 수 있습니다.
-        날짜별로 보고 싶다면 <a href="index.html">인증하기 페이지의 인증 피드</a>를 이용해 주세요.
+        지금까지 제출된 모든 인증글을 날짜별로 묶어 최신 날짜부터 볼 수 있습니다.
+        하루씩 넘겨 보고 싶다면 <a href="index.html">인증하기 페이지의 인증 피드</a>를 이용해 주세요.
       </p>
       <p class="hint">내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
-      <div id="allFeedList" class="all-feed-grid full">
+      <div class="row" style="margin-bottom:12px">
+        <div>
+          <label class="muted" for="allFeedSort">정렬</label>
+          <select id="allFeedSort">
+            <option value="recent">최신순</option>
+            <option value="likes">추천(👍) 많은순</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="allFeedList" class="all-feed-groups">
         <div class="empty">불러오는 중…</div>
       </div>
       <div class="feed-more-wrap" id="allFeedLoadMoreWrap" hidden>
