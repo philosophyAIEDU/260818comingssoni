@@ -382,7 +382,8 @@ footer.foot {
 
 /* ── 명예의 전당 ──────────────────────── */
 .fame { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.fame li {
+/* 한 줄(.fame-row)이 카드이고, 펼친 기록(.fame-detail)은 같은 li 안에서 그 줄 바로 아래에 붙는다. */
+.fame-row, .fame .none {
   display: flex; align-items: center; gap: 8px; font-size: 14px;
   padding: 7px 11px; border-radius: 9px;
   background: var(--surface-2); border: 1px solid var(--border);
@@ -393,14 +394,18 @@ footer.foot {
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
-.fame li.clickable { cursor: pointer; transition: border-color .15s, background .15s; }
-.fame li.clickable:hover, .fame li.clickable:focus-visible { border-color: var(--accent); background: var(--surface); }
-.fame li.clickable[aria-expanded="true"] { border-color: var(--accent); }
+.fame-row { cursor: pointer; transition: border-color .15s, background .15s; }
+.fame-row:hover, .fame-row:focus-visible { border-color: var(--accent); background: var(--surface); }
+/* 펼쳐진 줄은 아래 기록과 한 덩어리로 보이도록 아래쪽 모서리를 펴고 테두리를 강조한다 */
+.fame-row[aria-expanded="true"] {
+  border-color: var(--accent); background: var(--surface);
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent;
+}
 
-/* 명예의 전당: 이름 클릭 시 1등 했던 날의 인사이트를 펼쳐 보여주는 영역 */
+/* 명예의 전당: 이름 클릭 시 그 줄 바로 아래에 펼쳐지는 기록 */
 .fame-detail {
-  margin-top: 10px; padding: 10px 14px; border-radius: 10px;
-  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 10px 14px 12px; border-radius: 0 0 10px 10px;
+  background: var(--surface-2); border: 1px solid var(--accent); border-top: none;
   font-size: 13px; line-height: 1.6;
 }
 .fame-detail[hidden] { display: none; }

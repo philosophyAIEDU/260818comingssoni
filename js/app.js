@@ -517,20 +517,53 @@
 
   // 명예의 전당에서 이름을 클릭하면 그 사람이 그날 쓴 인사이트를 펼쳐 보여준다.
   let fameOpenName = null; // 현재 펼쳐진 이름 (null이면 닫힘)
-  let fameSubs = {};       // 닉네임 → 그날의 제출 내용 {date, sentence, reflection}
 
-  function renderFameDetail() {
-    const box = $('fameDetail');
-    const sub = fameOpenName ? fameSubs[fameOpenName] : null;
-    if (!sub) { box.hidden = true; box.innerHTML = ''; return; }
-    box.hidden = false;
-    box.innerHTML = `<strong>${esc(fameOpenName)}님의 ${esc(U.shortLabel(sub.date))} 기록</strong>
+  let fameRanked = [];     // 전일 순위 [{nickname, votes, rank, sentence, reflection, date}]
+  let fameEmptyMsg = '아직 집계할 전일 기록이 없습니다.';
+
+  /** 펼쳐진 사람의 기록 — 목록의 그 사람 줄 바로 아래에 끼워 넣는다. */
+  function fameDetailHtml(item) {
+    return `<div id="fameDetail" class="fame-detail">
+      <strong>${esc(item.nickname)}님의 ${esc(U.shortLabel(item.date))} 기록</strong>
       <div class="fame-entry">
         <div class="fame-entry-label">인상 깊은 내용</div>
-        <p class="quote">“${esc(sub.sentence)}”</p>
+        <p class="quote">“${esc(item.sentence)}”</p>
         <div class="fame-entry-label">느낀 점</div>
-        <p>${esc(sub.reflection)}</p>
-      </div>`;
+        <p>${esc(item.reflection)}</p>
+      </div>
+    </div>`;
+  }
+
+  function renderFameList() {
+    const fameList = $('hallOfFameList');
+    fameList.innerHTML = fameRanked.length
+      ? fameRanked.map((item) => {
+        const medal = ['🥇', '🥈', '🥉'][item.rank - 1] || '⭐';
+        const isOpen = fameOpenName === item.nickname;
+        return `<li class="fame-item">
+          <div class="fame-row" data-fame="${esc(item.nickname)}" role="button" tabindex="0"
+            aria-expanded="${isOpen}" title="클릭하면 이 사람이 쓴 인상 깊은 내용과 느낀 점을 볼 수 있어요">
+            <span class="medal">${medal}</span>` +
+          `<span class="who">${esc(item.nickname)}</span>` +
+          `<span class="cnt">${item.rank}등 · 👍 ${item.votes}</span>
+          </div>${isOpen ? fameDetailHtml(item) : ''}</li>`;
+      }).join('')
+      : `<li class="none">${esc(fameEmptyMsg)}</li>`;
+
+    fameList.querySelectorAll('[data-fame]').forEach((el) => {
+      const toggle = () => {
+        fameOpenName = fameOpenName === el.dataset.fame ? null : el.dataset.fame;
+        renderFameList(); // 펼침 위치가 바뀌므로 목록을 다시 그린다
+        if (fameOpenName) {
+          const row = $('hallOfFameList').querySelector(`[data-fame="${CSS.escape(fameOpenName)}"]`);
+          if (row) row.focus(); // 다시 그려도 키보드 초점은 방금 누른 줄에 남긴다
+        }
+      };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    });
   }
 
   // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~10위를 보여준다.
@@ -541,6 +574,7 @@
     const daySubs = date ? await Store.listSubmissions({ date }) : [];
 
     $('fameDateLabel').textContent = date ? `${U.shortLabel(date)}에` : '어제';
+    fameEmptyMsg = date ? '전일 인증글 중 추천받은 글이 없습니다.' : '아직 집계할 전일 기록이 없습니다.';
 
     // 추천 많은 순 → 동점이면 먼저 올린 사람이 위로.
     // 추천이 없는 글과, 마감(24:00)을 넘겨 올린 지각 글은 순위에서 제외한다
@@ -551,44 +585,19 @@
         String(a.createdAt).localeCompare(String(b.createdAt)))
       .slice(0, 10);
 
-    fameSubs = {};
-    for (const s of ranked) {
-      fameSubs[s.nickname] = { date: s.date, sentence: s.sentence, reflection: s.reflection };
-    }
+    let prevVotes = null, prevRank = 0;
+    fameRanked = ranked.map((s, idx) => {
+      const votes = s.upvotes || 0;
+      // 동점이면 같은 등수(1,1,3…). 공동 1등을 둘 다 1등으로 보여주기 위함.
+      const rank = votes === prevVotes ? prevRank : idx + 1;
+      prevVotes = votes; prevRank = rank;
+      return { nickname: s.nickname, votes, rank, date: s.date, sentence: s.sentence, reflection: s.reflection };
+    });
 
     // 순위가 바뀌면서 펼쳐 두었던 사람이 목록에서 사라질 수 있으니 닫아 준다.
-    if (fameOpenName && !fameSubs[fameOpenName]) fameOpenName = null;
+    if (fameOpenName && !fameRanked.some((i) => i.nickname === fameOpenName)) fameOpenName = null;
 
-    const fameList = $('hallOfFameList');
-    let prevVotes = null, prevRank = 0;
-    fameList.innerHTML = ranked.length
-      ? ranked.map((s, idx) => {
-        const votes = s.upvotes || 0;
-        // 동점이면 같은 등수(1,1,3…). 공동 1등을 둘 다 1등으로 보여주기 위함.
-        const rank = votes === prevVotes ? prevRank : idx + 1;
-        prevVotes = votes; prevRank = rank;
-        const medal = ['🥇', '🥈', '🥉'][rank - 1] || '⭐';
-        return `<li class="clickable" data-fame="${esc(s.nickname)}" role="button" tabindex="0"
-            aria-expanded="${fameOpenName === s.nickname}" title="클릭하면 이 사람이 쓴 인상 깊은 내용과 느낀 점을 볼 수 있어요">
-          <span class="medal">${medal}</span>` +
-          `<span class="who">${esc(s.nickname)}</span>` +
-          `<span class="cnt">${rank}등 · 👍 ${votes}</span></li>`;
-      }).join('')
-      : `<li class="none">${date ? '전일 인증글 중 추천받은 글이 없습니다.' : '아직 집계할 전일 기록이 없습니다.'}</li>`;
-
-    fameList.querySelectorAll('[data-fame]').forEach((el) => {
-      const open = () => {
-        fameOpenName = fameOpenName === el.dataset.fame ? null : el.dataset.fame;
-        fameList.querySelectorAll('[data-fame]').forEach((li) =>
-          li.setAttribute('aria-expanded', String(li.dataset.fame === fameOpenName)));
-        renderFameDetail();
-      };
-      el.addEventListener('click', open);
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      });
-    });
-    renderFameDetail();
+    renderFameList();
   }
 
   /* ── 전체 진행현황 대시보드 (모든 참여자 공개) ─── */
