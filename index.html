@@ -177,16 +177,17 @@
     <!-- 전체 진행현황 -->
     <section class="card">
       <h2>📊 전체 진행현황 <span class="tag" id="overallCount">0명</span></h2>
-      <p class="hint">참여자 전체의 인증 현황을 한눈에 볼 수 있는 대시보드입니다.</p>
+      <p class="hint">참여자 전체의 인증 현황을 한눈에 볼 수 있는 대시보드입니다.
+        전일 지표는 <strong id="ovPrevDateLabel">어제</strong> 24시 마감으로 확정된 기록입니다.</p>
 
       <div class="stats" id="overallStats">
         <div class="stat">
-          <div class="n" id="ovToday">0%</div>
-          <div class="k">오늘 인증률</div>
+          <div class="n" id="ovPrevRate">0%</div>
+          <div class="k">전일 인증률</div>
         </div>
-        <div class="stat clickable" id="ovDoneTile" role="button" tabindex="0" aria-expanded="false">
-          <div class="n" id="ovDone">0</div>
-          <div class="k">인증 완료 인원</div>
+        <div class="stat clickable" id="ovPrevDoneTile" role="button" tabindex="0" aria-expanded="false">
+          <div class="n" id="ovPrevDone">0</div>
+          <div class="k">전일 인증 완료 인원</div>
         </div>
         <div class="stat bad clickable" id="ovRiskTile" role="button" tabindex="0" aria-expanded="false">
           <div class="n" id="ovRisk">0</div>

@@ -166,14 +166,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('평균 인증률 타일 제거됨', (await page.locator('#ovAvgRate').count()) === 0);
   t('킥아웃 위험 인원 라벨로 변경', (await page.textContent('#overallStats')).includes('킥아웃 위험 인원'));
 
-  // ── 전체 진행현황: "인증 완료 인원" 타일 + 클릭 시 명단 펼치기 ──
-  t('참여중 → 인증 완료 인원으로 라벨 변경', (await page.textContent('#overallStats')).includes('인증 완료 인원'));
-  t('인증 완료 인원 수치 = 오늘 인증한 2명', (await page.textContent('#ovDone')) === '2');
-  await page.click('#ovDoneTile');
+  // ── 전체 진행현황: "전일 인증 완료 인원" 타일 + 클릭 시 명단 펼치기 ──
+  t('전일 기준 라벨로 표시', (await page.textContent('#overallStats')).includes('전일 인증 완료 인원'));
+  t('전일 인증률 라벨로 표시', (await page.textContent('#overallStats')).includes('전일 인증률'));
+  // 이 컨텍스트의 인증은 전부 '오늘' 것이라, 어제 기준 집계는 0명이어야 한다.
+  t('오늘 인증만 있으면 전일 인증 완료 인원은 0', (await page.textContent('#ovPrevDone')) === '0',
+    await page.textContent('#ovPrevDone'));
+  await page.click('#ovPrevDoneTile');
   await page.waitForTimeout(150);
   const ovDetailText = await page.textContent('#ovDetail');
-  t('완료 인원 타일 클릭 시 명단 노출', ovDetailText.includes('커밍쏜') && ovDetailText.includes('밤톨'));
-  await page.click('#ovDoneTile');
+  t('완료 인원 타일 클릭 시 명단 영역 노출', ovDetailText.includes('인증 완료'), ovDetailText);
+  await page.click('#ovPrevDoneTile');
   await page.waitForTimeout(150);
   t('같은 타일 재클릭 시 명단 다시 숨김', await page.isHidden('#ovDetail'));
   await page.click('#ovRiskTile');
@@ -838,6 +841,61 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     finishText.includes('전체 완주하셨습니다'), finishText.slice(0, 200));
 
   await finishCtx.close();
+
+  // ── 전체 진행현황: 전일(어제 24시 마감 확정) 기준 인증률·완료 인원 ──
+  const prevCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await prevCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    const yest = shift(-1);
+    const onTime = `${yest}T10:00:00.000Z`;          // 어제 마감(15:00Z) 전 → 인증(O)
+    const tooLate = `${shift(0)}T02:00:00.000Z`;     // 어제 마감 후 → 지각이라 미인증(X)
+    // 어제: 정시 3명 / 지각 1명 / 미제출 2명(마루·오늘만) → 완료 3명, 인증률 3÷6 = 50%
+    const parts = ['가온', '나린', '다솜', '라온', '마루', '오늘만'].map((n, i) => ({
+      id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z',
+    }));
+    const mk = (i, date, createdAt) => ({
+      id: `s${i}_${date}`, participantId: 'p' + i, nickname: parts[i].nickname, date,
+      sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [], createdAt, updatedAt: createdAt,
+    });
+    const subs = [mk(0, yest, onTime), mk(1, yest, onTime), mk(2, yest, onTime), mk(3, yest, tooLate)];
+    // '마루'(p4)는 어제 미제출. '오늘만'(p5)은 오늘만 인증 — 전일 집계에 섞이면 안 된다.
+    subs.push(mk(5, today, `${today}T01:00:00.000Z`));
+    await prevCtx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+
+    const prevPage = await prevCtx.newPage();
+    await prevPage.goto(BASE + '/index.html');
+    await prevPage.waitForTimeout(500);
+
+    t('전일 인증 완료 인원 = 어제 정시 인증한 3명',
+      (await prevPage.textContent('#ovPrevDone')) === '3', await prevPage.textContent('#ovPrevDone'));
+    t('전일 인증률 = 3÷6 = 50% (지각·미제출은 모두 분모에 포함)',
+      (await prevPage.textContent('#ovPrevRate')) === '50%', await prevPage.textContent('#ovPrevRate'));
+    t('안내 문구에 기준 날짜(어제)가 표시됨',
+      (await prevPage.textContent('#ovPrevDateLabel')) === `${Number(yest.slice(5, 7))}/${Number(yest.slice(8, 10))}(${'일월화수목금토'[new Date(yest + 'T00:00:00Z').getUTCDay()]})`,
+      await prevPage.textContent('#ovPrevDateLabel'));
+
+    await prevPage.click('#ovPrevDoneTile');
+    await prevPage.waitForSelector('#ovDetail:not([hidden])');
+    const prevNames = await prevPage.textContent('#ovDetail');
+    t('완료 명단에 어제 정시 인증자만 표시',
+      prevNames.includes('가온') && prevNames.includes('나린') && prevNames.includes('다솜'), prevNames);
+    t('어제 지각 제출자는 완료 명단에서 제외', !prevNames.includes('라온'), prevNames);
+    t('어제 미제출자는 완료 명단에서 제외', !prevNames.includes('마루'), prevNames);
+    t('오늘만 인증한 사람은 전일 집계에 섞이지 않음', !prevNames.includes('오늘만'), prevNames);
+  }
+  await prevCtx.close();
 
   // ── 명예의 전당: "오늘" 인증글을 추천(👍) 많은 순으로 1~5위 ──
   // 추천은 한 브라우저당 1표만 누를 수 있어 UI로는 득표차를 만들 수 없으므로 저장소를 직접 심는다.
