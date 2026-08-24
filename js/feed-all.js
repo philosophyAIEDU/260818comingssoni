@@ -102,13 +102,15 @@
   }
 
   /** 선택한 참가자의 인증 기록 전체(현재 화면의 정렬·더 보기 범위와 무관하게)를
-   *  날짜순으로 모아 텍스트 파일로 내려받는다. 나중에 한꺼번에 모아 보거나
-   *  이중으로 백업해 두고 싶다는 요청에 따른 기능. */
+   *  1일차부터 마지막 날까지 날짜순으로 모아 텍스트 파일로 내려받는다. 28일차까지
+   *  인증을 끝내고 나면 한 번에 전체 기록을 받아 보고 싶다는 요청에 따른 기능 —
+   *  진행 중에 받아도 그때까지의 기록이 똑같이 모두 담긴다. */
   async function downloadPersonTxt() {
     if (!feedPerson) return;
     const btn = $('allFeedDownloadBtn');
     const person = participants.find((p) => p.id === feedPerson);
     const name = (person && person.nickname) || '참여자';
+    const total = U.challengeDates().length;
     btn.disabled = true;
     try {
       const mine = (await Store.listSubmissions({ participantId: feedPerson }))
@@ -118,13 +120,15 @@
         return;
       }
       const lines = [
-        `📖 ${CS.CONFIG.title || '독서 챌린지'} · ${name}님의 인증 기록 (총 ${mine.length}건)`,
-        `내려받은 시각 : ${U.stampLabel(U.nowStamp())}`,
-        ''
+        `📖 ${CS.CONFIG.title || '독서 챌린지'} · ${name}님의 인증 기록 (${mine.length}/${total}일)`,
+        `내려받은 시각 : ${U.stampLabel(U.nowStamp())}`
       ];
+      if (mine.length >= total) lines.push('🎉 1일차부터 마지막 날까지 전체 완주하셨습니다!');
+      lines.push('');
       mine.forEach((s) => {
+        const day = U.dayIndex(s.date);
         lines.push('─'.repeat(30));
-        lines.push(`${U.longLabel(s.date)}${U.isLate(s.date, s.createdAt) ? ' · 지각' : ''}`
+        lines.push(`${day ? `${day}일차 · ` : ''}${U.longLabel(s.date)}${U.isLate(s.date, s.createdAt) ? ' · 지각' : ''}`
           + ` (제출 ${U.stampLabel(s.updatedAt || s.createdAt)})`);
         lines.push('');
         lines.push(`인상 깊었던 내용 : ${s.sentence}`);
