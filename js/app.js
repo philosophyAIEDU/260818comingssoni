@@ -439,7 +439,6 @@
     $('myCard').hidden = false;
     $('stVerified').textContent = stat.verified;
     $('stMissed').textContent = stat.missed;
-    $('stExempt').textContent = stat.exempt;
     $('stStreak').textContent = stat.streak;
     $('stRate').textContent = `${stat.rate}%`;
 
@@ -463,13 +462,13 @@
         <span class="d">${Number(c.date.slice(8))}</span>
       </div>`).join('');
 
-    // 최근 기록 (최신 5건)
+    // 전체 기록 — 최근 몇 건만 자르지 않고 날짜 순서(1일차 → 최근)대로 모두 보여준다.
     const box = $('myEntries');
-    const recent = subs.slice().reverse().slice(0, 5);
-    box.innerHTML = recent.length ? recent.map(renderEntry).join('') :
+    const all = subs.slice().sort((a, b) => a.date.localeCompare(b.date));
+    box.innerHTML = all.length ? all.map(renderEntry).join('') :
       '<div class="empty">아직 제출한 인증이 없습니다.</div>';
     $('myEntriesFold').querySelector('summary').textContent =
-      recent.length ? `최근 인증 기록 ${recent.length}건 보기` : '최근 인증 기록 보기';
+      all.length ? `전체 인증 기록 ${all.length}건 보기` : '전체 인증 기록 보기';
   }
 
   function labelOf(st) {
@@ -478,8 +477,9 @@
 
   function renderEntry(s) {
     const late = U.isLate(s.date, s.createdAt);
+    const idx = U.dayIndex(s.date);
     return `<div class="entry">
-      <h4>${esc(U.shortLabel(s.date))}
+      <h4>${idx ? `${idx}일차 · ` : ''}${esc(U.shortLabel(s.date))}
         <span class="tag ${late ? 'bad' : 'ok'}">${late ? '미인증(지각)' : '인증'}</span>
         <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
       </h4>
