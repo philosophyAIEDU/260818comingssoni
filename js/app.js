@@ -48,19 +48,38 @@
     $('countdown').textContent = U.hhmmss(U.secondsToMidnight());
   }
 
-  /** 배너의 "오늘의 범위"를 채운다. 오늘이 챌린지 기간 밖(시작 전·종료 후)이거나
-   *  해당 회차 안내가 설정돼 있지 않으면 접이식 자체를 숨긴다. */
-  function paintTodayRange() {
+  /* ── 배너: "오늘의 범위" — 오늘 회차뿐 아니라 ◀▶로 다른 날짜의 범위도 넘겨볼 수 있다 ── */
+  let rangeDayIdx = null; // 1-based. null이면 다음 렌더링 때 오늘(또는 1일차)로 초기화
+
+  function renderTodayRange() {
     const fold = $('todayRangeFold');
     if (!fold) return;
-    const idx = U.dayIndex(U.today());
-    const text = idx && CONFIG.readingPlan ? CONFIG.readingPlan[idx - 1] : null;
-    if (!text) {
+    const plan = CONFIG.readingPlan || [];
+    if (!plan.length) {
       fold.hidden = true;
       return;
     }
+    const todayIdx = U.dayIndex(U.today());
+    if (rangeDayIdx == null) {
+      // 진행 중이면 오늘 회차, 시작 전이면 1일차(다가올 첫 회차), 종료 후면 마지막 회차(가장
+      // 최근에 읽었을 내용)를 기본값으로 보여준다.
+      if (todayIdx && todayIdx <= plan.length) rangeDayIdx = todayIdx;
+      else rangeDayIdx = U.today() > CONFIG.endDate ? plan.length : 1;
+    }
+    rangeDayIdx = Math.min(Math.max(rangeDayIdx, 1), plan.length);
+
+    const date = U.addDays(CONFIG.startDate, rangeDayIdx - 1);
+    $('rangeDayLabel').textContent = `${rangeDayIdx}일차 (${U.shortLabel(date)})`
+      + (rangeDayIdx === todayIdx ? ' · 오늘' : '');
+    $('todayRangeText').innerHTML = plan[rangeDayIdx - 1] || '';
+    $('rangePrevDay').disabled = rangeDayIdx <= 1;
+    $('rangeNextDay').disabled = rangeDayIdx >= plan.length;
     fold.hidden = false;
-    $('todayRangeText').innerHTML = text;
+  }
+
+  function shiftRangeDay(delta) {
+    rangeDayIdx = (rangeDayIdx || 1) + delta;
+    renderTodayRange();
   }
 
   /** 오늘 인증을 제출할 수 있는지
@@ -716,7 +735,9 @@
   async function boot() {
     await Store.init();
     paintHeader();
-    paintTodayRange();
+    renderTodayRange();
+    $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));
+    $('rangeNextDay').addEventListener('click', () => shiftRangeDay(1));
     paintPhase();
     tickCountdown();
     setInterval(tickCountdown, 1000);

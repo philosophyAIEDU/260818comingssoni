@@ -145,6 +145,10 @@ a { color: var(--accent); }
   background: rgba(8, 29, 88, 0.08); border: 1px solid rgba(8, 29, 88, 0.25); color: #081d58;
 }
 .banner .fold > summary:hover { border-color: #081d58; color: #081d58; }
+.banner .today-range-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
+.banner .today-range-nav button { border-color: rgba(8, 29, 88, 0.35); color: #081d58; }
+.banner .today-range-nav button:hover { border-color: #081d58; }
+.banner .today-range-day { font-size: 13.5px; font-weight: 700; color: #081d58; min-width: 9em; text-align: center; }
 .banner .today-range { margin: 0; font-size: 13.5px; line-height: 1.6; color: #081d58; }
 
 
