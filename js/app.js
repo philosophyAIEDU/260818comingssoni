@@ -596,11 +596,13 @@
 
   const byKo = (a, b) => a.localeCompare(b, 'ko');
 
+  let ovPrevTitle = '전일 인증 완료'; // paintOverall()이 실제 날짜를 넣어 갱신한다
+
   function renderOvDetail() {
     const box = $('ovDetail');
     if (!ovOpenKey) { box.hidden = true; box.innerHTML = ''; return; }
     const names = ovLists[ovOpenKey];
-    const title = ovOpenKey === 'done' ? '오늘 인증 완료' : '킥아웃 위험 인원';
+    const title = ovOpenKey === 'done' ? ovPrevTitle : '킥아웃 위험 인원';
     box.hidden = false;
     box.innerHTML = `<strong>${esc(title)} (${names.length}명)</strong><br>` +
       (names.length ? names.map(esc).join(', ') : '<span class="muted">해당하는 사람이 없습니다.</span>');
@@ -608,7 +610,7 @@
 
   function toggleOvDetail(key) {
     ovOpenKey = ovOpenKey === key ? null : key;
-    $('ovDoneTile').setAttribute('aria-expanded', String(ovOpenKey === 'done'));
+    $('ovPrevDoneTile').setAttribute('aria-expanded', String(ovOpenKey === 'done'));
     $('ovRiskTile').setAttribute('aria-expanded', String(ovOpenKey === 'risk'));
     renderOvDetail();
   }
@@ -656,19 +658,35 @@
     overallStats = U.buildStats(participants, allSubs);
 
     const active = overallStats.filter((s) => s.participant.status !== 'out');
-    const doneToday = active.filter((s) => s.submittedToday);
+
+    // 전일(어제) 기준 집계. 오늘은 24:00 마감 전이라 아직 확정되지 않으므로, 마감이 지나
+    // O/X가 확정된 마지막 날인 어제를 기준으로 삼는다. 마감을 넘겨 올린 지각 제출은
+    // 다른 화면과 동일하게 인증으로 치지 않는다(statusFor 규칙).
+    const prevDate = U.lastSettledDate(); // 챌린지 첫날이라 어제가 없으면 null
+    const prevCell = (s) => s.cells.find((c) => c.date === prevDate);
+    // 면제(P)·참여 전(·)인 사람은 인증률 분모에서 빼고, O/X로 확정된 사람만 센다.
+    const prevGraded = prevDate
+      ? active.filter((s) => { const c = prevCell(s); return c && (c.status === 'O' || c.status === 'X'); })
+      : [];
+    const prevDone = prevGraded.filter((s) => prevCell(s).status === 'O');
+
     // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
     // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
     const riskZone = active.filter((s) => s.atRisk);
 
     ovLists = {
-      done: doneToday.map((s) => s.participant.nickname).sort(byKo),
+      done: prevDone.map((s) => s.participant.nickname).sort(byKo),
       risk: riskZone.map((s) => s.participant.nickname).sort(byKo)
     };
+    ovPrevTitle = prevDate ? `${U.shortLabel(prevDate)} 인증 완료` : '전일 인증 완료';
 
     $('overallCount').textContent = `${active.length}명`;
-    $('ovToday').textContent = active.length ? `${Math.round((doneToday.length / active.length) * 100)}%` : '0%';
-    $('ovDone').textContent = doneToday.length;
+    $('ovPrevDateLabel').textContent = prevDate ? U.shortLabel(prevDate) : '어제';
+    // 아직 마감이 지난 날이 없으면(챌린지 첫날) 숫자 대신 '-'로 비워 둔다.
+    $('ovPrevRate').textContent = prevDate
+      ? (prevGraded.length ? `${Math.round((prevDone.length / prevGraded.length) * 100)}%` : '0%')
+      : '-';
+    $('ovPrevDone').textContent = prevDate ? prevDone.length : '-';
     $('ovRisk').textContent = riskZone.length;
     renderOvDetail(); // 갱신 중에도 펼쳐 둔 명단이 있으면 최신 내용으로 다시 그린다
 
@@ -747,7 +765,7 @@
     await paintOverall();
 
     // 전체 진행현황: "인증 완료 인원" · "킥아웃 위험 인원" 타일을 클릭하면 명단이 펼쳐짐
-    [['ovDoneTile', 'done'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
+    [['ovPrevDoneTile', 'done'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
       const tile = $(id);
       tile.addEventListener('click', () => toggleOvDetail(key));
       tile.addEventListener('keydown', (e) => {
