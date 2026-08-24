@@ -45,6 +45,7 @@
         하루씩 넘겨 보고 싶다면 <a href="index.html">인증하기 페이지의 인증 피드</a>를 이용해 주세요.
       </p>
       <p class="hint">내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
+      <p class="hint">사람을 골라서 그 사람의 인증 기록만 모아 보거나, 텍스트 파일(.txt)로 내려받아 따로 보관할 수 있습니다.</p>
 
       <div class="row" style="margin-bottom:12px">
         <div>
@@ -53,6 +54,16 @@
             <option value="recent">최신순</option>
             <option value="likes">추천(👍) 많은순</option>
           </select>
+        </div>
+        <div>
+          <label class="muted" for="allFeedPerson">사람별로 보기</label>
+          <select id="allFeedPerson">
+            <option value="">전체</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button type="button" id="allFeedDownloadBtn" class="small" style="width:100%" disabled
+            title="사람을 먼저 선택해 주세요">📄 TXT로 다운로드</button>
         </div>
       </div>
 

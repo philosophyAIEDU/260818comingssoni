@@ -8,6 +8,8 @@
   const CLIENT_KEY = `${CS.CONFIG.storagePrefix}.clientId`;
   let visibleCount = FEED_PAGE_SIZE;
   let feedSort = 'recent'; // 'recent' 최신순 | 'likes' 추천(👍) 많은순
+  let feedPerson = ''; // 선택한 참가자 id. 빈 값이면 전체.
+  let participants = [];
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성 (index.html과 동일한 키를 써서 기기별로 통일)
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -89,15 +91,66 @@
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }
 
+  function download(filename, text) {
+    const blob = new Blob(['﻿' + text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  /** 선택한 참가자의 인증 기록 전체(현재 화면의 정렬·더 보기 범위와 무관하게)를
+   *  날짜순으로 모아 텍스트 파일로 내려받는다. 나중에 한꺼번에 모아 보거나
+   *  이중으로 백업해 두고 싶다는 요청에 따른 기능. */
+  async function downloadPersonTxt() {
+    if (!feedPerson) return;
+    const btn = $('allFeedDownloadBtn');
+    const person = participants.find((p) => p.id === feedPerson);
+    const name = (person && person.nickname) || '참여자';
+    btn.disabled = true;
+    try {
+      const mine = (await Store.listSubmissions({ participantId: feedPerson }))
+        .slice().sort((a, b) => a.date.localeCompare(b.date));
+      if (!mine.length) {
+        alert('다운로드할 인증 기록이 없습니다.');
+        return;
+      }
+      const lines = [
+        `📖 ${CS.CONFIG.title || '독서 챌린지'} · ${name}님의 인증 기록 (총 ${mine.length}건)`,
+        `내려받은 시각 : ${U.stampLabel(U.nowStamp())}`,
+        ''
+      ];
+      mine.forEach((s) => {
+        lines.push('─'.repeat(30));
+        lines.push(`${U.longLabel(s.date)}${U.isLate(s.date, s.createdAt) ? ' · 지각' : ''}`
+          + ` (제출 ${U.stampLabel(s.updatedAt || s.createdAt)})`);
+        lines.push('');
+        lines.push(`인상 깊었던 내용 : ${s.sentence}`);
+        lines.push('');
+        lines.push(`책을 읽고 느낀 점 : ${s.reflection}`);
+        lines.push('');
+      });
+      download(`${name}_인증기록_${U.today()}.txt`, lines.join('\n'));
+    } finally {
+      btn.disabled = !feedPerson;
+    }
+  }
+
   async function refreshAllFeed() {
-    const all = sortByMode(await Store.listSubmissions(), feedSort);
+    const filter = feedPerson ? { participantId: feedPerson } : undefined;
+    const all = sortByMode(await Store.listSubmissions(filter), feedSort);
 
     $('feedCount').textContent = `${all.length}건`;
+    $('allFeedDownloadBtn').disabled = !feedPerson || !all.length;
 
     const list = $('allFeedList');
     const moreWrap = $('allFeedLoadMoreWrap');
     if (!all.length) {
-      list.innerHTML = '<div class="empty">제출된 인증글이 없습니다.</div>';
+      list.innerHTML = feedPerson
+        ? '<div class="empty">이 사람이 제출한 인증글이 없습니다.</div>'
+        : '<div class="empty">제출된 인증글이 없습니다.</div>';
       moreWrap.hidden = true;
       return;
     }
@@ -122,6 +175,9 @@
 
   async function boot() {
     await Store.init();
+    participants = await Store.listParticipants();
+    $('allFeedPerson').insertAdjacentHTML('beforeend',
+      participants.map((p) => `<option value="${esc(p.id)}">${esc(p.nickname)}</option>`).join(''));
     await refreshAllFeed();
 
     $('allFeedLoadMoreBtn').addEventListener('click', () => {
@@ -133,6 +189,12 @@
       visibleCount = FEED_PAGE_SIZE; // 정렬 기준이 바뀌면 페이지도 처음부터 다시 본다
       refreshAllFeed();
     });
+    $('allFeedPerson').addEventListener('change', (e) => {
+      feedPerson = e.target.value;
+      visibleCount = FEED_PAGE_SIZE;
+      refreshAllFeed();
+    });
+    $('allFeedDownloadBtn').addEventListener('click', downloadPersonTxt);
     $('feedRefresh').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;

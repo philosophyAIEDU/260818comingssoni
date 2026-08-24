@@ -6,6 +6,7 @@ function loadPlaywright() {
   throw new Error('playwright 를 찾을 수 없습니다. `npm i -D playwright` 후 다시 실행하세요.');
 }
 const { chromium } = loadPlaywright();
+const fs = require('fs');
 const BASE = process.env.BASE || 'http://127.0.0.1:8765';
 const errs = [];
 let pass = 0, fail = 0;
@@ -575,6 +576,60 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await dayPage.waitForTimeout(300);
   const firstCardText = await dayPage.locator('#allFeedList .feed-item').first().textContent();
   t('추천(👍) 많은순 정렬 시 추천받은 글이 맨 위로', firstCardText.includes('오늘은 제때 제출'), firstCardText);
+
+  // ── 전체 보기: 사람별로 보기 + 인증 기록 TXT 다운로드
+  //    (나중에 한꺼번에 모아 보거나 이중으로 백업해 두고 싶다는 요청에 따른 기능) ──
+  await dayPage.goto(BASE + '/admin.html');
+  await dayPage.waitForTimeout(400);
+  await dayPage.click('button[data-tab="roster"]');
+  await dayPage.fill('#bulkNames', '다른사람');
+  await dayPage.click('#bulkAdd');
+  await dayPage.waitForTimeout(300);
+
+  await dayPage.goto(BASE + '/index.html');
+  await dayPage.waitForTimeout(400);
+  await dayPage.selectOption('#participant', { label: '다른사람' });
+  await dayPage.waitForTimeout(300);
+  await dayPage.fill('#sentence', '다른사람의 오늘 인증');
+  await dayPage.fill('#reflection', '다른사람 소감');
+  await dayPage.click('#submitBtn');
+  await dayPage.waitForTimeout(400);
+
+  await dayPage.goto(BASE + '/feed-all.html');
+  await dayPage.waitForTimeout(400);
+  const personOptions = await dayPage.locator('#allFeedPerson option').allTextContents();
+  t('사람별로 보기 드롭다운에 참가자 이름 노출',
+    personOptions.includes('지각이') && personOptions.includes('다른사람'), personOptions);
+  t('전체 선택 상태에서는 다운로드 버튼 비활성', await dayPage.isDisabled('#allFeedDownloadBtn'));
+
+  await dayPage.selectOption('#allFeedPerson', { label: '지각이' });
+  await dayPage.waitForTimeout(300);
+  t('사람별로 보기 선택 시 그 사람 건수만 표시',
+    (await dayPage.textContent('#feedCount')) === '2건', await dayPage.textContent('#feedCount'));
+  t('선택한 사람 외의 글은 보이지 않음',
+    !(await dayPage.textContent('#allFeedList')).includes('다른사람의 오늘 인증'));
+  t('사람 선택 시 다운로드 버튼 활성화', !(await dayPage.isDisabled('#allFeedDownloadBtn')));
+
+  // 헤드리스 브라우저에 따라 download 속성의 한글 파일명을 그대로 보고하지 않을 수 있어
+  // (실제로 이 샌드박스의 크로미움은 "download"로 뭉개서 보고함) 브라우저가 보고하는
+  // suggestedFilename 대신, 우리 코드가 실제로 설정한 <a download> 속성값을 직접 확인한다.
+  const filenamePromise = dayPage.evaluate(() => new Promise((resolve) => {
+    const orig = document.body.appendChild.bind(document.body);
+    document.body.appendChild = (el) => {
+      if (el.tagName === 'A' && el.download) resolve(el.download);
+      return orig(el);
+    };
+  }));
+  const [dl] = await Promise.all([
+    dayPage.waitForEvent('download'),
+    dayPage.click('#allFeedDownloadBtn')
+  ]);
+  const dlFilename = await filenamePromise;
+  t('다운로드 파일명에 이름 포함 및 .txt 확장자', dlFilename.includes('지각이') && dlFilename.endsWith('.txt'), dlFilename);
+  const dlText = fs.readFileSync(await dl.path(), 'utf-8');
+  t('다운로드한 텍스트에 두 건의 인증 내용이 모두 포함됨',
+    dlText.includes('늦게라도 기록 남김') && dlText.includes('오늘은 제때 제출'), dlText.slice(0, 200));
+  t('다운로드한 텍스트에 다른 사람의 글은 포함되지 않음', !dlText.includes('다른사람의 오늘 인증'));
 
   await dayCtx.close();
 
