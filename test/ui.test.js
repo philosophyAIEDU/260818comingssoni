@@ -205,6 +205,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     !!firstNickBox && firstNickBox.width > 10, firstNickBox);
   await feedAllPage.close();
 
+  // ── 인증 피드: 인상 깊은 구절은 항상 보이고, 느낀 점만 펼쳐야 보임 ──
+  const bomtolQuoteCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
+  t('인상 깊은 구절은 펼치지 않아도 바로 보임',
+    (await bomtolQuoteCard.locator('.feed-quote').textContent()).includes('읽는다는 건 버티는 일이다'));
+  t('느낀 점 영역은 기본적으로 접혀 있음', !(await bomtolQuoteCard.locator('.feed-more').evaluate((el) => el.open)));
+  t('접힌 상태에서는 느낀 점 텍스트가 화면에 노출되지 않음',
+    !(await bomtolQuoteCard.locator('dd').first().isVisible()));
+  await bomtolQuoteCard.locator('.feed-more summary').click();
+  await page.waitForTimeout(150);
+  t('느낀 점 보기를 누르면 느낀 점이 펼쳐짐',
+    (await bomtolQuoteCard.locator('.feed-more dd').first().textContent()).includes('오늘은 30분만 읽었다'));
+
   // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
   const bamtolCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
   t('본인 글 엄지척 비활성', await bamtolCard.locator('.upvote-btn').isDisabled());
