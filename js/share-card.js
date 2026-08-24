@@ -59,17 +59,23 @@ CS.ShareCard = (function () {
   /** container 안의 [data-share] 버튼들에 텍스트 복사 동작을 연결한다. */
   function bindButtons(container, meta) {
     container.querySelectorAll('[data-share]').forEach((btn) => {
-      const original = btn.textContent;
+      // 버튼 안에 SVG 아이콘이 들어 있으므로 textContent가 아니라 innerHTML로 되돌려야 한다.
+      const original = btn.innerHTML;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
           const text = buildText(submissionFromDataset(btn.dataset), meta);
           await copyToClipboard(text);
-          btn.textContent = '✅ 복사 완료';
+          btn.classList.add('copied');
+          btn.innerHTML = `${CS.U.icon('check')}<span class="lbl">복사 완료</span>`;
         } catch (err) {
           alert('텍스트 복사에 실패했습니다: ' + err.message);
         } finally {
-          setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
+          setTimeout(() => {
+            btn.innerHTML = original;
+            btn.classList.remove('copied');
+            btn.disabled = false;
+          }, 1200);
         }
       });
     });

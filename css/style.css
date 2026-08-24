@@ -150,6 +150,15 @@ a { color: var(--accent); }
 .banner .today-range-nav button:hover { border-color: #081d58; }
 .banner .today-range-day { font-size: 13.5px; font-weight: 700; color: #081d58; min-width: 9em; text-align: center; }
 .banner .today-range { margin: 0; font-size: 13.5px; line-height: 1.6; color: #081d58; }
+/* 오늘의 범위 — '1장 - 소제목'을 한 줄에 하나씩 세로로 */
+.range-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.range-list > li { display: flex; align-items: baseline; gap: 6px; }
+.range-list > li.range-plain { display: block; }
+.range-ch {
+  flex: 0 0 auto; font-weight: 800; font-variant-numeric: tabular-nums;
+  min-width: 3.6em;
+}
+.range-sep { flex: 0 0 auto; opacity: .55; }
 
 
 /* ── 폼 ───────────────────────────────── */
@@ -177,6 +186,13 @@ select { appearance: none; background-image: none; }
 
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .row > * { flex: 1 1 180px; min-width: 0; }
+
+/* 미니멀 선 아이콘 — 글자 크기·색을 그대로 따라간다 */
+.ico {
+  width: 1.15em; height: 1.15em; flex: 0 0 auto;
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
 
 button, .btn {
   font-family: inherit; font-size: 14px; font-weight: 600;
@@ -346,7 +362,8 @@ footer.foot {
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
 .intro-body .meta { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
-.intro-body .note { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--bad); }
+/* 눈에 띄는 경고가 아니라 덧붙이는 작은 안내(독소조항처럼) */
+.intro-body .fineprint { margin: 0 0 6px; font-size: 12px; line-height: 1.5; color: var(--text-faint); }
 .intro-body .desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-faint); }
 
 /* 참여 아이디 검색 + 드롭다운 */
@@ -435,6 +452,7 @@ footer.foot {
 .fame .cnt {
   margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-dim);
   white-space: nowrap; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: 3px;
 }
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
 .fame-row { cursor: pointer; transition: border-color .15s, background .15s; }
@@ -452,6 +470,10 @@ footer.foot {
   font-size: 13px; line-height: 1.6;
 }
 .fame-detail[hidden] { display: none; }
+/* 펼친 기록의 제목 줄 — 오른쪽 끝에 텍스트 복사 버튼 */
+.fame-detail-head { display: flex; align-items: center; gap: 8px; }
+.fame-detail-head > strong { flex: 1 1 auto; min-width: 0; }
+.fame-detail-head .share-btn { flex: 0 0 auto; min-height: 30px; padding: 4px 9px; font-size: 13px; }
 .fame-entry-label { font-size: 11.5px; font-weight: 700; color: var(--text-faint); margin-top: 8px; }
 .fame-entry-label:first-child { margin-top: 0; }
 .fame-entry .quote { margin: 3px 0 0; }
@@ -567,10 +589,10 @@ button.ghost { background: transparent; }
 .feed-item.win { border-color: var(--warn); background: var(--warn-soft); }
 .feed-main { min-width: 0; }
 /* 오른쪽 버튼단 — 세로로 쌓아 폭을 좁게 유지(가로로 놓으면 본문 자리를 크게 잡아먹는다) */
-/* 복사·엄지척 두 버튼은 같은 폭·같은 높이로 맞춘다 */
-.feed-acts { display: grid; justify-items: stretch; gap: 6px; }
+/* 복사·엄지척 두 버튼은 가로로 나란히, 같은 크기로 놓는다 */
+.feed-acts { display: flex; align-items: center; gap: 6px; }
 .feed-acts > button {
-  width: 100%; justify-content: center; min-height: 34px; padding: 6px 10px;
+  justify-content: center; min-height: 32px; min-width: 44px; padding: 5px 9px; gap: 4px;
 }
 /* 이름 + 지각 배지 + 시간. 버튼이 빠졌으므로 한 줄에 들어가고, 좁으면 시간만 아래로 내려간다. */
 .feed-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
@@ -598,6 +620,8 @@ button.ghost { background: transparent; }
   border-radius: 999px; font-variant-numeric: tabular-nums; flex: 0 0 auto;
 }
 .upvote-btn.voted { background: var(--info-soft); border-color: var(--info); color: var(--info); }
+/* 복사 직후 잠깐 뜨는 확인 표시 */
+.share-btn.copied { border-color: var(--ok); color: var(--ok); }
 
 /* 인증글을 이미지로 공유하는 버튼 */
 .share-btn {

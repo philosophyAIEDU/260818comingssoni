@@ -266,22 +266,40 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const upvoteBtn = otherCard.locator('.upvote-btn');
   await upvoteBtn.click();
   await page.waitForTimeout(400);
-  t('엄지척 1로 증가', (await upvoteBtn.textContent()).includes('👍 1'));
+  t('엄지척 1로 증가', (await upvoteBtn.textContent()).trim() === '1');
   await upvoteBtn.click();
   await page.waitForTimeout(400);
-  t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
+  t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).trim() === '0');
 
   // ── 명예의 전당은 전일 기준이라, 오늘 받은 추천은 올라오지 않는다 ──
   // (전일 기준 순위·펼치기 동작은 아래 전용 컨텍스트에서 따로 검증한다)
   await upvoteBtn.click(); // 커밍쏜을 다시 추천해 '오늘의 1등'으로 만든다
   await page.waitForTimeout(400);
-  t('엄지척 다시 1로', (await upvoteBtn.textContent()).includes('👍 1'));
+  t('엄지척 다시 1로', (await upvoteBtn.textContent()).trim() === '1');
   await page.click('#feedRefresh');
   await page.waitForTimeout(400);
   const fameNames = await page.locator('#hallOfFameList .who').allTextContents();
   t('오늘 추천은 명예의 전당(전일 기준)에 오르지 않음', !fameNames.includes('커밍쏜'), fameNames);
   t('전일 기록이 없으면 안내 문구 표시',
     (await page.textContent('#hallOfFameList')).includes('없습니다'), await page.textContent('#hallOfFameList'));
+
+  // ── 아이콘: 이모지 대신 선 아이콘, 복사·엄지척 버튼은 가로로 나란히 ──
+  {
+    const card = page.locator('#socialFeedList .feed-item').first();
+    t('복사 버튼이 이모지가 아니라 선 아이콘',
+      (await card.locator('.share-btn svg.ico').count()) === 1
+      && !(await card.locator('.share-btn').textContent()).includes('\u{1F4CB}'));
+    t('엄지척 버튼도 선 아이콘', (await card.locator('.upvote-btn svg.ico').count()) === 1);
+    const acts = await card.locator('.feed-acts').evaluate((el) => getComputedStyle(el).flexDirection);
+    t('두 버튼이 가로로 나란히 놓임', acts === 'row', acts);
+    const boxes = await card.locator('.feed-acts button').evaluateAll(
+      (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    t('두 버튼의 윗변이 같은 줄에 있음', new Set(boxes).size === 1, boxes);
+    t('새로고침·날짜 이동 버튼도 선 아이콘',
+      (await page.locator('#feedRefresh svg.ico').count()) === 1
+      && (await page.locator('#feedPrevDate svg.ico').count()) === 1
+      && (await page.locator('#participantToggle svg.ico').count()) === 1);
+  }
 
   // ── 인증 피드: 이름으로 찾기 ──
   await page.fill('#feedSearch', '밤');
@@ -1102,7 +1120,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('오늘 글은 전일 순위에 섞이지 않음', !names.includes('오늘왕'), names);
 
     const cnts = await famePage.locator('#hallOfFameList .cnt').allTextContents();
-    t('순위 옆에 실제 추천 수가 함께 표시됨', cnts[0].includes('👍 11') && cnts[1].includes('👍 10'), cnts);
+    t('순위 옆에 실제 추천 수가 함께 표시됨',
+      cnts[0].replace(/\s/g, '') === '1등·11' && cnts[1].replace(/\s/g, '') === '2등·10', cnts);
+    t('추천 수 옆 엄지척이 이모지가 아니라 선 아이콘',
+      (await famePage.locator('#hallOfFameList .cnt svg.ico').count()) === 5);
     t('등수가 1등부터 순서대로 매겨짐', cnts[0].startsWith('1등') && cnts[4].startsWith('5등'), cnts);
     t('안내 문구에 기준 날짜(어제)가 표시됨',
       (await famePage.textContent('#fameDateLabel')).includes(String(Number(yest.slice(5, 7))) + '/'),
