@@ -167,16 +167,14 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('킥아웃 위험 인원 라벨로 변경', (await page.textContent('#overallStats')).includes('킥아웃 위험 인원'));
 
   // ── 전체 진행현황: "전일 인증 완료 인원" 타일 + 클릭 시 명단 펼치기 ──
-  t('전일 기준 라벨로 표시', (await page.textContent('#overallStats')).includes('전일 인증 완료 인원'));
+  t('전일 누락·지각 라벨로 표시', (await page.textContent('#overallStats')).includes('전일 누락 · 지각 인원'));
   t('전일 인증률 라벨로 표시', (await page.textContent('#overallStats')).includes('전일 인증률'));
-  // 이 컨텍스트의 인증은 전부 '오늘' 것이라, 어제 기준 집계는 0명이어야 한다.
-  t('오늘 인증만 있으면 전일 인증 완료 인원은 0', (await page.textContent('#ovPrevDone')) === '0',
-    await page.textContent('#ovPrevDone'));
-  await page.click('#ovPrevDoneTile');
+  await page.click('#ovPrevMissTile');
   await page.waitForTimeout(150);
   const ovDetailText = await page.textContent('#ovDetail');
-  t('완료 인원 타일 클릭 시 명단 영역 노출', ovDetailText.includes('인증 완료'), ovDetailText);
-  await page.click('#ovPrevDoneTile');
+  t('누락·지각 타일 클릭 시 미제출/지각이 나뉘어 노출',
+    ovDetailText.includes('미제출') && ovDetailText.includes('지각'), ovDetailText);
+  await page.click('#ovPrevMissTile');
   await page.waitForTimeout(150);
   t('같은 타일 재클릭 시 명단 다시 숨김', await page.isHidden('#ovDetail'));
   await page.click('#ovRiskTile');
@@ -223,6 +221,25 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     (await feedAllPage.locator('.feed-card .hint').allTextContents())
       .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
   t('날짜별 그룹 헤더 노출', (await feedAllPage.locator('.all-feed-date-heading').count()) >= 1);
+  // 한 줄에 4장이 들어가면 카드가 좁아 본문이 열 글자씩 끊긴다 — 넓은 화면에서도 최대 3장.
+  await feedAllPage.setViewportSize({ width: 1440, height: 900 });
+  await feedAllPage.waitForTimeout(200);
+  const gridCols = await feedAllPage.evaluate(() =>
+    getComputedStyle(document.querySelector('.all-feed-grid')).gridTemplateColumns.split(' ').length);
+  t('넓은 화면에서도 한 줄에 최대 3장', gridCols === 3, gridCols);
+  const cardHeights = await feedAllPage.evaluate(() =>
+    Array.from(document.querySelectorAll('.all-feed-grid .feed-item')).map((e) => Math.round(e.getBoundingClientRect().height)));
+  t('카드 높이가 서로 같음(글 길이와 무관)', new Set(cardHeights).size === 1, cardHeights);
+  const bodyScrolls = await feedAllPage.evaluate(() =>
+    Array.from(document.querySelectorAll('.all-feed-grid .feed-body'))
+      .every((e) => getComputedStyle(e).overflowY === 'auto'));
+  t('긴 글은 카드마다 따로 스크롤됨', bodyScrolls);
+  t('인상 깊은 내용에 항목 라벨이 붙음',
+    (await feedAllPage.locator('.all-feed-grid .feed-label').first().textContent()).includes('인상 깊은 내용'));
+  await feedAllPage.locator('.all-feed-grid .feed-more summary').first().click();
+  await feedAllPage.waitForTimeout(200);
+  t('느낀 점은 별도 패널로 구분되어 보임',
+    (await feedAllPage.locator('.all-feed-grid .feed-more .body.reflect').first().count()) === 1);
   // 회귀 테스트: 그리드 카드 안에서도(넓은 화면이어도 카드 자체가 좁아서) 작성자 이름이
   // 폭 0으로 눌려 안 보이던 문제가 있었다 — 첫 카드의 이름이 실제로 보이는 너비를 갖는지 확인.
   const firstNickBox = await feedAllPage.locator('#allFeedList .feed-nick').first().boundingBox();
@@ -855,6 +872,86 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await finishCtx.close();
 
+  // ── 참여 아이디: 검색창 + 드롭다운을 한 칸으로 합친 콤보박스 ──
+  const comboCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await comboCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    const names = ['필로소피', '피리부는소년', '김보화', '이지예', '나간사람'];
+    const parts = names.map((n, i) => ({
+      id: 'p' + i, nickname: n, email: '', kakaoJoined: '',
+      status: n === '나간사람' ? 'out' : 'active', createdAt: shift(-5) + 'T00:00:00.000Z',
+    }));
+    await comboCtx.addInitScript(({ parts }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify([]));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts });
+
+    const cp = await comboCtx.newPage();
+    await cp.goto(BASE + '/index.html');
+    await cp.waitForTimeout(500);
+    const listNames = () => cp.locator('#participantListbox .combo-option').allTextContents();
+
+    t('검색창과 이름 선택이 한 칸으로 합쳐짐(별도 select는 화면에서 감춤)',
+      (await cp.locator('#participantCombo #participantSearch').count()) === 1
+      && (await cp.locator('#participant').evaluate((el) => el.classList.contains('sr-only'))));
+    t('목록은 처음엔 닫혀 있음', await cp.locator('#participantListbox').isHidden());
+
+    await cp.click('#participantToggle');
+    await cp.waitForSelector('#participantListbox:not([hidden])');
+    t('▾ 를 누르면 전체 명단이 열림', (await listNames()).length === 5, await listNames());
+    t('아웃한 사람은 (아웃)으로 표시', (await listNames()).some((n) => n.includes('(아웃)')), await listNames());
+
+    await cp.fill('#participantSearch', 'ㅍㄹ');
+    await cp.waitForTimeout(200);
+    t('초성으로 좁혀짐',
+      JSON.stringify(await listNames()) === JSON.stringify(['피리부는소년', '필로소피']), await listNames());
+
+    await cp.press('#participantSearch', 'Enter');
+    await cp.waitForTimeout(400);
+    t('Enter로 짚고 있던 사람이 선택됨', (await cp.inputValue('#participantSearch')) === '피리부는소년');
+    t('선택되면 목록이 닫힘', await cp.locator('#participantListbox').isHidden());
+    t('선택되면 나의 현황 카드가 열림', !(await cp.locator('#myCard').isHidden()));
+
+    await cp.fill('#participantSearch', '피');
+    await cp.waitForTimeout(200);
+    await cp.press('#participantSearch', 'ArrowDown');
+    await cp.press('#participantSearch', 'Enter');
+    await cp.waitForTimeout(400);
+    t('방향키로 다음 사람을 짚어 고를 수 있음', (await cp.inputValue('#participantSearch')) === '필로소피');
+
+    await cp.fill('#participantSearch', '');
+    await cp.waitForTimeout(150);
+    await cp.type('#participantSearch', '김보화', { delay: 20 });
+    await cp.waitForTimeout(400);
+    t('이름을 정확히 다 치면 Enter 없이도 선택됨',
+      (await cp.inputValue('#participantSearch')) === '김보화'
+      && (await cp.locator('#participant').inputValue()) === 'p2');
+
+    await cp.fill('#participantSearch', '이지');
+    await cp.waitForTimeout(200);
+    await cp.click('#participantListbox .combo-option');
+    await cp.waitForTimeout(400);
+    t('목록을 눌러서도 고를 수 있음', (await cp.inputValue('#participantSearch')) === '이지예');
+
+    await cp.fill('#participantSearch', 'zzz');
+    await cp.waitForTimeout(200);
+    t('맞는 이름이 없으면 안내 문구',
+      (await cp.textContent('#participantListbox')).includes('검색 결과가 없습니다'));
+    await cp.press('#participantSearch', 'Escape');
+    await cp.waitForTimeout(150);
+    t('Esc로 목록을 닫을 수 있음', await cp.locator('#participantListbox').isHidden());
+  }
+  await comboCtx.close();
+
   // ── 전체 진행현황: 전일(어제 24시 마감 확정) 기준 인증률·완료 인원 ──
   const prevCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await prevCtx.route('**/js/config.js', async (route) => {
@@ -891,22 +988,22 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await prevPage.goto(BASE + '/index.html');
     await prevPage.waitForTimeout(500);
 
-    t('전일 인증 완료 인원 = 어제 정시 인증한 3명',
-      (await prevPage.textContent('#ovPrevDone')) === '3', await prevPage.textContent('#ovPrevDone'));
+    t('전일 누락·지각 인원 = 지각 1명 + 미제출 2명 = 3명',
+      (await prevPage.textContent('#ovPrevMiss')) === '3', await prevPage.textContent('#ovPrevMiss'));
     t('전일 인증률 = 3÷6 = 50% (지각·미제출은 모두 분모에 포함)',
       (await prevPage.textContent('#ovPrevRate')) === '50%', await prevPage.textContent('#ovPrevRate'));
     t('안내 문구에 기준 날짜(어제)가 표시됨',
       (await prevPage.textContent('#ovPrevDateLabel')) === `${Number(yest.slice(5, 7))}/${Number(yest.slice(8, 10))}(${'일월화수목금토'[new Date(yest + 'T00:00:00Z').getUTCDay()]})`,
       await prevPage.textContent('#ovPrevDateLabel'));
 
-    await prevPage.click('#ovPrevDoneTile');
+    await prevPage.click('#ovPrevMissTile');
     await prevPage.waitForSelector('#ovDetail:not([hidden])');
     const prevNames = await prevPage.textContent('#ovDetail');
-    t('완료 명단에 어제 정시 인증자만 표시',
-      prevNames.includes('가온') && prevNames.includes('나린') && prevNames.includes('다솜'), prevNames);
-    t('어제 지각 제출자는 완료 명단에서 제외', !prevNames.includes('라온'), prevNames);
-    t('어제 미제출자는 완료 명단에서 제외', !prevNames.includes('마루'), prevNames);
-    t('오늘만 인증한 사람은 전일 집계에 섞이지 않음', !prevNames.includes('오늘만'), prevNames);
+    t('어제 정시 인증자는 누락·지각 명단에 없음',
+      !prevNames.includes('가온') && !prevNames.includes('나린') && !prevNames.includes('다솜'), prevNames);
+    t('어제 지각 제출자가 지각으로 표시', /지각 1명[^\n]*라온/.test(prevNames.replace(/\s+/g, ' ')), prevNames);
+    t('어제 미제출자가 미제출로 표시', /미제출 2명[^\n]*마루/.test(prevNames.replace(/\s+/g, ' ')), prevNames);
+    t('오늘만 인증한 사람도 어제는 미제출로 잡힘', prevNames.includes('오늘만'), prevNames);
   }
   await prevCtx.close();
 
@@ -958,18 +1055,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await famePage.waitForSelector('#hallOfFameList [data-fame]');
 
     const names = await famePage.locator('#hallOfFameList .who').allTextContents();
-    t('명예의 전당은 10위까지 보임', names.length === 10, names.length);
+    t('명예의 전당은 5위까지 보임', names.length === 5, names.length);
     t('명예의 전당이 전일 추천 많은 순서대로 줄 세워짐',
-      JSON.stringify(names) === JSON.stringify(['일번', '이번', '삼번', '사번', '오번', '육번', '칠번', '팔번', '구번', '십번']),
-      names);
-    t('11위 이하는 잘림', !names.includes('십일번'), names);
+      JSON.stringify(names) === JSON.stringify(['일번', '이번', '삼번', '사번', '오번']), names);
+    t('6위 이하는 잘림', !names.includes('육번') && !names.includes('십일번'), names);
     t('추천 0표인 사람은 순위에 오르지 않음', !names.includes('영표'), names);
     t('어제 지각 제출은 몰표를 받아도 명예의 전당에서 제외', !names.includes('지각왕'), names);
     t('오늘 글은 전일 순위에 섞이지 않음', !names.includes('오늘왕'), names);
 
     const cnts = await famePage.locator('#hallOfFameList .cnt').allTextContents();
     t('순위 옆에 실제 추천 수가 함께 표시됨', cnts[0].includes('👍 11') && cnts[1].includes('👍 10'), cnts);
-    t('등수가 1등부터 순서대로 매겨짐', cnts[0].startsWith('1등') && cnts[9].startsWith('10등'), cnts);
+    t('등수가 1등부터 순서대로 매겨짐', cnts[0].startsWith('1등') && cnts[4].startsWith('5등'), cnts);
     t('안내 문구에 기준 날짜(어제)가 표시됨',
       (await famePage.textContent('#fameDateLabel')).includes(String(Number(yest.slice(5, 7))) + '/'),
       await famePage.textContent('#fameDateLabel'));

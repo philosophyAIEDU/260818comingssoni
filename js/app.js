@@ -141,48 +141,140 @@
     return n.includes(term) ? 1 : 0;
   }
 
-  /** 검색어에 맞는 닉네임만 남기고 드롭다운을 다시 그린다.
-   *  이미 선택되어 있던 사람은 검색어와 안 맞아도 목록에서 사라지지 않는다. */
-  function renderParticipantOptions() {
+  /* ── 참여 아이디 콤보박스 ──────────────
+   * 검색창과 드롭다운을 한 칸으로 합쳤다. 입력창에 이름/초성을 치면 바로 아래 목록이
+   * 좁혀지고, Enter나 클릭으로 고른다. 고른 값은 화면에 보이지 않는 <select id="participant">가
+   * 들고 있어서(그리고 change 이벤트를 쏴서) 나머지 코드는 예전 그대로 동작한다. */
+  let comboOpen = false;
+  let comboItems = [];   // 현재 목록에 보이는 참가자들
+  let comboActive = -1;  // 키보드로 짚고 있는 항목
+
+  /** 화면 뒤의 select에는 항상 전체 명단을 넣어 둔다 — id로 값을 지정하는 코드가 언제든 먹히도록. */
+  function syncParticipantSelect() {
     const sel = $('participant');
     const keepId = sel.value;
-    const term = $('participantSearch').value.trim().toLowerCase();
-    const matches = (nick) => nicknameMatches(nick, term);
-    // 앞부분이 맞는 이름을 위로 (같은 순위면 원래의 가나다순 유지)
-    const byRank = (a, b) => matchRank(b.nickname, term) - matchRank(a.nickname, term);
-
-    let activeList = participants.filter((p) => p.status !== 'out' && matches(p.nickname)).sort(byRank);
-    let outList = participants.filter((p) => p.status === 'out' && matches(p.nickname)).sort(byRank);
-
-    const kept = participants.find((p) => p.id === keepId);
-    if (kept && kept.status !== 'out' && !activeList.some((p) => p.id === kept.id)) activeList = [kept, ...activeList];
-    if (kept && kept.status === 'out' && !outList.some((p) => p.id === kept.id)) outList = [kept, ...outList];
-
     sel.innerHTML = '<option value="">— 이름 선택 —</option>';
-    for (const p of activeList) {
+    for (const p of participants) {
       const o = document.createElement('option');
-      o.value = p.id; o.textContent = p.nickname;
+      o.value = p.id;
+      o.textContent = p.status === 'out' ? `${p.nickname} (아웃)` : p.nickname;
       sel.appendChild(o);
     }
-    if (outList.length) {
-      const g = document.createElement('optgroup');
-      g.label = '참여 종료';
-      for (const p of outList) {
-        const o = document.createElement('option');
-        o.value = p.id; o.textContent = `${p.nickname} (아웃)`;
-        g.appendChild(o);
-      }
-      sel.appendChild(g);
-    }
-    sel.value = kept ? kept.id : '';
+    sel.value = participants.some((p) => p.id === keepId) ? keepId : '';
+  }
 
-    const count = activeList.length + outList.length;
-    $('participantSearch').title = term ? `'${term}' 검색 결과 ${count}명` : '';
+  function comboLabel(p) { return p.status === 'out' ? `${p.nickname} (아웃)` : p.nickname; }
+
+  /** 검색어로 후보를 좁힌다. 참여 중인 사람이 위, 아웃은 아래. */
+  function comboCandidates(term) {
+    const matches = (nick) => nicknameMatches(nick, term);
+    const byRank = (a, b) => matchRank(b.nickname, term) - matchRank(a.nickname, term);
+    return [
+      ...participants.filter((p) => p.status !== 'out' && matches(p.nickname)).sort(byRank),
+      ...participants.filter((p) => p.status === 'out' && matches(p.nickname)).sort(byRank)
+    ];
+  }
+
+  function renderComboList() {
+    const box = $('participantListbox');
+    const input = $('participantSearch');
+    box.innerHTML = comboItems.length
+      ? comboItems.map((p, i) => `<li class="combo-option${i === comboActive ? ' active' : ''}"
+          role="option" id="combo-opt-${i}" aria-selected="${$('participant').value === p.id}"
+          data-pid="${esc(p.id)}">${esc(comboLabel(p))}</li>`).join('')
+      : '<li class="combo-empty">검색 결과가 없습니다.</li>';
+    box.hidden = !comboOpen;
+    input.setAttribute('aria-expanded', String(comboOpen));
+    input.setAttribute('aria-activedescendant', comboActive >= 0 ? `combo-opt-${comboActive}` : '');
+    const active = box.querySelector('.combo-option.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }
+
+  function openCombo(term) {
+    comboItems = comboCandidates(term === undefined ? $('participantSearch').value.trim().toLowerCase() : term);
+    comboOpen = true;
+    // 이미 고른 사람이 있으면 그 줄을, 아니면 첫 줄을 짚어 둔다.
+    const cur = $('participant').value;
+    const curIdx = comboItems.findIndex((p) => p.id === cur);
+    comboActive = comboItems.length ? (curIdx >= 0 ? curIdx : 0) : -1;
+    renderComboList();
+  }
+
+  function closeCombo() {
+    comboOpen = false; comboActive = -1;
+    renderComboList();
+  }
+
+  /** 한 명을 확정한다. select에 값을 넣고 change를 쏴서 기존 onSelect가 그대로 돌게 한다. */
+  function pickParticipant(p) {
+    const sel = $('participant');
+    sel.value = p.id;
+    $('participantSearch').value = comboLabel(p);
+    closeCombo();
+    sel.dispatchEvent(new Event('change'));
+  }
+
+  function bindParticipantCombo() {
+    const input = $('participantSearch');
+    const box = $('participantListbox');
+
+    input.addEventListener('input', () => {
+      const term = input.value.trim().toLowerCase();
+      openCombo(term);
+      // 이름을 정확히 다 쳤으면 Enter 없이도 바로 골라 준다.
+      const exact = participants.find((p) => p.nickname.toLowerCase() === term);
+      if (exact) pickParticipant(exact);
+    });
+    input.addEventListener('focus', () => openCombo());
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!comboOpen) { openCombo(); return; }
+        if (!comboItems.length) return;
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        comboActive = (comboActive + step + comboItems.length) % comboItems.length;
+        renderComboList();
+      } else if (e.key === 'Enter') {
+        // 폼이 제출되지 않도록 막고, 짚고 있는 사람을 고른다.
+        if (comboOpen && comboItems.length) {
+          e.preventDefault();
+          pickParticipant(comboItems[Math.max(0, comboActive)]);
+        } else if (comboItems.length === 1) {
+          e.preventDefault();
+          pickParticipant(comboItems[0]);
+        }
+      } else if (e.key === 'Escape') {
+        closeCombo();
+      }
+    });
+    // 목록을 클릭할 때 input의 blur가 먼저 나 목록이 닫히는 것을 막는다.
+    box.addEventListener('mousedown', (e) => e.preventDefault());
+    box.addEventListener('click', (e) => {
+      const li = e.target.closest('[data-pid]');
+      if (!li) return;
+      const p = participants.find((x) => x.id === li.dataset.pid);
+      if (p) pickParticipant(p);
+    });
+    $('participantToggle').addEventListener('mousedown', (e) => e.preventDefault());
+    $('participantToggle').addEventListener('click', () => {
+      if (comboOpen) { closeCombo(); return; }
+      input.focus();
+      openCombo('');       // 토글로 열 때는 전체 명단을 보여준다
+    });
+    input.addEventListener('blur', () => closeCombo());
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#participantCombo')) closeCombo();
+    });
+    // 테스트나 다른 코드가 select 값을 직접 바꿔도 입력창 글자가 따라가게 한다.
+    $('participant').addEventListener('change', () => {
+      const p = participants.find((x) => x.id === $('participant').value);
+      input.value = p ? comboLabel(p) : '';
+    });
   }
 
   async function loadParticipants() {
     participants = await Store.listParticipants();
-    renderParticipantOptions();
+    syncParticipantSelect();
 
     if (!participants.length) {
       msg($('formMsg'),
@@ -566,7 +658,7 @@
     });
   }
 
-  // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~10위를 보여준다.
+  // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5위를 보여준다.
   // 오늘 순위는 인증 피드에서 실시간으로 볼 수 있으므로, 여기서는 마감이 지나
   // 추천이 더는 늘지 않는 어제 것을 "확정된 명예"로 남긴다.
   async function calculateRanksAndFame() {
@@ -583,7 +675,7 @@
       .filter((s) => (s.upvotes || 0) > 0 && !U.isLate(s.date, s.createdAt))
       .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
         String(a.createdAt).localeCompare(String(b.createdAt)))
-      .slice(0, 10);
+      .slice(0, 5);
 
     let prevVotes = null, prevRank = 0;
     fameRanked = ranked.map((s, idx) => {
@@ -602,26 +694,37 @@
 
   /* ── 전체 진행현황 대시보드 (모든 참여자 공개) ─── */
   // 통계 타일 클릭 시 아래에 펼쳐 보여줄 명단. paintOverall()이 매번 최신 내용으로 채운다.
-  let ovOpenKey = null; // 'done' | 'risk' | null(닫힘)
-  let ovLists = { done: [], risk: [] };
+  let ovOpenKey = null; // 'miss' | 'risk' | null(닫힘)
+  let ovLists = { miss: [], risk: [] };
+  let ovMissDetail = { missed: [], late: [] }; // 전일 미제출 / 지각 명단 (나눠서 보여준다)
 
   const byKo = (a, b) => a.localeCompare(b, 'ko');
 
-  let ovPrevTitle = '전일 인증 완료'; // paintOverall()이 실제 날짜를 넣어 갱신한다
+  let ovPrevTitle = '전일 누락 · 지각'; // paintOverall()이 실제 날짜를 넣어 갱신한다
+
+  const nameLine = (names) => (names.length
+    ? names.map(esc).join(', ')
+    : '<span class="muted">해당하는 사람이 없습니다.</span>');
 
   function renderOvDetail() {
     const box = $('ovDetail');
     if (!ovOpenKey) { box.hidden = true; box.innerHTML = ''; return; }
-    const names = ovLists[ovOpenKey];
-    const title = ovOpenKey === 'done' ? ovPrevTitle : '킥아웃 위험 인원';
     box.hidden = false;
-    box.innerHTML = `<strong>${esc(title)} (${names.length}명)</strong><br>` +
-      (names.length ? names.map(esc).join(', ') : '<span class="muted">해당하는 사람이 없습니다.</span>');
+    if (ovOpenKey === 'miss') {
+      // 미제출과 지각은 성격이 달라(아예 안 올림 / 마감 넘겨 올림) 나눠서 보여준다.
+      const { missed, late } = ovMissDetail;
+      box.innerHTML = `<strong>${esc(ovPrevTitle)} (${missed.length + late.length}명)</strong>
+        <div class="ov-detail-row"><span class="ov-detail-key">미제출 ${missed.length}명</span> ${nameLine(missed)}</div>
+        <div class="ov-detail-row"><span class="ov-detail-key">지각 ${late.length}명</span> ${nameLine(late)}</div>`;
+      return;
+    }
+    const names = ovLists[ovOpenKey];
+    box.innerHTML = `<strong>킥아웃 위험 인원 (${names.length}명)</strong><br>${nameLine(names)}`;
   }
 
   function toggleOvDetail(key) {
     ovOpenKey = ovOpenKey === key ? null : key;
-    $('ovPrevDoneTile').setAttribute('aria-expanded', String(ovOpenKey === 'done'));
+    $('ovPrevMissTile').setAttribute('aria-expanded', String(ovOpenKey === 'miss'));
     $('ovRiskTile').setAttribute('aria-expanded', String(ovOpenKey === 'risk'));
     renderOvDetail();
   }
@@ -680,16 +783,23 @@
       ? active.filter((s) => { const c = prevCell(s); return c && (c.status === 'O' || c.status === 'X'); })
       : [];
     const prevDone = prevGraded.filter((s) => prevCell(s).status === 'O');
+    // 인증으로 인정받지 못한 사람(X) = 아예 안 올린 사람 + 마감을 넘겨 올린 사람
+    const prevMissed = prevGraded.filter((s) => prevCell(s).status === 'X');
+    const prevSubIds = new Set(allSubs.filter((s) => s.date === prevDate).map((s) => s.participantId));
 
     // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
     // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
     const riskZone = active.filter((s) => s.atRisk);
 
-    ovLists = {
-      done: prevDone.map((s) => s.participant.nickname).sort(byKo),
-      risk: riskZone.map((s) => s.participant.nickname).sort(byKo)
+    ovLists = { miss: prevMissed.map((s) => s.participant.nickname).sort(byKo),
+      risk: riskZone.map((s) => s.participant.nickname).sort(byKo) };
+    ovMissDetail = {
+      missed: prevMissed.filter((s) => !prevSubIds.has(s.participant.id))
+        .map((s) => s.participant.nickname).sort(byKo),
+      late: prevMissed.filter((s) => prevSubIds.has(s.participant.id))
+        .map((s) => s.participant.nickname).sort(byKo)
     };
-    ovPrevTitle = prevDate ? `${U.shortLabel(prevDate)} 인증 완료` : '전일 인증 완료';
+    ovPrevTitle = prevDate ? `${U.shortLabel(prevDate)} 누락 · 지각` : '전일 누락 · 지각';
 
     $('overallCount').textContent = `${active.length}명`;
     $('ovPrevDateLabel').textContent = prevDate ? U.shortLabel(prevDate) : '어제';
@@ -697,7 +807,7 @@
     $('ovPrevRate').textContent = prevDate
       ? (prevGraded.length ? `${Math.round((prevDone.length / prevGraded.length) * 100)}%` : '0%')
       : '-';
-    $('ovPrevDone').textContent = prevDate ? prevDone.length : '-';
+    $('ovPrevMiss').textContent = prevDate ? prevMissed.length : '-';
     $('ovRisk').textContent = riskZone.length;
     renderOvDetail(); // 갱신 중에도 펼쳐 둔 명단이 있으면 최신 내용으로 다시 그린다
 
@@ -776,7 +886,7 @@
     await paintOverall();
 
     // 전체 진행현황: "인증 완료 인원" · "킥아웃 위험 인원" 타일을 클릭하면 명단이 펼쳐짐
-    [['ovPrevDoneTile', 'done'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
+    [['ovPrevMissTile', 'miss'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
       const tile = $(id);
       tile.addEventListener('click', () => toggleOvDetail(key));
       tile.addEventListener('keydown', (e) => {
@@ -789,7 +899,7 @@
     });
 
     $('participant').addEventListener('change', onSelect);
-    $('participantSearch').addEventListener('input', renderParticipantOptions);
+    bindParticipantCombo();
     $('certifyDate').addEventListener('change', onCertifyDateChange);
     $('verifyForm').addEventListener('submit', onSubmit);
     ['sentence', 'reflection'].forEach((k) =>
