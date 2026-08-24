@@ -163,6 +163,10 @@ input[type="text"], input[type="date"], input[type="password"], input[type="numb
   background: var(--surface-2); color: var(--text);
   font-family: inherit; font-size: 16px; line-height: 1.5;
 }
+/* 회색 예시(placeholder) 글씨는 입력 글씨보다 3px 작게 — 질문 라벨과 구분 */
+input::placeholder, textarea::placeholder {
+  font-size: 13px; line-height: 1.5; opacity: 1;
+}
 textarea { resize: vertical; min-height: 76px; }
 /* 인상 깊은 내용 / 느낀 점: 충분히 길게 쓸 수 있도록 넉넉하게, 입력하는 만큼 자동으로 늘어남 */
 #sentence, #reflection { min-height: 160px; max-height: 70vh; overflow-y: auto; }
