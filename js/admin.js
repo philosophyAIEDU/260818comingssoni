@@ -151,19 +151,34 @@
     </div>`;
 
     $('toggleExempt').addEventListener('click', async () => {
+      const btn = $('toggleExempt');
       const list = new Set(p.exemptDates || []);
       if (exempt) list.delete(date); else list.add(date);
-      await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
-      await refresh();
-      showCell(pid, date);
+      btn.disabled = true;
+      try {
+        await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
+        await refresh();
+        showCell(pid, date);
+      } catch (err) {
+        // 저장이 실패해도 아무 표시가 없으면 성공한 줄 알고 넘어가기 쉬워서(실제로 이 문제로
+        // 면제 등록이 반영 안 된 사례가 있었음) 반드시 눈에 띄는 실패 메시지를 남긴다.
+        btn.disabled = false;
+        alert(`면제 상태 변경 실패: ${err.message}`);
+      }
     });
     const del = $('delSub');
     if (del) {
       del.addEventListener('click', async () => {
         if (!confirm(`${p.nickname} 님의 ${U.shortLabel(date)} 인증 기록을 삭제할까요?`)) return;
-        await Store.removeSubmission(sub.id);
-        await refresh();
-        showCell(pid, date);
+        del.disabled = true;
+        try {
+          await Store.removeSubmission(sub.id);
+          await refresh();
+          showCell(pid, date);
+        } catch (err) {
+          del.disabled = false;
+          alert(`삭제 실패: ${err.message}`);
+        }
       });
     }
     $('closeCell').addEventListener('click', () => { box.innerHTML = ''; });
@@ -284,9 +299,17 @@
         const p = participants.find((x) => x.id === pid);
         const list = new Set(p.exemptDates || []);
         list.add(d);
-        await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
-        msg($('rosterMsg'), `${p.nickname} 님의 ${U.shortLabel(d)}을(를) 면제일로 등록했습니다.`, 'ok');
-        await refresh();
+        el.disabled = true;
+        try {
+          await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
+          msg($('rosterMsg'), `${p.nickname} 님의 ${U.shortLabel(d)}을(를) 면제일로 등록했습니다.`, 'ok');
+          await refresh();
+        } catch (e) {
+          // 저장이 실패했는데도 아무 표시가 없으면 성공한 줄 알고 넘어가기 쉬워서(실제로 이 문제로
+          // 면제 등록이 반영 안 된 사례가 있었음) 반드시 눈에 띄는 실패 메시지를 남긴다.
+          el.disabled = false;
+          msg($('rosterMsg'), `면제일 등록 실패: ${esc(e.message)}`, 'bad');
+        }
       });
     });
     t.querySelectorAll('[data-unexempt]').forEach((el) => {
@@ -294,8 +317,14 @@
         const pid = el.dataset.unexempt;
         const p = participants.find((x) => x.id === pid);
         const list = (p.exemptDates || []).filter((d) => d !== el.dataset.date);
-        await Store.updateParticipant(pid, { exemptDates: list });
-        await refresh();
+        el.disabled = true;
+        try {
+          await Store.updateParticipant(pid, { exemptDates: list });
+          await refresh();
+        } catch (e) {
+          el.disabled = false;
+          msg($('rosterMsg'), `면제 해제 실패: ${esc(e.message)}`, 'bad');
+        }
       });
     });
   }
