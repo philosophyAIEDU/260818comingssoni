@@ -106,6 +106,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('오늘의 범위를 펼치면 9일차 안내가 보임',
     (await page.textContent('#todayRangeText')).includes('세컨드 크리에이터'),
     await page.textContent('#todayRangeText'));
+  t('오늘 회차에는 "오늘" 표시가 붙음', (await page.textContent('#rangeDayLabel')).includes('9일차')
+    && (await page.textContent('#rangeDayLabel')).includes('오늘'));
+
+  // ── 배너: "오늘의 범위" ◀▶로 다른 날짜의 범위도 넘겨볼 수 있음 ──
+  await page.click('#rangeNextDay');
+  await page.waitForTimeout(150);
+  t('다음(▶) 클릭 시 10일차 범위로 이동', (await page.textContent('#todayRangeText')).includes('스티브 잡스가 말하는 애플'));
+  t('다른 날짜로 이동하면 "오늘" 표시가 사라짐', !(await page.textContent('#rangeDayLabel')).includes('오늘'));
+  await page.click('#rangePrevDay');
+  await page.click('#rangePrevDay');
+  await page.waitForTimeout(150);
+  t('이전(◀) 두 번 클릭 시 8일차 범위로 이동', (await page.textContent('#todayRangeText')).includes('오케스트라형'));
 
   const opts = await page.locator('#participant option').count();
   t('드롭다운 채워짐 (5 = 안내 + 4명)', opts === 5, opts);
@@ -494,8 +506,12 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await beforePage.waitForTimeout(400);
   t('시작 전: D-day/OT 안내 배너는 더 이상 노출되지 않음(요청에 따라 제거)',
     (await beforePage.textContent('#phaseNote')).trim() === '');
-  t('시작 전: 아직 읽을 회차가 없으므로 오늘의 범위 접이식이 숨겨짐',
-    await beforePage.isHidden('#todayRangeFold'));
+  t('시작 전에도 오늘의 범위를 볼 수 있음(다른 날짜의 범위도 미리 볼 수 있도록)',
+    await beforePage.isVisible('#todayRangeFold'));
+  await beforePage.click('#todayRangeFold summary');
+  await beforePage.waitForTimeout(150);
+  t('시작 전 기본값은 1일차(다가올 첫 회차)', (await beforePage.textContent('#rangeDayLabel')).includes('1일차'));
+  t('시작 전에는 이전 버튼이 비활성(1일차가 처음)', await beforePage.isDisabled('#rangePrevDay'));
   t('연습 기간 날짜는 "연습 (날짜)" 형식으로 일자가 먼저 오지 않음(연습 라벨이 앞에 옴)',
     /^연습 \(\d+\/\d+/.test((await beforePage.locator('#certifyDate option:checked').textContent()).trim()));
   t('안내 규칙 카드가 책 소개와 배너 사이에 위치',
@@ -525,8 +541,12 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await afterPage.goto(BASE + '/index.html');
   await afterPage.waitForTimeout(400);
   t('종료 후: phaseNote 안내문 사라짐', (await afterPage.textContent('#phaseNote')).trim() === '');
-  t('종료 후: 더 읽을 회차가 없으므로 오늘의 범위 접이식이 숨겨짐',
-    await afterPage.isHidden('#todayRangeFold'));
+  t('종료 후에도 오늘의 범위를 볼 수 있음(지난 회차를 돌아볼 수 있도록)',
+    await afterPage.isVisible('#todayRangeFold'));
+  await afterPage.click('#todayRangeFold summary');
+  await afterPage.waitForTimeout(150);
+  t('종료 후 기본값은 마지막 회차', (await afterPage.textContent('#rangeDayLabel')).includes('28일차'));
+  t('종료 후에는 다음 버튼이 비활성(마지막 회차)', await afterPage.isDisabled('#rangeNextDay'));
   await afterCtx.close();
 
   // ── 참가자 화면: 인증할 날짜 드롭다운 & 지각 백필은 계속 미인증 ──
