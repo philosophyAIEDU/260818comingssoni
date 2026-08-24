@@ -764,6 +764,61 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     (await page.locator('#rosterTable tbody tr td input[data-editemail]').nth(sonyIdxAfter).inputValue())
       === 'sony-sync@example.com');
 
+  // ── 전체 보기: 전체 일정을 다 인증하고 나면 TXT 다운로드에 1일차~마지막 날 라벨과
+  //    완주 축하 안내가 포함됨 (짧은(3일) 챌린지 컨텍스트에서 전 일정 인증) ──
+  const finishCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await finishCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-2)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(0)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const finishPage = await finishCtx.newPage();
+
+  await finishPage.goto(BASE + '/admin.html');
+  await finishPage.waitForTimeout(400);
+  await finishPage.click('button[data-tab="roster"]');
+  await finishPage.fill('#bulkNames', '완주자');
+  await finishPage.click('#bulkAdd');
+  await finishPage.waitForTimeout(300);
+
+  await finishPage.goto(BASE + '/index.html');
+  await finishPage.waitForTimeout(400);
+  const finishDateCount = await finishPage.locator('#certifyDate option').count();
+  t('짧은(3일) 챌린지 컨텍스트에 3일치 날짜 존재', finishDateCount === 3, finishDateCount);
+  await finishPage.selectOption('#participant', { label: '완주자' });
+  await finishPage.waitForTimeout(300);
+  for (let i = 0; i < finishDateCount; i++) {
+    await finishPage.selectOption('#certifyDate', { index: i });
+    await finishPage.waitForTimeout(150);
+    await finishPage.fill('#sentence', `${i + 1}일차 인상 깊은 문장`);
+    await finishPage.fill('#reflection', `${i + 1}일차 느낀 점`);
+    await finishPage.click('#submitBtn');
+    await finishPage.waitForTimeout(300);
+  }
+
+  await finishPage.goto(BASE + '/feed-all.html');
+  await finishPage.waitForTimeout(400);
+  await finishPage.selectOption('#allFeedPerson', { label: '완주자' });
+  await finishPage.waitForTimeout(300);
+  t('전체 일정을 인증하면 그 사람 건수가 전체 일수와 같음',
+    (await finishPage.textContent('#feedCount')) === '3건', await finishPage.textContent('#feedCount'));
+
+  const [finishDl] = await Promise.all([
+    finishPage.waitForEvent('download'),
+    finishPage.click('#allFeedDownloadBtn')
+  ]);
+  const finishText = fs.readFileSync(await finishDl.path(), 'utf-8');
+  t('완주 시 다운로드 텍스트에 1일차~3일차 라벨이 모두 포함됨',
+    finishText.includes('1일차') && finishText.includes('2일차') && finishText.includes('3일차'),
+    finishText.slice(0, 400));
+  t('완주 시 다운로드 텍스트에 완주 축하 안내 포함',
+    finishText.includes('전체 완주하셨습니다'), finishText.slice(0, 200));
+
+  await finishCtx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
