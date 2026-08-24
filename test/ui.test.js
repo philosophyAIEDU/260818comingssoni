@@ -319,12 +319,20 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   // ── 피드 툴바: 날짜 이동 / 찾기·정렬이 한 줄에, 버튼은 조용한 톤 ──
   {
-    const sameRow = await page.evaluate(() => {
+    const stacked = await page.evaluate(() => {
+      const bar = document.querySelector('.feed-toolbar').getBoundingClientRect();
       const nav = document.querySelector('.feed-datenav').getBoundingClientRect();
       const fil = document.querySelector('.feed-filters').getBoundingClientRect();
-      return Math.abs(nav.top - fil.top) < 6 && nav.left < fil.left;
+      const mid = (r) => r.left + r.width / 2;
+      return {
+        navFirst: nav.bottom <= fil.top + 1,
+        navCentered: Math.abs(mid(nav) - mid(bar)) < 6,
+        filCentered: Math.abs(mid(fil) - mid(bar)) < 6,
+      };
     });
-    t('날짜 이동(왼쪽)과 찾기·정렬(오른쪽)이 같은 줄에 있음', sameRow);
+    t('날짜 이동이 맨 윗줄에 있음', stacked.navFirst, stacked);
+    t('날짜 이동이 가운데 정렬', stacked.navCentered, stacked);
+    t('이름 검색·정렬 줄도 가운데 정렬', stacked.filCentered, stacked);
     t('새로고침은 글자 없이 아이콘만',
       (await page.locator('#feedRefresh').textContent()).trim() === ''
       && (await page.locator('#feedRefresh svg.ico').count()) === 1);
