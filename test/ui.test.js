@@ -839,6 +839,68 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await finishCtx.close();
 
+  // ── 명예의 전당: "오늘" 인증글을 추천(👍) 많은 순으로 1~5위 ──
+  // 추천은 한 브라우저당 1표만 누를 수 있어 UI로는 득표차를 만들 수 없으므로 저장소를 직접 심는다.
+  const fameCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await fameCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    const yest = shift(-1);
+    // 오늘 7명(3표 동점 2명, 0표 1명) + 어제 몰표를 받은 1명
+    const rows = [
+      ['김보화', 6], ['이지예', 5], ['황은총', 3],
+      ['김성도', 3], ['박다연', 2], ['최민수', 1], ['한서준', 0],
+    ];
+    const parts = rows.map(([n], i) => ({ id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: today + 'T00:00:00' }));
+    const subs = rows.map(([n, v], i) => ({
+      id: 's' + i, participantId: 'p' + i, nickname: n, date: today,
+      sentence: `${n}의 오늘 문장`, reflection: `${n}의 오늘 느낀 점`,
+      upvotes: v, upvotedBy: [], createdAt: `${today}T0${i}:00:00`, updatedAt: `${today}T0${i}:00:00`,
+    }));
+    parts.push({ id: 'pY', nickname: '어제1등', email: '', kakaoJoined: '', createdAt: yest + 'T00:00:00' });
+    subs.push({ id: 'sY', participantId: 'pY', nickname: '어제1등', date: yest,
+      sentence: '어제 문장', reflection: '어제 느낀 점', upvotes: 99, upvotedBy: [],
+      createdAt: `${yest}T01:00:00`, updatedAt: `${yest}T01:00:00` });
+    await fameCtx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00' }));
+    }, { parts, subs });
+
+    const famePage = await fameCtx.newPage();
+    await famePage.goto(BASE + '/index.html');
+    await famePage.waitForSelector('#hallOfFameList li[data-fame]');
+
+    const names = await famePage.locator('#hallOfFameList .who').allTextContents();
+    t('명예의 전당이 추천 많은 순서대로 줄 세워짐',
+      JSON.stringify(names) === JSON.stringify(['김보화', '이지예', '황은총', '김성도', '박다연']), names);
+    t('명예의 전당은 5위까지만 보임', names.length === 5, names.length);
+
+    const cnts = await famePage.locator('#hallOfFameList .cnt').allTextContents();
+    t('순위 옆에 실제 추천 수가 함께 표시됨', cnts[0].includes('👍 6') && cnts[1].includes('👍 5'), cnts);
+    t('동점이면 공동 등수(3등·3등) 뒤가 5등',
+      cnts[2].startsWith('3등') && cnts[3].startsWith('3등') && cnts[4].startsWith('5등'), cnts);
+    t('추천 0표인 사람은 순위에 오르지 않음', !names.includes('한서준'), names);
+    t('어제 몰표를 받은 사람은 오늘 순위에 섞이지 않음', !names.includes('어제1등'), names);
+    t('안내 문구에 오늘 날짜가 표시됨',
+      (await famePage.textContent('#fameDateLabel')).includes(String(Number(today.slice(5, 7))) + '/'),
+      await famePage.textContent('#fameDateLabel'));
+
+    await famePage.click('#hallOfFameList li[data-fame="이지예"]');
+    await famePage.waitForSelector('#fameDetail:not([hidden])');
+    const fameToday = await famePage.textContent('#fameDetail');
+    t('이름을 누르면 그 사람의 오늘 인사이트가 펼쳐짐',
+      fameToday.includes('이지예의 오늘 문장') && fameToday.includes('이지예의 오늘 느낀 점'), fameToday);
+  }
+  await fameCtx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
