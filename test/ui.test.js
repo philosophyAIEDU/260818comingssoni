@@ -441,10 +441,37 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const detail = await page.textContent('#cellDetail');
   t('셀 상세에 제출 내용', /읽는다는 건|팬이 되는 순간/.test(detail), detail.slice(0, 120));
 
-  // 면제 등록 토글
+  // 면제 등록 토글 — 미인증(X)이었던 날을 면제로 바꾸면 그 셀이 P로 바뀌고 미인증 수가 줄어야 함
+  const xCell = page.locator('#matrix .cell-x').first();
+  const xPid = await xCell.getAttribute('data-pid');
+  const xDate = await xCell.getAttribute('data-date');
+  const xRow = page.locator('#matrix tbody tr').filter({ has: page.locator(`.cell[data-pid="${xPid}"]`) });
+  const missedBefore = Number(await xRow.locator('td.num').first().textContent());
+  await xCell.click();
+  await page.waitForTimeout(300);
   await page.click('#toggleExempt');
   await page.waitForTimeout(400);
-  t('면제 등록 반영', (await page.locator('#matrix .cell-p').count()) >= 0);
+  const exemptedCell = page.locator(`#matrix .cell[data-pid="${xPid}"][data-date="${xDate}"]`);
+  t('면제 등록 시 해당 날짜가 면제(P)로 바뀜', (await exemptedCell.getAttribute('class')).includes('cell-p'));
+  const missedAfter = Number(await xRow.locator('td.num').first().textContent());
+  t('면제 등록 시 미인증 수가 1 줄어듦', missedAfter === missedBefore - 1, `${missedBefore} -> ${missedAfter}`);
+
+  // 회귀 테스트: 면제 저장이 실패하면 반드시 눈에 띄는 오류가 떠야 함(성공한 줄 알고 넘어가
+  // 실제로 반영이 안 됐던 사례가 있었음) — 저장을 실패시켜 그 경로를 검증한다.
+  await exemptedCell.click();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    CS.Store.updateParticipant = () => Promise.reject(new Error('테스트: 저장 실패 시뮬레이션'));
+  });
+  let exemptFailAlert = '';
+  page.once('dialog', (d) => { exemptFailAlert = d.message(); });
+  await page.click('#toggleExempt');
+  await page.waitForTimeout(300);
+  t('면제 저장 실패 시 알림 메시지가 표시됨', exemptFailAlert.includes('면제 상태 변경 실패'), exemptFailAlert);
+  t('면제 저장 실패 시 상태는 그대로 유지됨(면제로 잘못 바뀌지 않음)',
+    (await exemptedCell.getAttribute('class')).includes('cell-p'));
+  await page.reload();
+  await page.waitForTimeout(400); // Store.updateParticipant 목(mock) 원복
 
   // 공지문 — 날짜별로 미리 작성/저장 (최대 30일치)
   await page.click('button[data-tab="report"]');
@@ -566,6 +593,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.locator('#rosterTable [data-exemptdate]').first().fill(shift(0));
   await page.locator('#rosterTable [data-addexempt]').first().click();
   await page.waitForTimeout(400); // 이 클릭이 refresh() 전체를 다시 실행시킨다
+  t('[명단 관리]에서 면제일을 추가하면 칩으로 표시됨',
+    (await page.locator('#rosterTable .chips .chip').count()) > 0);
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
   t('공지문 로딩이 실패해도 알림 메일 목록은 그대로 보임',
