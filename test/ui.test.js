@@ -1125,9 +1125,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('추천 수 옆 엄지척이 이모지가 아니라 선 아이콘',
       (await famePage.locator('#hallOfFameList .cnt svg.ico').count()) === 5);
     t('등수가 1등부터 순서대로 매겨짐', cnts[0].startsWith('1등') && cnts[4].startsWith('5등'), cnts);
-    t('안내 문구에 기준 날짜(어제)가 표시됨',
-      (await famePage.textContent('#fameDateLabel')).includes(String(Number(yest.slice(5, 7))) + '/'),
+    // 날짜는 박아 넣은 값이 아니라 '어제'를 그때그때 계산해서 넣는다 — 매일 저절로 넘어간다.
+    const expectDate = `${Number(yest.slice(5, 7))}/${Number(yest.slice(8, 10))}`
+      + `(${'일월화수목금토'[new Date(yest + 'T00:00:00Z').getUTCDay()]})에`;
+    t('안내 문구의 기준 날짜가 어제로 자동 계산됨',
+      (await famePage.textContent('#fameDateLabel')) === expectDate,
       await famePage.textContent('#fameDateLabel'));
+    t('안내 문구 워딩',
+      (await famePage.textContent('.fame-card .hint')).replace(/\s+/g, ' ').trim()
+      === `${expectDate} 올라온 인증글 중 추천을 많이 받은 분들입니다. 이름을 클릭하면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. 오늘 순위는 인증 피드에서 확인해주세요.`,
+      await famePage.textContent('.fame-card .hint'));
 
     await famePage.click('#hallOfFameList [data-fame="삼번"]');
     await famePage.waitForSelector('#fameDetail');
