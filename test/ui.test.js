@@ -283,6 +283,29 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('전일 기록이 없으면 안내 문구 표시',
     (await page.textContent('#hallOfFameList')).includes('없습니다'), await page.textContent('#hallOfFameList'));
 
+  // ── 인증 피드: 이름으로 찾기 ──
+  await page.fill('#feedSearch', '밤');
+  await page.waitForTimeout(300);
+  const searched = await page.locator('#socialFeedList .feed-nick').allTextContents();
+  t('이름을 검색하면 그 사람 글만 남음',
+    searched.length === 1 && searched[0].includes('밤톨'), searched);
+  t('검색 중에는 건수가 "N명 / 전체명"으로 표시됨',
+    /\d+명 \/ \d+명/.test(await page.textContent('#feedCount')), await page.textContent('#feedCount'));
+  await page.fill('#feedSearch', 'ㅋㅁ');
+  await page.waitForTimeout(300);
+  t('초성으로도 찾을 수 있음',
+    (await page.locator('#socialFeedList .feed-nick').allTextContents()).some((n) => n.includes('커밍쏜')),
+    await page.locator('#socialFeedList .feed-nick').allTextContents());
+  await page.fill('#feedSearch', 'zzzz');
+  await page.waitForTimeout(300);
+  t('맞는 이름이 없으면 안내 문구',
+    (await page.textContent('#socialFeedList')).includes('맞는 이름이 이 날짜에 없습니다'),
+    await page.textContent('#socialFeedList'));
+  await page.fill('#feedSearch', '');
+  await page.waitForTimeout(300);
+  t('검색어를 지우면 전체가 다시 보임',
+    (await page.locator('#socialFeedList .feed-nick').count()) === 2);
+
   // ── 인증 피드: 추천순 / 최신순 정렬 + 1등 배너 제거 ──
   t('중복이던 "👑 1등" 배너 제거됨', (await page.locator('#todayWinnerBadge').count()) === 0);
   t('피드 정렬 기본값은 추천 많은순',
@@ -928,19 +951,34 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await cp.waitForTimeout(400);
     t('방향키로 다음 사람을 짚어 고를 수 있음', (await cp.inputValue('#participantSearch')) === '필로소피');
 
+    // 이름을 다 쳐도 목록이 제멋대로 닫히지 않고, Enter로 확정할 때 '선택 완료'가 뜬다.
     await cp.fill('#participantSearch', '');
     await cp.waitForTimeout(150);
     await cp.type('#participantSearch', '김보화', { delay: 20 });
+    await cp.waitForTimeout(300);
+    t('이름을 다 쳐도 목록이 열려 있음(자동으로 닫히지 않음)',
+      !(await cp.locator('#participantListbox').isHidden()));
+    t('정확히 친 이름이 짚어져 있음',
+      (await cp.locator('#participantListbox .combo-option.active').textContent()) === '김보화');
+    t('확정 전에는 선택 완료 표시가 없음', await cp.locator('#participantPicked').isHidden());
+    await cp.press('#participantSearch', 'Enter');
     await cp.waitForTimeout(400);
-    t('이름을 정확히 다 치면 Enter 없이도 선택됨',
-      (await cp.inputValue('#participantSearch')) === '김보화'
+    t('Enter로 확정되면 선택 완료 표시가 나타남',
+      (await cp.textContent('#participantPicked')).includes('김보화')
       && (await cp.locator('#participant').inputValue()) === 'p2');
+    t('확정되면 입력칸에 선택됨 표시가 붙음',
+      await cp.locator('#participantCombo').evaluate((el) => el.classList.contains('picked')));
+    await cp.fill('#participantSearch', '김');
+    await cp.waitForTimeout(200);
+    t('다시 입력을 시작하면 선택 완료 표시가 사라짐', await cp.locator('#participantPicked').isHidden());
 
     await cp.fill('#participantSearch', '이지');
     await cp.waitForTimeout(200);
     await cp.click('#participantListbox .combo-option');
     await cp.waitForTimeout(400);
     t('목록을 눌러서도 고를 수 있음', (await cp.inputValue('#participantSearch')) === '이지예');
+    t('클릭으로 골라도 선택 완료 표시가 뜸',
+      (await cp.textContent('#participantPicked')).includes('이지예'));
 
     await cp.fill('#participantSearch', 'zzz');
     await cp.waitForTimeout(200);

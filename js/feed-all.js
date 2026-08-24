@@ -9,6 +9,7 @@
   let visibleCount = FEED_PAGE_SIZE;
   let feedSort = 'recent'; // 'recent' 최신순 | 'likes' 추천(👍) 많은순
   let feedPerson = ''; // 선택한 참가자 id. 빈 값이면 전체.
+  let feedDate = '';   // 선택한 날짜(YYYY-MM-DD). 빈 값이면 전체 날짜.
   let participants = [];
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성 (index.html과 동일한 키를 써서 기기별로 통일)
@@ -148,8 +149,26 @@
     }
   }
 
+  /** 인증글이 하루라도 올라온 날짜만 최신순으로 드롭다운에 채운다. */
+  async function populateDateOptions() {
+    const sel = $('allFeedDate');
+    const keep = sel.value;
+    const counts = new Map();
+    for (const s of await Store.listSubmissions()) {
+      counts.set(s.date, (counts.get(s.date) || 0) + 1);
+    }
+    const dates = [...counts.keys()].sort((a, b) => b.localeCompare(a));
+    sel.innerHTML = '<option value="">전체 날짜</option>' +
+      dates.map((d) => `<option value="${esc(d)}">${esc(U.shortLabel(d))} · ${counts.get(d)}건</option>`).join('');
+    // 고르고 있던 날짜가 사라졌으면 전체로 되돌린다.
+    sel.value = dates.includes(keep) ? keep : '';
+    feedDate = sel.value;
+  }
+
   async function refreshAllFeed() {
-    const filter = feedPerson ? { participantId: feedPerson } : undefined;
+    const filter = {};
+    if (feedPerson) filter.participantId = feedPerson;
+    if (feedDate) filter.date = feedDate;
     const all = sortByMode(await Store.listSubmissions(filter), feedSort);
 
     $('feedCount').textContent = `${all.length}건`;
@@ -158,9 +177,10 @@
     const list = $('allFeedList');
     const moreWrap = $('allFeedLoadMoreWrap');
     if (!all.length) {
+      const what = feedDate ? `${U.shortLabel(feedDate)}에 ` : '';
       list.innerHTML = feedPerson
-        ? '<div class="empty">이 사람이 제출한 인증글이 없습니다.</div>'
-        : '<div class="empty">제출된 인증글이 없습니다.</div>';
+        ? `<div class="empty">이 사람이 ${what}제출한 인증글이 없습니다.</div>`
+        : `<div class="empty">${what}제출된 인증글이 없습니다.</div>`;
       moreWrap.hidden = true;
       return;
     }
@@ -188,6 +208,7 @@
     participants = await Store.listParticipants();
     $('allFeedPerson').insertAdjacentHTML('beforeend',
       participants.map((p) => `<option value="${esc(p.id)}">${esc(p.nickname)}</option>`).join(''));
+    await populateDateOptions();
     await refreshAllFeed();
 
     $('allFeedLoadMoreBtn').addEventListener('click', () => {
@@ -204,16 +225,23 @@
       visibleCount = FEED_PAGE_SIZE;
       refreshAllFeed();
     });
+    $('allFeedDate').addEventListener('change', (e) => {
+      feedDate = e.target.value;
+      visibleCount = FEED_PAGE_SIZE; // 날짜가 바뀌면 페이지도 처음부터
+      refreshAllFeed();
+    });
     $('allFeedDownloadBtn').addEventListener('click', downloadPersonTxt);
     $('feedRefresh').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;
-      try { await refreshAllFeed(); } finally { btn.disabled = false; }
+      try { await populateDateOptions(); await refreshAllFeed(); } finally { btn.disabled = false; }
     });
 
     // 실시간 동기화(로컬 저장 백엔드일 때 다른 탭에서 바뀐 내용 반영)
     window.addEventListener('storage', (e) => {
-      if (e.key && e.key.startsWith(CS.CONFIG.storagePrefix)) refreshAllFeed().catch(console.error);
+      if (!e.key || !e.key.startsWith(CS.CONFIG.storagePrefix)) return;
+      // 새 날짜의 인증이 올라올 수 있으니 날짜 목록도 함께 다시 채운다
+      populateDateOptions().then(refreshAllFeed).catch(console.error);
     });
   }
 

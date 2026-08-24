@@ -41,8 +41,9 @@
         <p class="author">오바라 가즈히로 지음</p>
         <p class="meta">
           📅 <strong>챌린지 기간</strong> 2026년 8월 24일(월) ~ 9월 20일(일), 4주간<br>
-          📢 <strong>오티(OT)</strong> 2026년 8월 23일(일) 오전 10시
+          📢 <strong>독서모임</strong> 매주 22:00 - 22:30 진행
         </p>
+        <p class="note">* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요</p>
         <p class="desc">결과보다 과정을 파는 시대, 매일 독서 인증으로 과정을 공유하며 나만의 성장 팬덤을 함께 만들어 갑니다.</p>
       </div>
     </section>
@@ -107,6 +108,7 @@
             <button type="button" id="participantToggle" class="combo-toggle" tabindex="-1" aria-label="이름 목록 열기">▾</button>
             <ul id="participantListbox" class="combo-list" role="listbox" aria-label="참여 아이디" hidden></ul>
           </div>
+          <p class="combo-picked" id="participantPicked" hidden></p>
           <!-- 선택된 값의 실제 보관처. 화면에는 위 목록으로 보여주고, 값은 이 select가 들고 있다. -->
           <select id="participant" class="sr-only" tabindex="-1" aria-hidden="true">
             <option value="">— 이름 선택 —</option>
@@ -154,6 +156,9 @@
 
       <div id="feedDateView">
         <div class="feed-sort">
+          <label class="muted" for="feedSearch">이름 검색</label>
+          <input type="search" id="feedSearch" class="feed-search"
+            placeholder="이름 또는 초성" autocomplete="off" aria-label="인증 피드에서 이름 검색">
           <label class="muted" for="feedSortSelect">정렬</label>
           <select id="feedSortSelect">
             <option value="likes">추천(👍) 많은순</option>
@@ -179,6 +184,7 @@
     <section class="card fame-card">
       <h2>🏆 명예의 전당 <span class="tag warn">전일 Top 5</span></h2>
       <p class="hint"><strong id="fameDateLabel">어제</strong> 올라온 인증글 중 엄지척(👍)을 많이 받은 순서입니다.
+        5등까지 보여주며, 같은 추천 수로 공동 등수인 사람은 모두 올라갑니다.
         이름을 누르면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. 오늘 순위는 인증 피드에서 확인해주세요.</p>
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
