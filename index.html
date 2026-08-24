@@ -148,13 +148,19 @@
       <p class="hint">내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
       <div id="feedDateView">
+        <div class="feed-sort">
+          <label class="muted" for="feedSortSelect">정렬</label>
+          <select id="feedSortSelect">
+            <option value="likes">추천(👍) 많은순</option>
+            <option value="recent">최신순</option>
+          </select>
+        </div>
         <div class="feed-datenav">
           <button type="button" id="feedPrevDate" class="small ghost" aria-label="이전 날짜">◀</button>
           <span class="feed-date" id="feedDateLabel">-</span>
           <button type="button" id="feedNextDate" class="small ghost" aria-label="다음 날짜">▶</button>
         </div>
 
-        <div class="tag ok winner-badge" id="todayWinnerBadge" hidden>👑 1등: -</div>
         <div id="socialFeedList" class="feed-scroll">
           <div class="empty">제출된 인증글이 없습니다.</div>
         </div>
@@ -166,8 +172,9 @@
 
     <!-- 명예의 전당 -->
     <section class="card fame-card">
-      <h2>🏆 명예의 전당 <span class="tag warn">오늘의 Top 5</span></h2>
-      <p class="hint"><strong id="fameDateLabel">오늘</strong> 올라온 인증글 중 엄지척(👍)을 많이 받은 순서입니다. 매일 0시에 새로 시작됩니다.</p>
+      <h2>🏆 명예의 전당 <span class="tag warn">전일 Top 10</span></h2>
+      <p class="hint"><strong id="fameDateLabel">어제</strong> 올라온 인증글 중 엄지척(👍)을 많이 받은 순서입니다.
+        이름을 누르면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. (오늘 순위는 아래 인증 피드에서 실시간으로 확인하세요.)</p>
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
       </ol>

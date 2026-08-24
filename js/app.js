@@ -11,6 +11,7 @@
   let participants = [];
   let feedDate = U.today();
   let feedVisibleCount = FEED_PAGE_SIZE;
+  let feedSort = 'likes'; // 'likes' 추천 많은순(기본) | 'recent' 최신순
   let currentPid = '';
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
@@ -464,12 +465,16 @@
     const date = feedDate;
     const daySubs = (await Store.listSubmissions({ date })).slice();
 
-    // 엄지척 순 내림차순 정렬 (동점이면 먼저 올린 사람이 위로)
-    daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
-      String(a.createdAt).localeCompare(String(b.createdAt)));
+    // 정렬: 추천 많은순(기본) | 최신순. 동점·동시각이면 먼저 올린 사람이 위로.
+    if (feedSort === 'recent') {
+      daySubs.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    } else {
+      daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
+        String(a.createdAt).localeCompare(String(b.createdAt)));
+    }
 
-    // 1등(가장 많이 추천된 사람) 선정 — 공동 1등 모두 인정
-    const maxVotes = daySubs.length ? (daySubs[0].upvotes || 0) : 0;
+    // 1등(가장 많이 추천된 사람) — 공동 1등 모두 인정. 정렬과 무관하게 왕관을 달아 준다.
+    const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
     const winners = maxVotes > 0
       ? daySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
       : [];
@@ -482,14 +487,6 @@
     $('feedPrevDate').disabled = date <= lo;
     $('feedNextDate').disabled = date >= hi;
     $('feedDateLabel').textContent = isToday ? `오늘 · ${U.shortLabel(date)}` : U.shortLabel(date);
-
-    const badge = $('todayWinnerBadge');
-    if (winners.length) {
-      badge.textContent = `👑 1등: ${winners.join(', ')} (👍 ${maxVotes})`;
-      badge.hidden = false;
-    } else {
-      badge.hidden = true;
-    }
 
     const feedList = $('socialFeedList');
     const moreWrap = $('feedLoadMoreWrap');
@@ -527,27 +524,32 @@
     const sub = fameOpenName ? fameSubs[fameOpenName] : null;
     if (!sub) { box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
-    box.innerHTML = `<strong>${esc(fameOpenName)}님의 ${esc(U.shortLabel(sub.date))} 인사이트</strong>
+    box.innerHTML = `<strong>${esc(fameOpenName)}님의 ${esc(U.shortLabel(sub.date))} 기록</strong>
       <div class="fame-entry">
+        <div class="fame-entry-label">인상 깊은 내용</div>
         <p class="quote">“${esc(sub.sentence)}”</p>
+        <div class="fame-entry-label">느낀 점</div>
         <p>${esc(sub.reflection)}</p>
       </div>`;
   }
 
-  // 오늘 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5위를 보여준다.
-  // 누적이 아니라 "그날 하루" 기준이라 매일 0시에 순위가 새로 시작된다.
+  // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~10위를 보여준다.
+  // 오늘 순위는 인증 피드에서 실시간으로 볼 수 있으므로, 여기서는 마감이 지나
+  // 추천이 더는 늘지 않는 어제 것을 "확정된 명예"로 남긴다.
   async function calculateRanksAndFame() {
-    const date = U.today();
-    const daySubs = await Store.listSubmissions({ date });
+    const date = U.lastSettledDate(); // 어제 (챌린지 첫날이라 어제가 없으면 null)
+    const daySubs = date ? await Store.listSubmissions({ date }) : [];
 
-    $('fameDateLabel').textContent = `${U.shortLabel(date)}에`;
+    $('fameDateLabel').textContent = date ? `${U.shortLabel(date)}에` : '어제';
 
-    // 추천 많은 순 → 동점이면 먼저 올린 사람이 위로. 아직 추천이 없는 글은 순위에서 제외한다.
+    // 추천 많은 순 → 동점이면 먼저 올린 사람이 위로.
+    // 추천이 없는 글과, 마감(24:00)을 넘겨 올린 지각 글은 순위에서 제외한다
+    // (지각 글은 다른 화면에서도 인증으로 인정하지 않으므로 명예의 전당에도 올리지 않는다).
     const ranked = daySubs
-      .filter((s) => (s.upvotes || 0) > 0)
+      .filter((s) => (s.upvotes || 0) > 0 && !U.isLate(s.date, s.createdAt))
       .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
         String(a.createdAt).localeCompare(String(b.createdAt)))
-      .slice(0, 5);
+      .slice(0, 10);
 
     fameSubs = {};
     for (const s of ranked) {
@@ -567,12 +569,12 @@
         prevVotes = votes; prevRank = rank;
         const medal = ['🥇', '🥈', '🥉'][rank - 1] || '⭐';
         return `<li class="clickable" data-fame="${esc(s.nickname)}" role="button" tabindex="0"
-            aria-expanded="${fameOpenName === s.nickname}" title="클릭하면 이 사람이 오늘 쓴 인사이트를 볼 수 있어요">
+            aria-expanded="${fameOpenName === s.nickname}" title="클릭하면 이 사람이 쓴 인상 깊은 내용과 느낀 점을 볼 수 있어요">
           <span class="medal">${medal}</span>` +
           `<span class="who">${esc(s.nickname)}</span>` +
           `<span class="cnt">${rank}등 · 👍 ${votes}</span></li>`;
       }).join('')
-      : '<li class="none">아직 오늘 추천받은 인증글이 없습니다.</li>';
+      : `<li class="none">${date ? '전일 인증글 중 추천받은 글이 없습니다.' : '아직 집계할 전일 기록이 없습니다.'}</li>`;
 
     fameList.querySelectorAll('[data-fame]').forEach((el) => {
       const open = () => {
@@ -793,6 +795,11 @@
       feedVisibleCount += FEED_PAGE_SIZE;
       refreshSocialFeed();
     });
+    $('feedSortSelect').addEventListener('change', (e) => {
+      feedSort = e.target.value;
+      feedVisibleCount = FEED_PAGE_SIZE; // 정렬이 바뀌면 처음부터 다시 보여준다
+      refreshSocialFeed();
+    });
     bindFeedSwipe(document.querySelector('.feed-card'));
 
     // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
@@ -807,10 +814,11 @@
       } finally { btn.disabled = false; }
     });
     const pollFeed = () => {
-      if (document.visibilityState === 'visible' && feedDate === U.today()) {
-        refreshSocialFeed().catch(console.error);
-        calculateRanksAndFame().catch(console.error);
-      }
+      if (document.visibilityState !== 'visible') return;
+      // 피드는 '오늘'을 보고 있을 때만, 명예의 전당(전일 기준)은 어느 날짜를 보고 있든 갱신한다
+      // — 지난 날짜 피드에서 추천을 누르면 전일 순위가 바뀔 수 있기 때문이다.
+      if (feedDate === U.today()) refreshSocialFeed().catch(console.error);
+      calculateRanksAndFame().catch(console.error);
     };
     setInterval(pollFeed, 120000);
     document.addEventListener('visibilitychange', pollFeed);

@@ -254,25 +254,38 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('엄지척 취소되어 0으로', (await upvoteBtn.textContent()).includes('👍 0'));
 
-  // ── 명예의 전당: 이름을 클릭하면 1등 했던 날의 인사이트가 펼쳐짐 ──
-  await upvoteBtn.click(); // 커밍쏜을 다시 추천해 오늘의 1등으로 만든다
+  // ── 명예의 전당은 전일 기준이라, 오늘 받은 추천은 올라오지 않는다 ──
+  // (전일 기준 순위·펼치기 동작은 아래 전용 컨텍스트에서 따로 검증한다)
+  await upvoteBtn.click(); // 커밍쏜을 다시 추천해 '오늘의 1등'으로 만든다
   await page.waitForTimeout(400);
-  t('엄지척 다시 1로(명예의 전당 테스트 준비)', (await upvoteBtn.textContent()).includes('👍 1'));
-  await page.click('#feedRefresh'); // 명예의 전당은 자동 갱신 대상이 아니라 수동으로 재집계
+  t('엄지척 다시 1로', (await upvoteBtn.textContent()).includes('👍 1'));
+  await page.click('#feedRefresh');
   await page.waitForTimeout(400);
   const fameNames = await page.locator('#hallOfFameList .who').allTextContents();
-  t('명예의 전당에 오늘의 1등이 표시됨', fameNames.includes('커밍쏜'), fameNames);
+  t('오늘 추천은 명예의 전당(전일 기준)에 오르지 않음', !fameNames.includes('커밍쏜'), fameNames);
+  t('전일 기록이 없으면 안내 문구 표시',
+    (await page.textContent('#hallOfFameList')).includes('없습니다'), await page.textContent('#hallOfFameList'));
 
-  const fameItem = page.locator('#hallOfFameList li[data-fame="커밍쏜"]');
-  t('명예의 전당 항목이 클릭 가능하게(role=button) 표시됨', await fameItem.getAttribute('role') === 'button');
-  await fameItem.click();
-  await page.waitForTimeout(200);
-  const fameDetailText = await page.textContent('#fameDetail');
-  t('이름 클릭 시 1등 했던 날의 인상 깊은 내용이 보임', fameDetailText.includes('팬이 되는 순간'), fameDetailText);
-  t('이름 클릭 시 느낀 점도 함께 보임', fameDetailText.includes('결과가 나오기 전에도'), fameDetailText);
-  await fameItem.click();
-  await page.waitForTimeout(200);
-  t('다시 클릭하면 접힘', await page.isHidden('#fameDetail'));
+  // ── 인증 피드: 추천순 / 최신순 정렬 + 1등 배너 제거 ──
+  t('중복이던 "👑 1등" 배너 제거됨', (await page.locator('#todayWinnerBadge').count()) === 0);
+  t('피드 정렬 기본값은 추천 많은순',
+    (await page.locator('#feedSortSelect').inputValue()) === 'likes',
+    await page.locator('#feedSortSelect').inputValue());
+  const feedOrder = () => page.locator('#socialFeedList .feed-nick').allTextContents();
+  // 이 시점에 커밍쏜만 👍 1표(밤톨 0표), 작성 순서는 커밍쏜 → 밤톨
+  t('추천순: 표를 받은 커밍쏜이 맨 위',
+    (await feedOrder())[0].includes('커밍쏜'), await feedOrder());
+  await page.selectOption('#feedSortSelect', 'recent');
+  await page.waitForTimeout(300);
+  t('최신순: 나중에 올린 밤톨이 맨 위',
+    (await feedOrder())[0].includes('밤톨'), await feedOrder());
+  t('최신순에서도 1등에게는 왕관이 그대로 붙음',
+    (await page.locator('#socialFeedList .feed-nick').allTextContents()).some((n) => n.includes('👑')),
+    await feedOrder());
+  await page.selectOption('#feedSortSelect', 'likes');
+  await page.waitForTimeout(300);
+  t('다시 추천순으로 되돌릴 수 있음', (await feedOrder())[0].includes('커밍쏜'), await feedOrder());
+
 
   // ── 인증글 텍스트 복사 ──
   const shareBtn = otherCard.locator('[data-share]');
@@ -897,7 +910,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   }
   await prevCtx.close();
 
-  // ── 명예의 전당: "오늘" 인증글을 추천(👍) 많은 순으로 1~5위 ──
+  // ── 명예의 전당: 전일(어제) 인증글을 추천(👍) 많은 순으로 1~10위 ──
   // 추천은 한 브라우저당 1표만 누를 수 있어 UI로는 득표차를 만들 수 없으므로 저장소를 직접 심는다.
   const fameCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await fameCtx.route('**/js/config.js', async (route) => {
@@ -910,26 +923,34 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   });
   {
     const yest = shift(-1);
-    // 오늘 7명(3표 동점 2명, 0표 1명) + 어제 몰표를 받은 1명
+    const onTime = `${yest}T10:00:00.000Z`;      // 어제 마감(15:00Z) 전
+    const tooLate = `${today}T02:00:00.000Z`;    // 어제 마감 후 → 지각
+    // 어제 12명(11표~0표) + 지각 1명(몰표) + 오늘 1명(몰표)
     const rows = [
-      ['김보화', 6], ['이지예', 5], ['황은총', 3],
-      ['김성도', 3], ['박다연', 2], ['최민수', 1], ['한서준', 0],
+      ['일번', 11], ['이번', 10], ['삼번', 9], ['사번', 8], ['오번', 7],
+      ['육번', 6], ['칠번', 5], ['팔번', 4], ['구번', 3], ['십번', 2],
+      ['십일번', 1], ['영표', 0],
     ];
-    const parts = rows.map(([n], i) => ({ id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: today + 'T00:00:00' }));
+    const parts = rows.map(([n], i) => ({ id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z' }));
     const subs = rows.map(([n, v], i) => ({
-      id: 's' + i, participantId: 'p' + i, nickname: n, date: today,
-      sentence: `${n}의 오늘 문장`, reflection: `${n}의 오늘 느낀 점`,
-      upvotes: v, upvotedBy: [], createdAt: `${today}T0${i}:00:00`, updatedAt: `${today}T0${i}:00:00`,
+      id: 's' + i, participantId: 'p' + i, nickname: n, date: yest,
+      sentence: `${n}의 어제 인상 깊은 내용`, reflection: `${n}의 어제 느낀 점`,
+      upvotes: v, upvotedBy: [], createdAt: onTime, updatedAt: onTime,
     }));
-    parts.push({ id: 'pY', nickname: '어제1등', email: '', kakaoJoined: '', createdAt: yest + 'T00:00:00' });
-    subs.push({ id: 'sY', participantId: 'pY', nickname: '어제1등', date: yest,
-      sentence: '어제 문장', reflection: '어제 느낀 점', upvotes: 99, upvotedBy: [],
-      createdAt: `${yest}T01:00:00`, updatedAt: `${yest}T01:00:00` });
+    parts.push({ id: 'pL', nickname: '지각왕', email: '', kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z' });
+    subs.push({ id: 'sL', participantId: 'pL', nickname: '지각왕', date: yest,
+      sentence: '지각 문장', reflection: '지각 느낀 점', upvotes: 99, upvotedBy: [],
+      createdAt: tooLate, updatedAt: tooLate });
+    parts.push({ id: 'pT', nickname: '오늘왕', email: '', kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z' });
+    subs.push({ id: 'sT', participantId: 'pT', nickname: '오늘왕', date: today,
+      sentence: '오늘 문장', reflection: '오늘 느낀 점', upvotes: 98, upvotedBy: [],
+      createdAt: `${today}T01:00:00.000Z`, updatedAt: `${today}T01:00:00.000Z` });
+
     await fameCtx.addInitScript(({ parts, subs }) => {
       const K = 'comingsoon.reading.v1';
       localStorage.setItem(K + '.participants', JSON.stringify(parts));
       localStorage.setItem(K + '.submissions', JSON.stringify(subs));
-      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00' }));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
     }, { parts, subs });
 
     const famePage = await fameCtx.newPage();
@@ -937,25 +958,32 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await famePage.waitForSelector('#hallOfFameList li[data-fame]');
 
     const names = await famePage.locator('#hallOfFameList .who').allTextContents();
-    t('명예의 전당이 추천 많은 순서대로 줄 세워짐',
-      JSON.stringify(names) === JSON.stringify(['김보화', '이지예', '황은총', '김성도', '박다연']), names);
-    t('명예의 전당은 5위까지만 보임', names.length === 5, names.length);
+    t('명예의 전당은 10위까지 보임', names.length === 10, names.length);
+    t('명예의 전당이 전일 추천 많은 순서대로 줄 세워짐',
+      JSON.stringify(names) === JSON.stringify(['일번', '이번', '삼번', '사번', '오번', '육번', '칠번', '팔번', '구번', '십번']),
+      names);
+    t('11위 이하는 잘림', !names.includes('십일번'), names);
+    t('추천 0표인 사람은 순위에 오르지 않음', !names.includes('영표'), names);
+    t('어제 지각 제출은 몰표를 받아도 명예의 전당에서 제외', !names.includes('지각왕'), names);
+    t('오늘 글은 전일 순위에 섞이지 않음', !names.includes('오늘왕'), names);
 
     const cnts = await famePage.locator('#hallOfFameList .cnt').allTextContents();
-    t('순위 옆에 실제 추천 수가 함께 표시됨', cnts[0].includes('👍 6') && cnts[1].includes('👍 5'), cnts);
-    t('동점이면 공동 등수(3등·3등) 뒤가 5등',
-      cnts[2].startsWith('3등') && cnts[3].startsWith('3등') && cnts[4].startsWith('5등'), cnts);
-    t('추천 0표인 사람은 순위에 오르지 않음', !names.includes('한서준'), names);
-    t('어제 몰표를 받은 사람은 오늘 순위에 섞이지 않음', !names.includes('어제1등'), names);
-    t('안내 문구에 오늘 날짜가 표시됨',
-      (await famePage.textContent('#fameDateLabel')).includes(String(Number(today.slice(5, 7))) + '/'),
+    t('순위 옆에 실제 추천 수가 함께 표시됨', cnts[0].includes('👍 11') && cnts[1].includes('👍 10'), cnts);
+    t('등수가 1등부터 순서대로 매겨짐', cnts[0].startsWith('1등') && cnts[9].startsWith('10등'), cnts);
+    t('안내 문구에 기준 날짜(어제)가 표시됨',
+      (await famePage.textContent('#fameDateLabel')).includes(String(Number(yest.slice(5, 7))) + '/'),
       await famePage.textContent('#fameDateLabel'));
 
-    await famePage.click('#hallOfFameList li[data-fame="이지예"]');
+    await famePage.click('#hallOfFameList li[data-fame="삼번"]');
     await famePage.waitForSelector('#fameDetail:not([hidden])');
-    const fameToday = await famePage.textContent('#fameDetail');
-    t('이름을 누르면 그 사람의 오늘 인사이트가 펼쳐짐',
-      fameToday.includes('이지예의 오늘 문장') && fameToday.includes('이지예의 오늘 느낀 점'), fameToday);
+    const fameText = await famePage.textContent('#fameDetail');
+    t('이름을 누르면 인상 깊은 내용이 펼쳐짐', fameText.includes('삼번의 어제 인상 깊은 내용'), fameText);
+    t('이름을 누르면 느낀 점도 함께 펼쳐짐', fameText.includes('삼번의 어제 느낀 점'), fameText);
+    t('펼친 내용에 항목 라벨이 붙음',
+      fameText.includes('인상 깊은 내용') && fameText.includes('느낀 점'), fameText);
+    await famePage.click('#hallOfFameList li[data-fame="삼번"]');
+    await famePage.waitForTimeout(150);
+    t('다시 누르면 접힘', await famePage.isHidden('#fameDetail'));
   }
   await fameCtx.close();
 
