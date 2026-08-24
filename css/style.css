@@ -138,6 +138,14 @@ a { color: var(--accent); }
 .banner .lbl { font-size: 12px; color: #3d4f8f; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
 .banner .col { display: flex; flex-direction: column; }
 .banner .sep { width: 2px; align-self: stretch; background: rgba(8, 29, 88, 0.15); }
+/* "오늘의 범위" 접이식 안내 — 노란 배너 안에서는 하나의 새 줄을 통째로 차지하게 하고,
+   .fold의 기본 색(테마용 surface/border)이 노란 배경과 어울리지 않으므로 배너 톤에 맞춘다. */
+.banner > .fold { flex: 1 1 100%; margin: 0; }
+.banner .fold > summary {
+  background: rgba(8, 29, 88, 0.08); border: 1px solid rgba(8, 29, 88, 0.25); color: #081d58;
+}
+.banner .fold > summary:hover { border-color: #081d58; color: #081d58; }
+.banner .today-range { margin: 0; font-size: 13.5px; line-height: 1.6; color: #081d58; }
 
 
 /* ── 폼 ───────────────────────────────── */

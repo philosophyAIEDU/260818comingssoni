@@ -48,6 +48,21 @@
     $('countdown').textContent = U.hhmmss(U.secondsToMidnight());
   }
 
+  /** 배너의 "오늘의 범위"를 채운다. 오늘이 챌린지 기간 밖(시작 전·종료 후)이거나
+   *  해당 회차 안내가 설정돼 있지 않으면 접이식 자체를 숨긴다. */
+  function paintTodayRange() {
+    const fold = $('todayRangeFold');
+    if (!fold) return;
+    const idx = U.dayIndex(U.today());
+    const text = idx && CONFIG.readingPlan ? CONFIG.readingPlan[idx - 1] : null;
+    if (!text) {
+      fold.hidden = true;
+      return;
+    }
+    fold.hidden = false;
+    $('todayRangeText').innerHTML = text;
+  }
+
   /** 오늘 인증을 제출할 수 있는지
    *  기본은 챌린지 기간 안에서만 허용. CONFIG.allowSubmitOutsidePeriod 가 true 면
    *  시작 전·종료 후에도 제출할 수 있다(시연·테스트용).
@@ -701,6 +716,7 @@
   async function boot() {
     await Store.init();
     paintHeader();
+    paintTodayRange();
     paintPhase();
     tickCountdown();
     setInterval(tickCountdown, 1000);
