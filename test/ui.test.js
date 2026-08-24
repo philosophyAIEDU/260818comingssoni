@@ -97,6 +97,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('브랜드 로고 노출', await page.isVisible('.brand-logo'));
   t('브랜드명 반영', (await page.textContent('#brandTitle')).includes('퍼스널메이커스'));
+
+  // ── 배너: "오늘의 범위" 접이식 (이 컨텍스트는 오늘이 9일차) ──
+  t('오늘의 범위는 기본적으로 접혀 있음', !(await page.locator('#todayRangeFold').evaluate((el) => el.open)));
+  t('접힌 상태에서는 오늘의 범위 안내가 화면에 노출되지 않음', !(await page.isVisible('#todayRangeText')));
+  await page.click('#todayRangeFold summary');
+  await page.waitForTimeout(150);
+  t('오늘의 범위를 펼치면 9일차 안내가 보임',
+    (await page.textContent('#todayRangeText')).includes('세컨드 크리에이터'),
+    await page.textContent('#todayRangeText'));
+
   const opts = await page.locator('#participant option').count();
   t('드롭다운 채워짐 (5 = 안내 + 4명)', opts === 5, opts);
   await page.selectOption('#participant', { label: '커밍쏜' });
@@ -484,6 +494,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await beforePage.waitForTimeout(400);
   t('시작 전: D-day/OT 안내 배너는 더 이상 노출되지 않음(요청에 따라 제거)',
     (await beforePage.textContent('#phaseNote')).trim() === '');
+  t('시작 전: 아직 읽을 회차가 없으므로 오늘의 범위 접이식이 숨겨짐',
+    await beforePage.isHidden('#todayRangeFold'));
   t('연습 기간 날짜는 "연습 (날짜)" 형식으로 일자가 먼저 오지 않음(연습 라벨이 앞에 옴)',
     /^연습 \(\d+\/\d+/.test((await beforePage.locator('#certifyDate option:checked').textContent()).trim()));
   t('안내 규칙 카드가 책 소개와 배너 사이에 위치',
@@ -513,6 +525,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await afterPage.goto(BASE + '/index.html');
   await afterPage.waitForTimeout(400);
   t('종료 후: phaseNote 안내문 사라짐', (await afterPage.textContent('#phaseNote')).trim() === '');
+  t('종료 후: 더 읽을 회차가 없으므로 오늘의 범위 접이식이 숨겨짐',
+    await afterPage.isHidden('#todayRangeFold'));
   await afterCtx.close();
 
   // ── 참가자 화면: 인증할 날짜 드롭다운 & 지각 백필은 계속 미인증 ──
