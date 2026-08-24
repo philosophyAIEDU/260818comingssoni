@@ -28,25 +28,30 @@
     const late = U.isLate(s.date, s.createdAt);
     const hasUpvoted = (s.upvotedBy || []).includes(clientId);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : ''].filter(Boolean).join(' ');
+    // index.html의 피드와 동일한 구조: 왼쪽 글 / 오른쪽 버튼
     return `<article class="feed-item">
-      <div class="feed-top">
-        <span class="feed-nick">${esc(s.nickname)}</span>
-        ${late ? '<span class="tag bad">지각</span>' : ''}
-        <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+      <div class="feed-main">
+        <div class="feed-top">
+          <span class="feed-nick">${esc(s.nickname)}</span>
+          ${late ? '<span class="tag bad">지각</span>' : ''}
+          <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        </div>
+        <p class="feed-quote">“${esc(s.sentence)}”</p>
+        <details class="feed-more">
+          <summary>느낀 점 보기</summary>
+          <dl class="body">
+            <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
+          </dl>
+        </details>
+      </div>
+      <div class="feed-acts">
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
-          aria-label="텍스트 복사" title="텍스트 복사">📋 텍스트 복사</button>
+          aria-label="텍스트 복사" title="텍스트 복사">📋 <span class="lbl">텍스트 복사</span></button>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
-      <p class="feed-quote">“${esc(s.sentence)}”</p>
-      <details class="feed-more">
-        <summary>느낀 점 보기</summary>
-        <dl class="body">
-          <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-        </dl>
-      </details>
     </article>`;
   }
 

@@ -432,26 +432,31 @@
     const late = U.isLate(s.date, s.createdAt);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
     const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
+    // 왼쪽에는 글(이름·시간·본문)만, 오른쪽에는 버튼만 모아 둔다 — 본문이 버튼 사이로 파고들지 않게.
     return `<article class="feed-item${isWinner ? ' win' : ''}">
-      <div class="feed-top">
-        <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
-        ${late ? '<span class="tag bad">지각</span>' : ''}
-        <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+      <div class="feed-main">
+        <div class="feed-top">
+          <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
+          ${late ? '<span class="tag bad">지각</span>' : ''}
+          <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+        </div>
+        <p class="feed-quote">“${esc(s.sentence)}”</p>
+        <details class="feed-more">
+          <summary>느낀 점 보기</summary>
+          <dl class="body">
+            <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
+          </dl>
+        </details>
+      </div>
+      <div class="feed-acts">
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
           data-winner="${isWinner ? '1' : ''}"
-          aria-label="텍스트 복사" title="텍스트 복사">📋 텍스트 복사</button>
+          aria-label="텍스트 복사" title="텍스트 복사">📋 <span class="lbl">텍스트 복사</span></button>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
       </div>
-      <p class="feed-quote">“${esc(s.sentence)}”</p>
-      <details class="feed-more">
-        <summary>느낀 점 보기</summary>
-        <dl class="body">
-          <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-        </dl>
-      </details>
     </article>`;
   }
 
