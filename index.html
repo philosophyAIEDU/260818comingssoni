@@ -99,13 +99,18 @@
 
       <form id="verifyForm" autocomplete="off">
         <div class="field">
-          <label for="participantSearch">참여 아이디 <span class="sub">이름 또는 초성으로 검색 후 선택</span></label>
-          <div class="participant-picker">
-            <input type="text" id="participantSearch" placeholder="예) 필로소피 → '필' 또는 'ㅍㄹ'를 검색한 후 이름 선택 부분을 누르세요" autocomplete="off">
-            <select id="participant" required>
-              <option value="">— 이름 선택 —</option>
-            </select>
+          <label for="participantSearch">참여 아이디 <span class="sub">이름이나 초성을 입력해 바로 선택</span></label>
+          <div class="combo" id="participantCombo">
+            <input type="text" id="participantSearch" role="combobox" aria-autocomplete="list"
+              aria-expanded="false" aria-controls="participantListbox" aria-haspopup="listbox"
+              autocomplete="off" placeholder="예) 필로소피 → '필' 또는 'ㅍㄹ' 입력 후 목록에서 선택">
+            <button type="button" id="participantToggle" class="combo-toggle" tabindex="-1" aria-label="이름 목록 열기">▾</button>
+            <ul id="participantListbox" class="combo-list" role="listbox" aria-label="참여 아이디" hidden></ul>
           </div>
+          <!-- 선택된 값의 실제 보관처. 화면에는 위 목록으로 보여주고, 값은 이 select가 들고 있다. -->
+          <select id="participant" class="sr-only" tabindex="-1" aria-hidden="true">
+            <option value="">— 이름 선택 —</option>
+          </select>
         </div>
 
         <div class="field">
@@ -172,9 +177,9 @@
 
     <!-- 명예의 전당 -->
     <section class="card fame-card">
-      <h2>🏆 명예의 전당 <span class="tag warn">전일 Top 10</span></h2>
+      <h2>🏆 명예의 전당 <span class="tag warn">전일 Top 5</span></h2>
       <p class="hint"><strong id="fameDateLabel">어제</strong> 올라온 인증글 중 엄지척(👍)을 많이 받은 순서입니다.
-        이름을 누르면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. (오늘 순위는 아래 인증 피드에서 실시간으로 확인하세요.)</p>
+        이름을 누르면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. 오늘 순위는 인증 피드에서 확인해주세요.</p>
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
       </ol>
@@ -191,9 +196,9 @@
           <div class="n" id="ovPrevRate">0%</div>
           <div class="k">전일 인증률</div>
         </div>
-        <div class="stat clickable" id="ovPrevDoneTile" role="button" tabindex="0" aria-expanded="false">
-          <div class="n" id="ovPrevDone">0</div>
-          <div class="k">전일 인증 완료 인원</div>
+        <div class="stat warn clickable" id="ovPrevMissTile" role="button" tabindex="0" aria-expanded="false">
+          <div class="n" id="ovPrevMiss">0</div>
+          <div class="k">전일 누락 · 지각 인원</div>
         </div>
         <div class="stat bad clickable" id="ovRiskTile" role="button" tabindex="0" aria-expanded="false">
           <div class="n" id="ovRisk">0</div>

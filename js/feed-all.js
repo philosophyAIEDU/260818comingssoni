@@ -36,13 +36,14 @@
           ${late ? '<span class="tag bad">지각</span>' : ''}
           <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         </div>
-        <p class="feed-quote">“${esc(s.sentence)}”</p>
-        <details class="feed-more">
-          <summary>느낀 점 보기</summary>
-          <dl class="body">
-            <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-          </dl>
-        </details>
+        <div class="feed-body">
+          <div class="feed-label">인상 깊은 내용</div>
+          <p class="feed-quote">“${esc(s.sentence)}”</p>
+          <details class="feed-more">
+            <summary>느낀 점 보기</summary>
+            <div class="body reflect"><p>${esc(s.reflection)}</p></div>
+          </details>
+        </div>
       </div>
       <div class="feed-acts">
         <button type="button" class="share-btn" data-share
