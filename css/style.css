@@ -433,8 +433,8 @@ footer.foot {
 .strip-cell .cell { display: block; width: 100%; }
 .strip-cell .d { font-size: 9.5px; line-height: 1.2; color: var(--text-faint); }
 
-/* 통계 타일 5개가 한 줄에 들어오도록 */
-#myCard .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* 통계 타일 4개가 한 줄에 들어오도록 */
+#myCard .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /* ── 최근 기록 목록 ───────────────────── */
 .entry-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; overscroll-behavior: contain; }
@@ -520,7 +520,12 @@ button.ghost { background: transparent; }
    넘치는 본문은 카드마다 따로 스크롤한다. */
 .all-feed-grid .feed-item { height: 340px; align-items: stretch; }
 .all-feed-grid .feed-main { display: flex; flex-direction: column; min-height: 0; }
-.all-feed-grid .feed-acts { align-self: start; }
+/* 전체 보기 카드는 폭이 좁다 — 버튼을 세로로 쌓아(엄지척 위, 복사 아래) 한 칸 폭만 쓰고,
+   그만큼 본문이 넓어지게 한다. column-reverse라 DOM 순서(복사 → 엄지척)와 반대로 보인다. */
+.all-feed-grid .feed-acts { align-self: start; flex-direction: column-reverse; gap: 5px; }
+.all-feed-grid .feed-acts > button { width: 100%; min-width: 42px; }
+.all-feed-grid .feed-item { column-gap: 8px; }
+.all-feed-grid .feed-item { padding: 12px 11px; }
 .all-feed-grid .feed-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px;
 }

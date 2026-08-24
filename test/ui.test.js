@@ -240,6 +240,22 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await feedAllPage.waitForTimeout(200);
   t('느낀 점은 별도 패널로 구분되어 보임',
     (await feedAllPage.locator('.all-feed-grid .feed-more .body.reflect').first().count()) === 1);
+  // 좁은 그리드 카드에서는 버튼을 세로로 쌓아(엄지척 위 / 복사 아래) 본문 폭을 넓힌다.
+  const gridActs = await feedAllPage.locator('.all-feed-grid .feed-acts').first().evaluate((el) => {
+    const btns = [...el.querySelectorAll('button')];
+    const copy = btns.find((b) => b.classList.contains('share-btn'));
+    const up = btns.find((b) => b.classList.contains('upvote-btn'));
+    return {
+      col: getComputedStyle(el).flexDirection.startsWith('column'),
+      copyBelow: copy.getBoundingClientRect().top > up.getBoundingClientRect().top,
+      actsW: el.getBoundingClientRect().width,
+      bodyW: el.closest('.feed-item').querySelector('.feed-main').getBoundingClientRect().width,
+    };
+  });
+  t('전체 보기 카드는 버튼을 세로로 쌓음', gridActs.col, gridActs);
+  t('복사 버튼이 엄지척 아래에 놓임', gridActs.copyBelow, gridActs);
+  t('버튼단이 한 칸 폭이라 본문이 훨씬 넓음',
+    gridActs.actsW < 60 && gridActs.bodyW > gridActs.actsW * 4, gridActs);
   // 회귀 테스트: 그리드 카드 안에서도(넓은 화면이어도 카드 자체가 좁아서) 작성자 이름이
   // 폭 0으로 눌려 안 보이던 문제가 있었다 — 첫 카드의 이름이 실제로 보이는 너비를 갖는지 확인.
   const firstNickBox = await feedAllPage.locator('#allFeedList .feed-nick').first().boundingBox();
