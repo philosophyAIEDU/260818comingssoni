@@ -133,6 +133,12 @@
           <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요." required></textarea>
         </div>
 
+        <!-- 제출 직전, 이 인증이 무엇으로 쌓이는지 한 번 짚어 주는 자리 -->
+        <p class="form-note">
+          28일간 매일 책을 읽고 느낀 점을 남기면 28일 후 <strong>한 권의 나만의 브랜딩 워크북</strong>이 완성됩니다.
+          단순히 인증을 위해서가 아닌 여러분들의 <strong>브랜딩 자산</strong>을 만들어가세요.
+        </p>
+
         <div class="actions form-actions">
           <button type="submit" class="primary btn-verify" id="submitBtn">인증하기</button>
           <span class="muted" id="draftNote"></span>
@@ -146,29 +152,33 @@
         <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
         <div class="feed-head-actions">
           <div class="feed-tabs" id="feedTabs">
-            <a href="feed-all.html" target="_blank" rel="noopener" class="btn on">전체 보기 ↗</a>
+            <a href="feed-all.html" target="_blank" rel="noopener" class="btn on">전체 보기<svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 10 10.4 5.6"/><path d="M6.3 5.6h4.1v4.1"/></svg></a>
           </div>
-          <button type="button" id="feedRefresh" class="small ghost" title="피드 새로고침"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/></svg> 새로고침</button>
+          <button type="button" id="feedRefresh" class="icon-btn" title="새로고침" aria-label="피드 새로고침"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/></svg></button>
         </div>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 확인할 수 있습니다. <strong>전체 보기</strong>를 누르면 새 창에서 지금까지의 모든 인증글을 한눈에 볼 수 있습니다.</p>
-      <p class="hint">내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
+      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 볼 수 있습니다.
+        내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
       <div id="feedDateView">
-        <div class="feed-sort">
-          <label class="muted" for="feedSearch">이름 검색</label>
-          <input type="search" id="feedSearch" class="feed-search"
-            placeholder="이름 또는 초성" autocomplete="off" aria-label="인증 피드에서 이름 검색">
-          <label class="muted" for="feedSortSelect">정렬</label>
-          <select id="feedSortSelect">
-            <option value="likes">추천 많은순</option>
-            <option value="recent">최신순</option>
-          </select>
-        </div>
-        <div class="feed-datenav">
-          <button type="button" id="feedPrevDate" class="small ghost" aria-label="이전 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
-          <span class="feed-date" id="feedDateLabel">-</span>
-          <button type="button" id="feedNextDate" class="small ghost" aria-label="다음 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.4 10.4 8 6 12.6"/></svg></button>
+        <!-- 날짜 이동(왼쪽) + 찾기·정렬(오른쪽)을 한 줄에 묶어 컨트롤이 흩어지지 않게 한다 -->
+        <div class="feed-toolbar">
+          <div class="feed-datenav">
+            <button type="button" id="feedPrevDate" class="icon-btn" aria-label="이전 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
+            <span class="feed-date" id="feedDateLabel">-</span>
+            <button type="button" id="feedNextDate" class="icon-btn" aria-label="다음 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.4 10.4 8 6 12.6"/></svg></button>
+          </div>
+          <div class="feed-filters">
+            <span class="field-icon">
+              <svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7.2" cy="7.2" r="4.3"/><path d="M10.4 10.4 13.6 13.6"/></svg>
+              <input type="search" id="feedSearch" class="feed-search"
+                placeholder="이름 검색" autocomplete="off" aria-label="인증 피드에서 이름으로 찾기">
+            </span>
+            <select id="feedSortSelect" aria-label="정렬 기준">
+              <option value="likes">추천 많은순</option>
+              <option value="recent">최신순</option>
+            </select>
+          </div>
         </div>
 
         <div id="socialFeedList" class="feed-scroll">

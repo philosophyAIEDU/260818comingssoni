@@ -317,6 +317,34 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       && (await page.locator('#participantToggle svg.ico').count()) === 1);
   }
 
+  // ── 피드 툴바: 날짜 이동 / 찾기·정렬이 한 줄에, 버튼은 조용한 톤 ──
+  {
+    const sameRow = await page.evaluate(() => {
+      const nav = document.querySelector('.feed-datenav').getBoundingClientRect();
+      const fil = document.querySelector('.feed-filters').getBoundingClientRect();
+      return Math.abs(nav.top - fil.top) < 6 && nav.left < fil.left;
+    });
+    t('날짜 이동(왼쪽)과 찾기·정렬(오른쪽)이 같은 줄에 있음', sameRow);
+    t('새로고침은 글자 없이 아이콘만',
+      (await page.locator('#feedRefresh').textContent()).trim() === ''
+      && (await page.locator('#feedRefresh svg.ico').count()) === 1);
+    t('전체 보기 버튼은 채운 색이 아니라 외곽선 톤',
+      await page.locator('#feedTabs a.on').evaluate((el) => {
+        const c = getComputedStyle(el);
+        // 자기가 놓인 카드와 같은 면 위에 테두리만 두른 버튼이어야 조용하다
+        const cardBg = getComputedStyle(el.closest('.card')).backgroundColor;
+        return c.backgroundColor === cardBg
+          && c.color !== 'rgb(255, 255, 255)'
+          && c.borderColor !== cardBg;
+      }));
+    t('검색창 안에 돋보기 아이콘이 붙음',
+      (await page.locator('.field-icon > svg.ico').count()) === 1);
+    t('검색·정렬 높이가 서로 같음', await page.evaluate(() => {
+      const h = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().height);
+      return h('#feedSearch') === h('#feedSortSelect');
+    }));
+  }
+
   // ── 인증 피드: 이름으로 찾기 ──
   await page.fill('#feedSearch', '밤');
   await page.waitForTimeout(300);
