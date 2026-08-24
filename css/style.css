@@ -111,7 +111,7 @@ a { color: var(--accent); }
   box-shadow: var(--shadow);
 }
 .card > h2 {
-  margin: 0 0 4px; font-size: 17px; letter-spacing: -.01em; color: var(--text); font-weight: 700;
+  margin: 0 0 6px; font-size: 17px; letter-spacing: -.01em; color: var(--text); font-weight: 700;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .card > .hint { margin: 0 0 16px; font-size: 13px; color: var(--text-dim); }
@@ -232,10 +232,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
 .stat {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
+  border-radius: 10px; padding: 14px;
 }
-.stat .n { font-size: 24px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.stat .k { font-size: 12px; color: var(--text-dim); }
+.stat .n { font-size: 24px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat .k { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.4; }
 .stat.ok .n { color: var(--ok); }
 .stat.bad .n { color: var(--bad); }
 .stat.warn .n { color: var(--warn); }
@@ -346,6 +346,7 @@ footer.foot {
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
 .intro-body .meta { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.intro-body .note { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--bad); }
 .intro-body .desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-faint); }
 
 /* 참여 아이디 검색 + 드롭다운 */
@@ -378,6 +379,12 @@ footer.foot {
 .combo-option.active { background: var(--accent); color: #fff; }
 .combo-option[aria-selected="true"]:not(.active) { font-weight: 700; color: var(--accent); }
 .combo-empty { padding: 10px; font-size: 13px; color: var(--text-faint); text-align: center; }
+/* 선택이 끝났다는 걸 눈으로 확인할 수 있게 — 입력칸 테두리와 아래 한 줄로 알린다 */
+.combo.picked > input { border-color: var(--ok); }
+.combo-picked {
+  margin: 6px 0 0; font-size: 12.5px; font-weight: 700; color: var(--ok);
+}
+.combo-picked[hidden] { display: none; }
 
 /* ── 접이식 블록 ──────────────────────── */
 .fold { margin-top: 16px; }
@@ -392,7 +399,9 @@ footer.foot {
 .fold[open] > summary::after { content: '▴'; }
 .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
 .fold[open] > summary { margin-bottom: 12px; }
-.card > .fold { margin-top: 0; }
+/* 카드 안의 접이식 블록도 윗 내용과 한 줄 띄운다.
+   (예전에는 margin-top: 0 이라 '참여자별 상세 보기'가 통계 타일에 딱 붙어 답답했다) */
+.card > .fold { margin-top: 16px; }
 
 /* 안내 목록 */
 .card > ul.muted { padding-left: 18px; margin: 0; }
@@ -496,13 +505,11 @@ button.ghost { background: transparent; }
 .all-feed-grid .feed-body::-webkit-scrollbar { width: 6px; }
 .all-feed-grid .feed-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 
-/* 인상 깊은 내용 / 느낀 점을 한눈에 구분되도록 */
+/* 인상 깊은 내용 / 느낀 점 구분 — 별도의 칸을 두지 않고 라벨과 글꼴로만 나눈다.
+   인상 깊은 내용은 기울임 + 강조색(.feed-quote), 느낀 점은 보통 글꼴이라 눈으로 바로 갈린다. */
 .feed-label { font-size: 11px; font-weight: 700; color: var(--text-faint); margin-top: 7px; }
-.feed-more .body.reflect {
-  background: var(--surface); border: 1px solid var(--border);
-  border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px;
-}
-.feed-more .body.reflect p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.feed-more .body.reflect { padding: 0; }
+.feed-more .body.reflect p { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
 .all-feed-grid::-webkit-scrollbar { width: 8px; }
 .all-feed-grid::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 .all-feed-grid .empty { grid-column: 1 / -1; }
@@ -524,6 +531,8 @@ button.ghost { background: transparent; }
 .feed-sort { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
 .feed-sort label { white-space: nowrap; }
 .feed-sort select { width: auto; min-width: 9.5em; padding: 7px 10px; font-size: 13.5px; }
+.feed-sort .feed-search { width: auto; flex: 0 1 12em; padding: 7px 10px; font-size: 13.5px; }
+.feed-sort { flex-wrap: wrap; row-gap: 8px; }
 
 .feed-datenav {
   display: flex; align-items: center; justify-content: center; gap: 14px;
@@ -558,8 +567,11 @@ button.ghost { background: transparent; }
 .feed-item.win { border-color: var(--warn); background: var(--warn-soft); }
 .feed-main { min-width: 0; }
 /* 오른쪽 버튼단 — 세로로 쌓아 폭을 좁게 유지(가로로 놓으면 본문 자리를 크게 잡아먹는다) */
+/* 복사·엄지척 두 버튼은 같은 폭·같은 높이로 맞춘다 */
 .feed-acts { display: grid; justify-items: stretch; gap: 6px; }
-.feed-acts > button { width: 100%; justify-content: center; }
+.feed-acts > button {
+  width: 100%; justify-content: center; min-height: 34px; padding: 6px 10px;
+}
 /* 이름 + 지각 배지 + 시간. 버튼이 빠졌으므로 한 줄에 들어가고, 좁으면 시간만 아래로 내려간다. */
 .feed-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
 .feed-nick { font-size: 14px; font-weight: 700; white-space: normal; overflow: visible; text-overflow: clip; }
@@ -592,7 +604,12 @@ button.ghost { background: transparent; }
   font-size: 14px; padding: 6px 10px; min-height: 34px;
   border-radius: 999px; flex: 0 0 auto; white-space: nowrap;
 }
-.share-btn .lbl { font-size: 12.5px; font-weight: 600; }
+/* 버튼은 아이콘(📋)만 남긴다 — 글자를 빼면 버튼단이 좁아져 본문이 그만큼 넓어진다.
+   글자는 DOM에 남겨 두어 스크린리더·복사 대상 텍스트로는 계속 읽힌다. */
+.share-btn .lbl {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 .share-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── 반응형 ───────────────────────────── */
@@ -635,8 +652,5 @@ button.ghost { background: transparent; }
   .entry-list { max-height: 60vh; }
   .feed-scroll { max-height: 70vh; }
   .upvote-btn { min-height: 38px; padding: 7px 13px; }
-  /* 좁은 화면에서는 오른쪽 버튼단이 본문 폭을 잡아먹지 않도록 '텍스트 복사' 글자를 접고
-     아이콘(📋)만 남긴다. 버튼의 aria-label/title은 그대로라 뜻은 전달된다. */
-  .share-btn .lbl { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .feed-item { column-gap: 10px; }
 }

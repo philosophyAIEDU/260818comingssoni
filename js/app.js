@@ -12,6 +12,7 @@
   let feedDate = U.today();
   let feedVisibleCount = FEED_PAGE_SIZE;
   let feedSort = 'likes'; // 'likes' 추천 많은순(기본) | 'recent' 최신순
+  let feedSearch = '';    // 피드에서 찾을 이름(초성도 됨). 빈 값이면 전체.
   let currentPid = '';
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성
@@ -205,12 +206,22 @@
     renderComboList();
   }
 
+  /** 확정된 사람을 입력칸 아래에 '선택 완료'로 보여 준다 (p가 null이면 표시를 지운다). */
+  function markPicked(p) {
+    const note = $('participantPicked');
+    $('participantCombo').classList.toggle('picked', !!p);
+    if (!p) { note.hidden = true; note.textContent = ''; return; }
+    note.hidden = false;
+    note.textContent = `✓ ${comboLabel(p)} 님으로 선택되었습니다.`;
+  }
+
   /** 한 명을 확정한다. select에 값을 넣고 change를 쏴서 기존 onSelect가 그대로 돌게 한다. */
   function pickParticipant(p) {
     const sel = $('participant');
     sel.value = p.id;
     $('participantSearch').value = comboLabel(p);
     closeCombo();
+    markPicked(p);
     sel.dispatchEvent(new Event('change'));
   }
 
@@ -220,10 +231,13 @@
 
     input.addEventListener('input', () => {
       const term = input.value.trim().toLowerCase();
+      markPicked(null); // 다시 입력하기 시작하면 '선택됨' 표시를 지운다
       openCombo(term);
-      // 이름을 정확히 다 쳤으면 Enter 없이도 바로 골라 준다.
-      const exact = participants.find((p) => p.nickname.toLowerCase() === term);
-      if (exact) pickParticipant(exact);
+      // 이름을 정확히 다 쳤으면 그 줄을 짚어 둔다. 다만 자동으로 확정하지는 않는다 —
+      // 목록이 곧바로 닫혀 버리면 제대로 선택됐는지 알 수 없다는 의견이 있었다.
+      // Enter를 치거나 그 줄을 눌러야 확정되고, 확정되면 아래에 '선택 완료'가 뜬다.
+      const exactIdx = comboItems.findIndex((p) => p.nickname.toLowerCase() === term);
+      if (exactIdx >= 0) { comboActive = exactIdx; renderComboList(); }
     });
     input.addEventListener('focus', () => openCombo());
     input.addEventListener('keydown', (e) => {
@@ -269,6 +283,7 @@
     $('participant').addEventListener('change', () => {
       const p = participants.find((x) => x.id === $('participant').value);
       input.value = p ? comboLabel(p) : '';
+      markPicked(p || null);
     });
   }
 
@@ -565,13 +580,20 @@
         String(a.createdAt).localeCompare(String(b.createdAt)));
     }
 
-    // 1등(가장 많이 추천된 사람) — 공동 1등 모두 인정. 정렬과 무관하게 왕관을 달아 준다.
+    // 1등(가장 많이 추천된 사람) — 공동 1등 모두 인정. 정렬·검색과 무관하게 왕관을 달아 준다.
+    // (검색으로 걸러내기 전의 그날 전체를 기준으로 뽑아야 1등이 검색어에 따라 바뀌지 않는다)
     const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
     const winners = maxVotes > 0
       ? daySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
       : [];
 
-    $('feedCount').textContent = `${daySubs.length}명`;
+    const shown = feedSearch
+      ? daySubs.filter((s) => nicknameMatches(s.nickname, feedSearch))
+      : daySubs;
+
+    $('feedCount').textContent = feedSearch
+      ? `${shown.length}명 / ${daySubs.length}명`
+      : `${daySubs.length}명`;
 
     // 날짜 넘기기 컨트롤
     const { lo, hi } = feedDateBounds();
@@ -582,21 +604,23 @@
 
     const feedList = $('socialFeedList');
     const moreWrap = $('feedLoadMoreWrap');
-    if (!daySubs.length) {
-      feedList.innerHTML = `<div class="empty">${isToday ? '오늘' : U.shortLabel(date) + '에'} 제출된 인증글이 없습니다.` +
-        `${isToday ? ' 첫 번째 글을 작성해 보세요!' : ''}</div>`;
+    if (!shown.length) {
+      feedList.innerHTML = daySubs.length
+        ? `<div class="empty">'${esc(feedSearch)}'와(과) 맞는 이름이 이 날짜에 없습니다.</div>`
+        : `<div class="empty">${isToday ? '오늘' : U.shortLabel(date) + '에'} 제출된 인증글이 없습니다.` +
+          `${isToday ? ' 첫 번째 글을 작성해 보세요!' : ''}</div>`;
       moreWrap.hidden = true;
       return;
     }
 
     const winnerSet = new Set(winners);
-    const visible = daySubs.slice(0, feedVisibleCount);
+    const visible = shown.slice(0, feedVisibleCount);
     feedList.innerHTML = visible.map((s) =>
       renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
     bindUpvoteButtons(feedList);
     CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: U.shortLabel(date) });
 
-    const remaining = daySubs.length - visible.length;
+    const remaining = shown.length - visible.length;
     if (remaining > 0) {
       moreWrap.hidden = false;
       $('feedLoadMoreBtn').textContent = `더 보기 (${remaining}명 더 남음)`;
@@ -610,6 +634,7 @@
   // 명예의 전당에서 이름을 클릭하면 그 사람이 그날 쓴 인사이트를 펼쳐 보여준다.
   let fameOpenName = null; // 현재 펼쳐진 이름 (null이면 닫힘)
 
+  const FAME_TOP_RANK = 5; // 몇 등까지 보여줄지 (인원수가 아니라 등수 기준)
   let fameRanked = [];     // 전일 순위 [{nickname, votes, rank, sentence, reflection, date}]
   let fameEmptyMsg = '아직 집계할 전일 기록이 없습니다.';
 
@@ -658,7 +683,8 @@
     });
   }
 
-  // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5위를 보여준다.
+  // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5등을 보여준다.
+  // '5명'이 아니라 '5등까지'라, 동점으로 5등 안에 드는 사람은 인원수와 상관없이 모두 올린다.
   // 오늘 순위는 인증 피드에서 실시간으로 볼 수 있으므로, 여기서는 마감이 지나
   // 추천이 더는 늘지 않는 어제 것을 "확정된 명예"로 남긴다.
   async function calculateRanksAndFame() {
@@ -674,8 +700,7 @@
     const ranked = daySubs
       .filter((s) => (s.upvotes || 0) > 0 && !U.isLate(s.date, s.createdAt))
       .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
-        String(a.createdAt).localeCompare(String(b.createdAt)))
-      .slice(0, 5);
+        String(a.createdAt).localeCompare(String(b.createdAt)));
 
     let prevVotes = null, prevRank = 0;
     fameRanked = ranked.map((s, idx) => {
@@ -684,7 +709,7 @@
       const rank = votes === prevVotes ? prevRank : idx + 1;
       prevVotes = votes; prevRank = rank;
       return { nickname: s.nickname, votes, rank, date: s.date, sentence: s.sentence, reflection: s.reflection };
-    });
+    }).filter((item) => item.rank <= FAME_TOP_RANK);
 
     // 순위가 바뀌면서 펼쳐 두었던 사람이 목록에서 사라질 수 있으니 닫아 준다.
     if (fameOpenName && !fameRanked.some((i) => i.nickname === fameOpenName)) fameOpenName = null;
@@ -912,6 +937,11 @@
     $('feedNextDate').addEventListener('click', () => shiftFeedDate(1));
     $('feedLoadMoreBtn').addEventListener('click', () => {
       feedVisibleCount += FEED_PAGE_SIZE;
+      refreshSocialFeed();
+    });
+    $('feedSearch').addEventListener('input', (e) => {
+      feedSearch = e.target.value.trim().toLowerCase();
+      feedVisibleCount = FEED_PAGE_SIZE; // 검색어가 바뀌면 처음부터 다시 보여준다
       refreshSocialFeed();
     });
     $('feedSortSelect').addEventListener('change', (e) => {
