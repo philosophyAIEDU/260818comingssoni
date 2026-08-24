@@ -53,6 +53,23 @@
   /* ── 배너: "오늘의 범위" — 오늘 회차뿐 아니라 ◀▶로 다른 날짜의 범위도 넘겨볼 수 있다 ── */
   let rangeDayIdx = null; // 1-based. null이면 다음 렌더링 때 오늘(또는 1일차)로 초기화
 
+  /** 하루치 읽을 범위를 '1장 - 소제목' 형태로 한 줄에 하나씩 세로로 나열한다.
+   *  (한 줄에 ' · '로 이어 붙이면 길어질 때 어디까지가 한 꼭지인지 알아보기 어렵다.)
+   *  예전처럼 문자열 한 줄로 적어 둔 회차도 그대로 보여준다. */
+  function rangeHtml(entry) {
+    if (!entry) return '';
+    if (typeof entry === 'string') return entry;
+    const lines = [];
+    for (const group of entry) {
+      for (const text of group.s || []) {
+        lines.push(group.ch
+          ? `<li><b class="range-ch">${esc(group.ch)}</b><span class="range-sep">-</span>${text}</li>`
+          : `<li class="range-plain">${text}</li>`);
+      }
+    }
+    return `<ul class="range-list">${lines.join('')}</ul>`;
+  }
+
   function renderTodayRange() {
     const fold = $('todayRangeFold');
     if (!fold) return;
@@ -73,7 +90,7 @@
     const date = U.addDays(CONFIG.startDate, rangeDayIdx - 1);
     $('rangeDayLabel').textContent = `${rangeDayIdx}일차 (${U.shortLabel(date)})`
       + (rangeDayIdx === todayIdx ? ' · 오늘' : '');
-    $('todayRangeText').innerHTML = plan[rangeDayIdx - 1] || '';
+    $('todayRangeText').innerHTML = rangeHtml(plan[rangeDayIdx - 1]);
     $('rangePrevDay').disabled = rangeDayIdx <= 1;
     $('rangeNextDay').disabled = rangeDayIdx >= plan.length;
     fold.hidden = false;
@@ -368,6 +385,8 @@
   }
 
   async function onCertifyDateChange() {
+    // 날짜를 먼저 고르는 순서라, 이름을 아직 안 골랐어도 지각 안내는 바로 보여 준다.
+    paintCertifyDateWarn($('certifyDate').value);
     const pid = $('participant').value;
     if (!pid) return;
     await loadEntryForm(pid, $('certifyDate').value);
@@ -561,9 +580,9 @@
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
           data-winner="${isWinner ? '1' : ''}"
-          aria-label="텍스트 복사" title="텍스트 복사">📋 <span class="lbl">텍스트 복사</span></button>
+          aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
         <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
-          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">👍 ${s.upvotes || 0}</button>
+          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
       </div>
     </article>`;
   }
@@ -641,7 +660,14 @@
   /** 펼쳐진 사람의 기록 — 목록의 그 사람 줄 바로 아래에 끼워 넣는다. */
   function fameDetailHtml(item) {
     return `<div id="fameDetail" class="fame-detail">
-      <strong>${esc(item.nickname)}님의 ${esc(U.shortLabel(item.date))} 기록</strong>
+      <div class="fame-detail-head">
+        <strong>${esc(item.nickname)}님의 ${esc(U.shortLabel(item.date))} 기록</strong>
+        <button type="button" class="share-btn" data-share
+          data-nickname="${esc(item.nickname)}" data-date="${esc(item.date)}"
+          data-sentence="${esc(item.sentence)}" data-reflection="${esc(item.reflection)}"
+          data-winner="${item.rank === 1 ? '1' : ''}"
+          aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
+      </div>
       <div class="fame-entry">
         <div class="fame-entry-label">인상 깊은 내용</div>
         <p class="quote">“${esc(item.sentence)}”</p>
@@ -662,7 +688,7 @@
             aria-expanded="${isOpen}" title="클릭하면 이 사람이 쓴 인상 깊은 내용과 느낀 점을 볼 수 있어요">
             <span class="medal">${medal}</span>` +
           `<span class="who">${esc(item.nickname)}</span>` +
-          `<span class="cnt">${item.rank}등 · 👍 ${item.votes}</span>
+          `<span class="cnt">${item.rank}등 · ${U.icon('thumb')}${item.votes}</span>
           </div>${isOpen ? fameDetailHtml(item) : ''}</li>`;
       }).join('')
       : `<li class="none">${esc(fameEmptyMsg)}</li>`;
@@ -681,6 +707,8 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
       });
     });
+    // 펼친 기록의 텍스트 복사 버튼
+    CS.ShareCard.bindButtons(fameList, { title: CONFIG.title });
   }
 
   // 전일(어제) 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5등을 보여준다.

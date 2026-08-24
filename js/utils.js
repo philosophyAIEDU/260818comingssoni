@@ -226,7 +226,33 @@ CS.U = (function () {
     return { cls: 'ok', label: '참여중' };
   }
 
+  /* ── 아이콘 ────────────────────────────
+   * 이모지 대신 쓰는 미니멀 선(stroke) 아이콘. 색은 글자색(currentColor)을 따라가고
+   * 크기는 em 기준이라 버튼 글씨 크기에 맞춰 자연스럽게 커지고 작아진다. */
+  const ICON_PATHS = {
+    // 사각형 두 개가 겹친 전형적인 '복사' 표시
+    copy: '<rect x="5.6" y="5.6" width="8" height="8" rx="1.6"/>'
+        + '<path d="M10.4 2.6H4.1a1.5 1.5 0 0 0-1.5 1.5v6.3"/>',
+    check: '<path d="M3 8.6 6.4 12l6.6-7.4"/>',
+    thumb: '<rect x="1.7" y="6.9" width="3.1" height="6.9" rx="0.9"/>'
+         + '<path d="M4.8 7.5 8.2 2.6a1.3 1.3 0 0 1 2.34 1l-.44 2.8h3.1a1.4 1.4 0 0 1 1.37 1.7l-.95 4.3a1.5 1.5 0 0 1-1.47 1.18H4.8z"/>',
+    refresh: '<path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/>',
+    download: '<path d="M8 2.7v7.5"/><path d="M4.9 7.3 8 10.4l3.1-3.1"/>'
+            + '<path d="M2.8 12.4v.7a1.2 1.2 0 0 0 1.2 1.2h8a1.2 1.2 0 0 0 1.2-1.2v-.7"/>',
+    down: '<path d="M4.2 6.3 8 10.1l3.8-3.8"/>',
+    left: '<path d="M10 3.4 5.6 8l4.4 4.6"/>',
+    right: '<path d="M6 3.4 10.4 8 6 12.6"/>'
+  };
+
+  /** 이름으로 인라인 SVG 아이콘 문자열을 만든다. 버튼 안에 그대로 넣어 쓴다. */
+  function icon(name) {
+    const d = ICON_PATHS[name];
+    if (!d) return '';
+    return `<svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${d}</svg>`;
+  }
+
   return {
+    icon,
     nowParts, today, secondsToMidnight, addDays, dateRange, diffDays,
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
