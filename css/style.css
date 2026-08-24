@@ -388,7 +388,10 @@ footer.foot {
   background: var(--surface-2); border: 1px solid var(--border);
 }
 .fame .who { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fame .cnt { margin-left: auto; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.fame .cnt {
+  margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-dim);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 .fame .none { justify-content: center; color: var(--text-faint); font-size: 13px; font-weight: 400; }
 .fame li.clickable { cursor: pointer; transition: border-color .15s, background .15s; }
 .fame li.clickable:hover, .fame li.clickable:focus-visible { border-color: var(--accent); background: var(--surface); }

@@ -518,68 +518,61 @@
 
   // 인증 피드 "전체 보기"는 feed-all.html(새 창)에서 js/feed-all.js가 별도로 렌더링합니다.
 
-  // 명예의 전당에서 이름을 클릭하면 그 사람이 1등 했던 날의 인사이트를 펼쳐 보여준다.
+  // 명예의 전당에서 이름을 클릭하면 그 사람이 그날 쓴 인사이트를 펼쳐 보여준다.
   let fameOpenName = null; // 현재 펼쳐진 이름 (null이면 닫힘)
-  let fameWinSubs = {};    // 닉네임 → 1등 했던 날의 제출 목록 [{date, sentence, reflection}]
+  let fameSubs = {};       // 닉네임 → 그날의 제출 내용 {date, sentence, reflection}
 
   function renderFameDetail() {
     const box = $('fameDetail');
-    if (!fameOpenName) { box.hidden = true; box.innerHTML = ''; return; }
-    const subs = (fameWinSubs[fameOpenName] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const sub = fameOpenName ? fameSubs[fameOpenName] : null;
+    if (!sub) { box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
-    box.innerHTML = `<strong>${esc(fameOpenName)}님의 1등 인사이트</strong>` +
-      subs.map((s) => `
-        <div class="fame-entry">
-          <div class="fame-entry-date">${esc(U.shortLabel(s.date))}</div>
-          <p class="quote">“${esc(s.sentence)}”</p>
-          <p>${esc(s.reflection)}</p>
-        </div>`).join('');
+    box.innerHTML = `<strong>${esc(fameOpenName)}님의 ${esc(U.shortLabel(sub.date))} 인사이트</strong>
+      <div class="fame-entry">
+        <p class="quote">“${esc(sub.sentence)}”</p>
+        <p>${esc(sub.reflection)}</p>
+      </div>`;
   }
 
-  // 날짜별 1등 횟수를 집계해서 명예의 전당 Top 5 목록 렌더링
+  // 오늘 인증글을 엄지척(추천) 많이 받은 순으로 줄 세워 1~5위를 보여준다.
+  // 누적이 아니라 "그날 하루" 기준이라 매일 0시에 순위가 새로 시작된다.
   async function calculateRanksAndFame() {
-    const allSubs = await Store.listSubmissions();
+    const date = U.today();
+    const daySubs = await Store.listSubmissions({ date });
 
-    // 제출이 있는 날짜별로 묶어 1등을 뽑는다 (공동 1등 모두 인정)
-    const byDate = new Map();
-    for (const s of allSubs) {
-      if (!byDate.has(s.date)) byDate.set(s.date, []);
-      byDate.get(s.date).push(s);
-    }
+    $('fameDateLabel').textContent = `${U.shortLabel(date)}에`;
 
-    const winsMap = {}; // 닉네임 → 1등 횟수
-    fameWinSubs = {};   // 닉네임 → 1등 했던 날의 제출 내용
-    for (const daySubs of byDate.values()) {
-      const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
-      if (maxVotes <= 0) continue;
-      for (const s of daySubs) {
-        if ((s.upvotes || 0) === maxVotes) {
-          winsMap[s.nickname] = (winsMap[s.nickname] || 0) + 1;
-          (fameWinSubs[s.nickname] = fameWinSubs[s.nickname] || [])
-            .push({ date: s.date, sentence: s.sentence, reflection: s.reflection });
-        }
-      }
-    }
-
-    const sortedFame = Object.entries(winsMap)
-      .map(([nickname, wins]) => ({ nickname, wins }))
-      .sort((a, b) => b.wins - a.wins || a.nickname.localeCompare(b.nickname, 'ko'))
+    // 추천 많은 순 → 동점이면 먼저 올린 사람이 위로. 아직 추천이 없는 글은 순위에서 제외한다.
+    const ranked = daySubs
+      .filter((s) => (s.upvotes || 0) > 0)
+      .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
+        String(a.createdAt).localeCompare(String(b.createdAt)))
       .slice(0, 5);
 
+    fameSubs = {};
+    for (const s of ranked) {
+      fameSubs[s.nickname] = { date: s.date, sentence: s.sentence, reflection: s.reflection };
+    }
+
     // 순위가 바뀌면서 펼쳐 두었던 사람이 목록에서 사라질 수 있으니 닫아 준다.
-    if (fameOpenName && !sortedFame.some((u) => u.nickname === fameOpenName)) fameOpenName = null;
+    if (fameOpenName && !fameSubs[fameOpenName]) fameOpenName = null;
 
     const fameList = $('hallOfFameList');
-    fameList.innerHTML = sortedFame.length
-      ? sortedFame.map((user, idx) => {
-        const medal = ['🥇', '🥈', '🥉'][idx] || '⭐';
-        return `<li class="clickable" data-fame="${esc(user.nickname)}" role="button" tabindex="0"
-            aria-expanded="${fameOpenName === user.nickname}" title="클릭하면 1등 했던 날의 인사이트를 볼 수 있어요">
+    let prevVotes = null, prevRank = 0;
+    fameList.innerHTML = ranked.length
+      ? ranked.map((s, idx) => {
+        const votes = s.upvotes || 0;
+        // 동점이면 같은 등수(1,1,3…). 공동 1등을 둘 다 1등으로 보여주기 위함.
+        const rank = votes === prevVotes ? prevRank : idx + 1;
+        prevVotes = votes; prevRank = rank;
+        const medal = ['🥇', '🥈', '🥉'][rank - 1] || '⭐';
+        return `<li class="clickable" data-fame="${esc(s.nickname)}" role="button" tabindex="0"
+            aria-expanded="${fameOpenName === s.nickname}" title="클릭하면 이 사람이 오늘 쓴 인사이트를 볼 수 있어요">
           <span class="medal">${medal}</span>` +
-          `<span class="who">${esc(user.nickname)}</span>` +
-          `<span class="cnt">1등 ${user.wins}회</span></li>`;
+          `<span class="who">${esc(s.nickname)}</span>` +
+          `<span class="cnt">${rank}등 · 👍 ${votes}</span></li>`;
       }).join('')
-      : '<li class="none">집계된 순위가 없습니다.</li>';
+      : '<li class="none">아직 오늘 추천받은 인증글이 없습니다.</li>';
 
     fameList.querySelectorAll('[data-fame]').forEach((el) => {
       const open = () => {
@@ -785,7 +778,7 @@
     bindFeedSwipe(document.querySelector('.feed-card'));
 
     // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
-    // (명예의 전당은 전체 기록을 읽어야 해서 Firestore 읽기 비용이 크므로 자동 갱신에서 제외)
+    // (명예의 전당도 하루치만 읽으므로 함께 갱신한다 — 추천이 들어오면 순위가 바로 따라간다)
     $('feedRefresh').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;
@@ -798,6 +791,7 @@
     const pollFeed = () => {
       if (document.visibilityState === 'visible' && feedDate === U.today()) {
         refreshSocialFeed().catch(console.error);
+        calculateRanksAndFame().catch(console.error);
       }
     };
     setInterval(pollFeed, 120000);
