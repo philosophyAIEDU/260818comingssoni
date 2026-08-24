@@ -955,7 +955,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
     const famePage = await fameCtx.newPage();
     await famePage.goto(BASE + '/index.html');
-    await famePage.waitForSelector('#hallOfFameList li[data-fame]');
+    await famePage.waitForSelector('#hallOfFameList [data-fame]');
 
     const names = await famePage.locator('#hallOfFameList .who').allTextContents();
     t('명예의 전당은 10위까지 보임', names.length === 10, names.length);
@@ -974,16 +974,22 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       (await famePage.textContent('#fameDateLabel')).includes(String(Number(yest.slice(5, 7))) + '/'),
       await famePage.textContent('#fameDateLabel'));
 
-    await famePage.click('#hallOfFameList li[data-fame="삼번"]');
-    await famePage.waitForSelector('#fameDetail:not([hidden])');
+    await famePage.click('#hallOfFameList [data-fame="삼번"]');
+    await famePage.waitForSelector('#fameDetail');
     const fameText = await famePage.textContent('#fameDetail');
+    // 펼친 기록은 목록 맨 아래가 아니라 '삼번' 줄 바로 아래(같은 li 안)에 들어가야 한다
+    t('펼친 기록이 클릭한 이름 바로 아래에 들어감',
+      await famePage.locator('#hallOfFameList li', { has: famePage.locator('[data-fame="삼번"]') })
+        .locator('#fameDetail').count() === 1);
+    const openIdx = (await famePage.locator('#hallOfFameList .who').allTextContents()).indexOf('삼번');
+    t('펼쳐도 순위 목록의 이름 순서는 그대로', openIdx === 2, openIdx);
     t('이름을 누르면 인상 깊은 내용이 펼쳐짐', fameText.includes('삼번의 어제 인상 깊은 내용'), fameText);
     t('이름을 누르면 느낀 점도 함께 펼쳐짐', fameText.includes('삼번의 어제 느낀 점'), fameText);
     t('펼친 내용에 항목 라벨이 붙음',
       fameText.includes('인상 깊은 내용') && fameText.includes('느낀 점'), fameText);
-    await famePage.click('#hallOfFameList li[data-fame="삼번"]');
+    await famePage.click('#hallOfFameList [data-fame="삼번"]');
     await famePage.waitForTimeout(150);
-    t('다시 누르면 접힘', await famePage.isHidden('#fameDetail'));
+    t('다시 누르면 접힘', (await famePage.locator('#fameDetail').count()) === 0);
   }
   await fameCtx.close();
 
