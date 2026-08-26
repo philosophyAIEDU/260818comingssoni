@@ -643,6 +643,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
   const rulesLis = await rulesCard.locator('ul.muted li').count();
   t('규칙 목록 5개(날짜 선택·지각 안내 포함)', rulesLis === 5, rulesLis);
+  t('예전 날짜의 인증글도 고칠 수 있다는 안내 문구 노출', rulesText.includes('이미 낸 인증글을 나중에 다시 고칠 수 있습니다'));
+  t('인증할 날짜 필드에도 과거 인증 수정 안내가 붙음',
+    (await page.locator('label[for="certifyDate"] .sub').textContent()).includes('이미 낸 인증도 고칠 수 있어요'));
   t('전체 진행현황 3개 지표만 노출', (await page.locator('#overallStats .stat').count()) === 3);
 
   // ── 참가자 화면: 챌린지 시작 전(before) 상태의 안내 위치 ──
@@ -755,6 +758,29 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('지각 백필은 운영진 매트릭스에서도 미인증(X)으로 집계',
     (await lateCell.getAttribute('class')).includes('cell-x'));
 
+  // ── 오늘 이전에 이미 제출한 인증글도 다시 골라서 수정할 수 있어야 함 ──
+  //    (참여자 문의: "오늘 이전에 제출한 것도 수정 가능할까요?") ──
+  await dayPage.goto(BASE + '/index.html');
+  await dayPage.waitForTimeout(400);
+  await dayPage.selectOption('#participant', { label: '지각이' });
+  await dayPage.waitForTimeout(300);
+  await dayPage.selectOption('#certifyDate', pastDateValue);
+  await dayPage.waitForTimeout(300);
+  t('과거 날짜를 다시 선택하면 그때 제출한 내용이 그대로 불러와짐',
+    (await dayPage.inputValue('#sentence')) === '늦게라도 기록 남김'
+    && (await dayPage.inputValue('#reflection')) === '지각이지만 남겨봄');
+  t('과거 인증 재선택 시 버튼이 수정 모드로 표시됨', (await dayPage.textContent('#submitBtn')).includes('수정'));
+
+  await dayPage.fill('#sentence', '늦었지만 다시 고쳐 씀');
+  await dayPage.click('#submitBtn');
+  await dayPage.waitForTimeout(400);
+  t('과거 인증글 수정 후 안내 메시지', /인증이 저장되었습니다/.test(await dayPage.textContent('#formMsg')));
+
+  await dayPage.goto(BASE + '/feed-all.html');
+  await dayPage.waitForTimeout(400);
+  t('과거 인증글을 고친 내용이 피드에 반영됨(새 글로 쌓이지 않고 덮어씀)',
+    (await dayPage.textContent('#allFeedList')).includes('늦었지만 다시 고쳐 씀'));
+
   // ── 전체 보기: 날짜별 그룹핑 + 추천(👍) 많은순 정렬 (이 컨텍스트엔 과거·오늘 두 날짜가 있음) ──
   await dayPage.goto(BASE + '/index.html');
   await dayPage.waitForTimeout(400);
@@ -829,7 +855,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('다운로드 파일명에 이름 포함 및 .txt 확장자', dlFilename.includes('지각이') && dlFilename.endsWith('.txt'), dlFilename);
   const dlText = fs.readFileSync(await dl.path(), 'utf-8');
   t('다운로드한 텍스트에 두 건의 인증 내용이 모두 포함됨',
-    dlText.includes('늦게라도 기록 남김') && dlText.includes('오늘은 제때 제출'), dlText.slice(0, 200));
+    dlText.includes('늦었지만 다시 고쳐 씀') && dlText.includes('오늘은 제때 제출'), dlText.slice(0, 200));
   t('다운로드한 텍스트에 다른 사람의 글은 포함되지 않음', !dlText.includes('다른사람의 오늘 인증'));
 
   await dayCtx.close();
