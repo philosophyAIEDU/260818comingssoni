@@ -306,11 +306,20 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       (await card.locator('.share-btn svg.ico').count()) === 1
       && !(await card.locator('.share-btn').textContent()).includes('\u{1F4CB}'));
     t('엄지척 버튼도 선 아이콘', (await card.locator('.upvote-btn svg.ico').count()) === 1);
-    const acts = await card.locator('.feed-acts').evaluate((el) => getComputedStyle(el).flexDirection);
-    t('두 버튼이 가로로 나란히 놓임', acts === 'row', acts);
-    const boxes = await card.locator('.feed-acts button').evaluateAll(
-      (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
-    t('두 버튼의 윗변이 같은 줄에 있음', new Set(boxes).size === 1, boxes);
+    const acts = await card.locator('.feed-acts').evaluate((el) => {
+      const copy = el.querySelector('.share-btn').getBoundingClientRect();
+      const up = el.querySelector('.upvote-btn').getBoundingClientRect();
+      const main = el.closest('.feed-item').querySelector('.feed-main').getBoundingClientRect();
+      return {
+        col: getComputedStyle(el).flexDirection.startsWith('column'),
+        copyBelow: copy.top > up.top,
+        actsW: Math.round(el.getBoundingClientRect().width),
+        bodyW: Math.round(main.width),
+      };
+    });
+    t('두 버튼이 세로로 쌓임', acts.col, acts);
+    t('복사가 엄지척 아래에 놓임', acts.copyBelow, acts);
+    t('버튼단이 한 칸 폭이라 본문이 넓게 남음', acts.actsW < 60 && acts.bodyW > acts.actsW * 5, acts);
     t('새로고침·날짜 이동 버튼도 선 아이콘',
       (await page.locator('#feedRefresh svg.ico').count()) === 1
       && (await page.locator('#feedPrevDate svg.ico').count()) === 1
