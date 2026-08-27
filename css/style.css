@@ -544,10 +544,8 @@ button.ghost { background: transparent; }
 .all-feed-grid .feed-main { display: flex; flex-direction: column; min-height: 0; }
 /* 전체 보기 카드는 폭이 좁다 — 버튼을 세로로 쌓아(엄지척 위, 복사 아래) 한 칸 폭만 쓰고,
    그만큼 본문이 넓어지게 한다. column-reverse라 DOM 순서(복사 → 엄지척)와 반대로 보인다. */
-.all-feed-grid .feed-acts { align-self: start; flex-direction: column-reverse; gap: 5px; }
-.all-feed-grid .feed-acts > button { width: 100%; min-width: 42px; }
-.all-feed-grid .feed-item { column-gap: 8px; }
-.all-feed-grid .feed-item { padding: 12px 11px; }
+.all-feed-grid .feed-acts > button { min-width: 42px; }
+.all-feed-grid .feed-item { column-gap: 8px; padding: 12px 11px; }
 .all-feed-grid .feed-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px;
 }
@@ -635,10 +633,14 @@ button.ghost { background: transparent; }
 .feed-item.win { border-color: var(--warn); background: var(--warn-soft); }
 .feed-main { min-width: 0; }
 /* 오른쪽 버튼단 — 세로로 쌓아 폭을 좁게 유지(가로로 놓으면 본문 자리를 크게 잡아먹는다) */
-/* 복사·엄지척 두 버튼은 가로로 나란히, 같은 크기로 놓는다 */
-.feed-acts { display: flex; align-items: center; gap: 6px; }
+/* 복사·엄지척 두 버튼은 세로로 쌓는다(엄지척 위 / 복사 아래).
+   가로로 두면 버튼단이 두 칸 폭을 차지해 좁은 화면에서 본문이 눌린다.
+   DOM 순서는 복사 → 엄지척이라 column-reverse로 뒤집어 보여 준다. */
+.feed-acts {
+  display: flex; flex-direction: column-reverse; align-self: start; gap: 5px;
+}
 .feed-acts > button {
-  justify-content: center; min-height: 32px; min-width: 44px; padding: 5px 9px; gap: 4px;
+  width: 100%; justify-content: center; min-height: 32px; min-width: 44px; padding: 5px 9px; gap: 4px;
 }
 /* 이름 + 지각 배지 + 시간. 버튼이 빠졌으므로 한 줄에 들어가고, 좁으면 시간만 아래로 내려간다. */
 .feed-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
