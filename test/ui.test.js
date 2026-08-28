@@ -1029,6 +1029,61 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await finishCtx.close();
 
+  // ── 킥아웃 위험 인원: 이름만이 아니라 누적 미인증 횟수까지 ──
+  const riskCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await riskCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    // 확정된 날(어제까지) 9일 중 며칠을 인증했는지로 미인증 횟수를 만든다.
+    const plan = [['성실이', 9], ['적게한이', 5], ['더적게', 3], ['거의안함', 2]];
+    const parts = plan.map(([n], i) => ({
+      id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: shift(-9) + 'T00:00:00.000Z',
+    }));
+    const subs = [];
+    plan.forEach(([n, done], i) => {
+      for (let d = 0; d < done; d++) {
+        const date = shift(-9 + d);
+        subs.push({
+          id: `s${i}_${d}`, participantId: 'p' + i, nickname: n, date,
+          sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [],
+          createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`,
+        });
+      }
+    });
+    await riskCtx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+
+    const rp = await riskCtx.newPage();
+    await rp.goto(BASE + '/index.html');
+    await rp.waitForTimeout(600);
+    await rp.click('#ovRiskTile');
+    await rp.waitForSelector('#ovDetail:not([hidden])');
+
+    const chips = (await rp.locator('#ovDetail .ov-chip').allTextContents())
+      .map((c) => c.replace(/\s+/g, ''));
+    t('킥아웃 위험 명단에 누적 미인증 횟수가 함께 표시됨',
+      chips.every((c) => /\d+회$/.test(c)) && chips.length > 0, chips);
+    t('9일 다 인증한 사람은 위험 명단에 없음', !chips.some((c) => c.startsWith('성실이')), chips);
+    t('누락이 많은 사람이 위로', chips[0].startsWith('거의안함'), chips);
+    t('누락 횟수가 실제 값과 맞음(9일 중 2일 인증 → 7회)', chips[0] === '거의안함7회', chips);
+    t('킥아웃 대상(6회 이상)은 따로 표시됨',
+      (await rp.locator('#ovDetail .ov-chip.out').count()) === 2,
+      await rp.locator('#ovDetail .ov-chip.out').allTextContents());
+    t('기준(위험 4회 / 킥아웃 6회)이 안내에 적혀 있음',
+      (await rp.textContent('#ovDetail')).includes('4회 이상'));
+  }
+  await riskCtx.close();
+
   // ── 참여 아이디: 검색창 + 드롭다운을 한 칸으로 합친 콤보박스 ──
   const comboCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await comboCtx.route('**/js/config.js', async (route) => {

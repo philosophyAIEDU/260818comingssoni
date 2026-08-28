@@ -275,6 +275,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   font-size: 13px; line-height: 1.6;
 }
 .ov-detail[hidden] { display: none; }
+/* 킥아웃 위험 명단 — 이름 + 누적 미인증 횟수를 작은 칩으로 */
+.ov-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ov-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12.5px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.ov-chip > b { font-weight: 700; color: var(--warn); font-variant-numeric: tabular-nums; }
+/* 이미 킥아웃 대상(누적 미인증 kickoutThreshold회 이상)은 한눈에 갈리도록 붉은 톤 */
+.ov-chip.out { border-color: var(--bad); }
+.ov-chip.out > b { color: var(--bad); }
+
 /* 전일 누락·지각 명단 — '미제출 N명' / '지각 N명'을 줄을 나눠 보여준다 */
 .ov-detail-row { margin-top: 8px; }
 .ov-detail-key {
