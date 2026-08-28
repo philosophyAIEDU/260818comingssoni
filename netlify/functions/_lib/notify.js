@@ -5,9 +5,13 @@
  * send-custom-email.js(운영진 화면의 "특정 대상에게 1회성 안내 메일 보내기")가 함께 사용합니다.
  *
  * 필요한 환경 변수 (Netlify 사이트 설정 → Environment variables)
- *   GMAIL_USER          발신용 지메일 주소. 예) yourname@gmail.com
- *   GMAIL_APP_PASSWORD  구글 계정의 "앱 비밀번호"(App Password) 16자리
- *                        (2단계 인증을 켠 뒤 https://myaccount.google.com/apppasswords 에서 발급)
+ *   GMAIL_USER                  발신용 지메일 주소. 예) yourname@gmail.com
+ *   GMAIL_APP_PASSWORD          구글 계정의 "앱 비밀번호"(App Password) 16자리
+ *                                (2단계 인증을 켠 뒤 https://myaccount.google.com/apppasswords 에서 발급)
+ *   FIREBASE_SERVICE_ACCOUNT_KEY  Firebase 콘솔 → 프로젝트 설정 → 서비스 계정 →
+ *                                "새 비공개 키 생성"으로 받은 JSON 파일의 내용을 그대로
+ *                                (한 줄로) 붙여넣습니다. Firestore를 서버(Admin SDK)
+ *                                권한으로 읽고 쓰기 위해 필요합니다 — README 참고.
  *
  * 지메일 개인 계정은 하루 최대 약 500통(수신자 합산 기준)까지 무료로 보낼 수 있어
  * 이 정도 규모의 챌린지에는 비용이 들지 않습니다.
@@ -15,20 +19,44 @@
  * 필요하면 아래 두 값도 js/config.js 의 CS.CONFIG 와 맞춰 바꿔주세요.
  */
 const nodemailer = require('nodemailer');
+const admin = require('firebase-admin');
 
-// js/config.js 의 CS.FIREBASE_CONFIG.projectId / apiKey 와 동일해야 합니다.
-// (클라이언트용 Firebase apiKey는 비밀값이 아니라 이미 브라우저 번들에 그대로 노출되는
-//  값이라 여기 넣어도 새로운 노출은 아닙니다 — 실제 접근 제어는 Firestore 보안 규칙이 담당.
-//  이 키 없이 익명으로 Firestore REST를 호출하면 프로젝트 자체의 할당량과는 별도로 훨씬
-//  낮은 "인증 안 된 요청" 전용 한도에 걸려 429가 자주 나서, 반드시 붙여서 호출한다.)
-const FIREBASE_PROJECT_ID = 'comingssoni-e7517';
-const FIREBASE_API_KEY = 'AIzaSyDZU5Q6GTnFuZxu3NbPcWrM_pedoLA4frY';
 // js/config.js 의 CS.CONFIG.title / appUrl / startDate / endDate / timezone 과 동일해야 합니다.
 const CHALLENGE_TITLE = '퍼스널메이커스 독서 챌린지';
 const APP_URL = 'https://comingssoni.netlify.app/';
 const START_DATE = '2026-08-24';
 const END_DATE = '2026-09-20'; // 챌린지 종료일(포함) — 종료일 다음 날부터는 발송하지 않음
 const TIMEZONE = 'Asia/Seoul';
+
+/** Firebase Admin SDK를 서비스 계정으로 초기화하고 Firestore 클라이언트를 반환한다.
+ *  (이전에는 API 키만 붙여 Firestore REST를 "익명"으로 호출했는데, 그 방식은 프로젝트
+ *  자체 할당량과 별개로 훨씬 낮은 "인증 안 된 요청" 한도에 걸려 429가 자주 났다. 서비스
+ *  계정으로 진짜 인증된 요청을 보내면 이 문제가 없다.) 여러 함수 호출에서 재사용하도록
+ *  모듈 스코프에 한 번만 초기화해 둔다(Netlify Functions는 같은 컨테이너가 재사용될 때
+ *  이 캐시가 유지된다). */
+let db = null;
+function getDb() {
+  if (db) return db;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!raw) {
+    throw new Error(
+      'FIREBASE_SERVICE_ACCOUNT_KEY 환경 변수가 설정되어 있지 않습니다. Firebase 콘솔 → 프로젝트 설정 → ' +
+      '서비스 계정에서 새 비공개 키를 발급받아 Netlify 환경 변수로 등록해 주세요. (README 참고)');
+  }
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'FIREBASE_SERVICE_ACCOUNT_KEY 값이 올바른 JSON이 아닙니다. Firebase 콘솔에서 받은 키 파일의 내용을 ' +
+      '그대로 붙여넣었는지 확인해 주세요.');
+  }
+  if (!admin.apps.length) {
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  }
+  db = admin.firestore();
+  return db;
+}
 
 /** 챌린지 기준 시간대(KST)의 오늘 날짜 (YYYY-MM-DD). js/utils.js today()와 동일한 방식. */
 function todayInChallengeTz() {
@@ -40,23 +68,13 @@ function todayInChallengeTz() {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
-/** Firestore REST API로 notifyEmails 컬렉션을 읽는다. { name, email } 목록을 반환한다.
- *  (별도 서비스 계정 없이 동작하려면 Firestore 보안 규칙에서 notifyEmails 컬렉션의
- *   읽기를 허용해 두어야 합니다.) */
+/** notifyEmails 컬렉션을 읽는다. { name, email } 목록을 반환한다. */
 async function fetchNotifyEmails() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/notifyEmails?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Firestore 조회 실패 (${res.status}): notifyEmails 컬렉션의 읽기 권한을 확인해 주세요.`);
-  }
-  const data = await res.json();
-  const docs = data.documents || [];
-  const list = docs
-    .map((d) => {
-      const f = d.fields || {};
-      const email = f.email && f.email.stringValue;
-      const name = (f.name && f.name.stringValue) || '';
-      return email ? { name, email } : null;
+  const snap = await getDb().collection('notifyEmails').get();
+  const list = snap.docs
+    .map((doc) => {
+      const d = doc.data();
+      return d.email ? { name: d.name || '', email: d.email } : null;
     })
     .filter(Boolean);
 
@@ -89,20 +107,13 @@ function defaultBody() {
   ].join('\n');
 }
 
-/** Firestore REST API로 meta/app 문서에 저장된 운영진 커스텀 제목·본문을 읽는다.
+/** meta/app 문서에 저장된 운영진 커스텀 제목·본문을 읽는다.
  *  저장한 적이 없으면 null을 반환하고, 이 경우 호출부에서 기본값을 사용한다. */
 async function fetchNotifyTemplate() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Firestore 조회 실패 (${res.status}): meta 문서의 읽기 권한을 확인해 주세요.`);
-  }
-  const data = await res.json();
-  const f = data.fields || {};
-  const subject = f.notifySubject && f.notifySubject.stringValue;
-  const body = f.notifyBody && f.notifyBody.stringValue;
-  return (subject && body) ? { subject, body } : null;
+  const doc = await getDb().doc('meta/app').get();
+  if (!doc.exists) return null;
+  const d = doc.data();
+  return (d.notifySubject && d.notifyBody) ? { subject: d.notifySubject, body: d.notifyBody } : null;
 }
 
 /** template({subject,body}|null)으로 메일 1통 분을 만든다. */
@@ -162,16 +173,11 @@ async function sendViaGmail(recipients) {
 /** meta/app 문서의 notifyLastSentDate 필드에 오늘 날짜(KST)를 기록한다.
  *  같은 날 예약 함수가 중복 실행되더라도(Netlify 재시도 등) 두 번째 실행은 이 값을 보고 건너뛴다. */
 async function markNotifySentToday(dateStr) {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`
-    + `?updateMask.fieldPaths=notifyLastSentDate&key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: { notifyLastSentDate: { stringValue: dateStr } } })
-  });
-  if (!res.ok) {
+  try {
+    await getDb().doc('meta/app').set({ notifyLastSentDate: dateStr }, { merge: true });
+  } catch (err) {
     // 기록 실패는 발송 자체를 실패시키지 않는다 — 다음 실행 때 다시 시도된다.
-    console.error(`[notify] notifyLastSentDate 기록 실패 (${res.status})`);
+    console.error('[notify] notifyLastSentDate 기록 실패', err);
   }
 }
 
@@ -195,12 +201,9 @@ async function shouldRunScheduledReminder() {
 }
 
 async function fetchNotifyLastSentDate() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app?key=${FIREBASE_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  const f = data.fields || {};
-  return (f.notifyLastSentDate && f.notifyLastSentDate.stringValue) || null;
+  const doc = await getDb().doc('meta/app').get();
+  if (!doc.exists) return null;
+  return doc.data().notifyLastSentDate || null;
 }
 
 async function runNotification() {
