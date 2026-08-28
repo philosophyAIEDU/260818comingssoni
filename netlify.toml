@@ -1,7 +1,2 @@
 [build]
   publish = "."
-  functions = "netlify/functions"
-
-# 매일 22:00(KST) = 13:00(UTC) 에 인증 알림 메일을 자동 발송합니다.
-[functions."send-daily-reminder"]
-  schedule = "0 13 * * *"

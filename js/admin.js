@@ -46,7 +46,6 @@
         '읽기·쓰기를 허용해 두었는지 확인해 주세요. (README 참고)', 'bad');
     }
     await refreshNotify();
-    await loadNotifyTemplate();
   }
 
   /* ── 상단 지표 ───────────────────────── */
@@ -714,33 +713,6 @@
 
   /* ── 알림 메일 ───────────────────────── */
 
-  // 운영진이 아직 한 번도 저장한 적 없을 때 쓰이는 기본 제목·본문.
-  // 본문의 {{APP_URL}}은 CONFIG.appUrl로 발송 시 치환됩니다.
-  function defaultNotifySubject() {
-    return `[${CONFIG.title}] 오늘 인증하셨나요? 📖`;
-  }
-  function defaultNotifyBody() {
-    return [
-      '안녕하세요! 오늘 밤 24시까지 독서 인증을 잊지 않으셨는지 확인해 주세요.',
-      '마감은 24시 정각이며 유예 시간은 없습니다.',
-      '',
-      '인증하러 가기 → {{APP_URL}}',
-      '',
-      '오늘도 함께 읽어주셔서 감사합니다. 🙌',
-      '',
-      '※ 이 알림을 더 이상 받고 싶지 않으시면 운영진에게 말씀해 주세요. 운영진 페이지의 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.'
-    ].join('\n');
-  }
-
-  let notifyTemplateDirty = false; // 저장 안 한 편집 중인 내용을 다른 새로고침이 덮어쓰지 않도록
-
-  function paintNotifyPreview() {
-    const subject = $('notifySubjectInput').value || defaultNotifySubject();
-    const body = ($('notifyBodyInput').value || defaultNotifyBody())
-      .split('{{APP_URL}}').join(CONFIG.appUrl);
-    $('notifyPreview').textContent = `제목: ${subject}\n\n${body}`;
-  }
-
   function paintNotify() {
     $('notifyCount').textContent = `${notifyEmails.length}명`;
     const t = $('notifyTable');
@@ -766,12 +738,12 @@
     notifyEmails = await Store.listNotifyEmails();
     paintNotify();
     paintCustomMailResults();
-    // 미인증 경고 메일 발송 가능 여부는 notifyEmails 목록에 달려 있으므로, 그 목록이
-    // 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
+    // 미인증 경고 메일의 이메일(참여자 이메일이 비어 있을 때의 대체 조회)은 notifyEmails
+    // 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
     paintMissedWarn();
   }
 
-  /* ── 특정 대상에게 1회성 안내 메일 ─────── */
+  /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
 
   let customMailTarget = null; // 검색 결과에서 선택된 { name, email }
 
@@ -813,7 +785,8 @@
     $('customMailMsg').innerHTML = '';
   }
 
-  async function sendCustomMail() {
+  /** 자동 발송 없이, 제목+본문을 클립보드에 복사해서 운영진이 본인 메일 앱으로 직접 보내게 한다. */
+  async function copyCustomMail() {
     if (!customMailTarget) return;
     const subject = $('customMailSubject').value.trim();
     const body = $('customMailBody').value.trim();
@@ -821,45 +794,26 @@
       msg($('customMailMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
       return;
     }
-    const btn = $('customMailSendBtn');
-    btn.disabled = true;
-    const old = btn.textContent;
-    btn.textContent = '보내는 중…';
-    try {
-      const res = await fetch('/.netlify/functions/send-custom-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: customMailTarget.email, subject, body })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `서버 응답 오류 (${res.status})`);
-      msg($('customMailMsg'), `${esc(customMailTarget.name || customMailTarget.email)}님께 발송했습니다.`, 'ok');
-    } catch (e) {
-      msg($('customMailMsg'),
-        `발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정되어 있는지 확인해 주세요. (README 참고)`, 'bad');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = old;
-    }
+    await copyText(`제목: ${subject}\n\n${body}`, $('customMailCopyBtn'));
+    msg($('customMailMsg'),
+      `${esc(customMailTarget.name || customMailTarget.email)}님께 보낼 내용을 복사했습니다. 메일 앱에 붙여넣어 보내주세요.`,
+      'ok');
   }
 
   /* ── 미인증 경고 메일 ───────────────────
    *  현재 미인증 횟수가 있는 참여자에게, 몇 회 미인증됐고 누적 kickoutThreshold회가 되면
-   *  킥아웃될 수 있다는 점을 안내하는 메일. 아웃 처리된 사람은 이미 조치가 끝난 상태라 제외한다.
-   *  send-custom-email 함수는 [알림 메일] 목록(notifyEmails)에 등록된 주소로만 발송하므로
-   *  (임의 주소 오발송 방지), 참여자 이메일이 그 목록에 없으면 이름으로도 한 번 더 찾아본다. */
+   *  킥아웃될 수 있다는 점을 안내하는 메일 초안을 만들어 준다(자동 발송은 하지 않음).
+   *  아웃 처리된 사람은 이미 조치가 끝난 상태라 제외한다. 참여자 이메일이 비어 있으면
+   *  [알림 메일] 목록에 같은 이름으로 등록된 주소를 대신 찾아본다. */
   function missedWarnCandidates() {
     return stats
       .filter((s) => s.missed > 0 && s.participant.status !== 'out')
-      .map((s) => ({ stat: s, email: findNotifyEmailFor(s.participant) }));
+      .map((s) => ({ stat: s, email: resolveEmailFor(s.participant) }));
   }
 
-  function findNotifyEmailFor(participant) {
-    const email = (participant.email || '').trim().toLowerCase();
-    if (email) {
-      const byEmail = notifyEmails.find((e) => (e.email || '').toLowerCase() === email);
-      if (byEmail) return byEmail.email;
-    }
+  function resolveEmailFor(participant) {
+    const email = (participant.email || '').trim();
+    if (email) return email;
     const byName = notifyEmails.find((e) => e.name === participant.nickname);
     return byName ? byName.email : '';
   }
@@ -891,7 +845,7 @@
         rows.map(({ stat: s, email }) => `<tr>
           <td>${esc(s.participant.nickname)}</td>
           <td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>
-          <td>${email ? esc(email) : '<span class="muted">알림 메일 목록에 없음</span>'}</td>
+          <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
           <td>${email
             ? `<button class="small" data-warnmail="${esc(s.participant.id)}">메일 작성</button>`
             : ''}</td>
@@ -908,84 +862,6 @@
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
-
-    $('missedWarnSendAllBtn').disabled = !rows.some((r) => r.email);
-  }
-
-  async function sendMissedWarnAll() {
-    const rows = missedWarnCandidates().filter((r) => r.email);
-    if (!rows.length) return;
-    if (!confirm(`미인증이 있는 ${rows.length}명에게 미인증 경고 메일을 일괄 발송할까요?\n` +
-      '(각자의 현재 미인증 횟수가 자동으로 채워집니다)')) return;
-
-    const btn = $('missedWarnSendAllBtn');
-    btn.disabled = true;
-    const old = btn.textContent;
-    let sent = 0;
-    const failed = [];
-    try {
-      for (const { stat: s, email } of rows) {
-        btn.textContent = `발송 중… (${sent + failed.length + 1}/${rows.length})`;
-        try {
-          const res = await fetch('/.netlify/functions/send-custom-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email,
-              subject: missedWarnSubject(s),
-              body: missedWarnBody(s)
-            })
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || `서버 응답 오류 (${res.status})`);
-          sent++;
-        } catch (e) {
-          failed.push(`${s.participant.nickname}(${e.message})`);
-        }
-      }
-      msg($('missedWarnMsg'),
-        `${sent}명 발송 완료${failed.length ? ` · 실패 ${failed.length}건: ${esc(failed.join(', '))}` : ''}`,
-        failed.length ? 'warn' : 'ok');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = old;
-      paintMissedWarn();
-    }
-  }
-
-  /** 저장된 제목·본문을 불러와 입력창에 채운다. 편집 중(dirty)이면 덮어쓰지 않는다. */
-  async function loadNotifyTemplate() {
-    if (notifyTemplateDirty) return;
-    $('notifyAppUrlHint').textContent = CONFIG.appUrl;
-    const meta = await Store.getMeta();
-    $('notifySubjectInput').value = meta.notifySubject || defaultNotifySubject();
-    $('notifyBodyInput').value = meta.notifyBody || defaultNotifyBody();
-    paintNotifyPreview();
-  }
-
-  async function saveNotifyTemplate() {
-    const subject = $('notifySubjectInput').value.trim();
-    const body = $('notifyBodyInput').value.trim();
-    if (!subject || !body) {
-      msg($('notifyTemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
-      return;
-    }
-    try {
-      await Store.setMeta({ notifySubject: subject, notifyBody: body });
-      notifyTemplateDirty = false;
-      msg($('notifyTemplateMsg'), '저장했습니다. 다음 발송부터 반영됩니다.', 'ok');
-      paintNotifyPreview();
-    } catch (e) {
-      msg($('notifyTemplateMsg'), `저장 실패: ${esc(e.message)}`, 'bad');
-    }
-  }
-
-  function resetNotifyTemplate() {
-    $('notifySubjectInput').value = defaultNotifySubject();
-    $('notifyBodyInput').value = defaultNotifyBody();
-    notifyTemplateDirty = true; // 초기화만 하고 아직 저장 전이므로 다음 새로고침에 덮어써지지 않게
-    paintNotifyPreview();
-    msg($('notifyTemplateMsg'), '기본값으로 채웠습니다. [저장]을 눌러야 실제로 반영됩니다.', 'warn');
   }
 
   /** "이름, 메일" 한 줄씩(엑셀에서 두 열을 복사하면 탭으로도 구분됨)을 { name, email } 목록으로 변환 */
@@ -1013,26 +889,6 @@
     }
   }
 
-  async function sendNotifyTest() {
-    const btn = $('notifySendTest');
-    btn.disabled = true;
-    const old = btn.textContent;
-    btn.textContent = '발송 중…';
-    try {
-      const res = await fetch('/.netlify/functions/send-daily-reminder-test', { method: 'POST' });
-      if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
-      const data = await res.json().catch(() => ({}));
-      const failedNote = data.failed ? ` · 실패 ${data.failed}건` : '';
-      msg($('notifyMsg'), `테스트 발송 완료 (${data.sent != null ? `${data.sent}건` : '완료'}${failedNote})`,
-        data.failed ? 'warn' : 'ok');
-    } catch (e) {
-      msg($('notifyMsg'),
-        `테스트 발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정되어 있는지 확인해 주세요. (README 참고)`, 'bad');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = old;
-    }
-  }
 
   /* ── 내보내기 / 가져오기 ─────────────── */
   function download(filename, text, mime) {
@@ -1144,19 +1000,10 @@
     });
 
     $('notifyAddBtn').addEventListener('click', addNotifyEmail);
-    $('notifySendTest').addEventListener('click', sendNotifyTest);
 
     $('customMailSearch').addEventListener('input', paintCustomMailResults);
     $('customMailCancelBtn').addEventListener('click', cancelCustomMail);
-    $('customMailSendBtn').addEventListener('click', sendCustomMail);
-
-    $('missedWarnSendAllBtn').addEventListener('click', sendMissedWarnAll);
-
-    $('notifyTemplateSave').addEventListener('click', saveNotifyTemplate);
-    $('notifyTemplateReset').addEventListener('click', resetNotifyTemplate);
-    ['notifySubjectInput', 'notifyBodyInput'].forEach((id) => {
-      $(id).addEventListener('input', () => { notifyTemplateDirty = true; paintNotifyPreview(); });
-    });
+    $('customMailCopyBtn').addEventListener('click', copyCustomMail);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
