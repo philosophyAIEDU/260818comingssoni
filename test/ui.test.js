@@ -565,9 +565,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const notifyNames = await page.locator('#notifyTable tbody tr td:first-child').allTextContents();
   t('알림 메일 목록이 이름 가나다순으로 정렬됨',
     notifyNames.indexOf('김철수') < notifyNames.indexOf('홍길동'), notifyNames);
-  t('메일 미리보기에 앱 주소 포함', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
 
-  // 특정 대상에게 1회성 안내 메일 — 이름 검색 + 선택
+  // 특정 대상에게 안내 메일 작성 — 이름 검색 + 선택
   await page.fill('#customMailSearch', '홍길동');
   await page.waitForTimeout(150);
   t('이름 검색 결과에 대상 표시', (await page.textContent('#customMailResults')).includes('reader1@example.com'));
@@ -577,6 +576,20 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('받는 사람에 이름·메일 표시', (await page.textContent('#customMailTarget')).includes('홍길동')
     && (await page.textContent('#customMailTarget')).includes('reader1@example.com'));
   t('본문에 받는 사람 이름 초안 채움', (await page.inputValue('#customMailBody')).includes('홍길동님'));
+
+  // 발송 서버 없이, 제목+본문을 클립보드로 복사해서 직접 보내는 방식
+  await page.evaluate(() => {
+    window.__copiedMailText = null;
+    navigator.clipboard.writeText = (text) => { window.__copiedMailText = text; return Promise.resolve(); };
+  });
+  await page.fill('#customMailBody', '안녕하세요, 홍길동님,\n\n테스트 본문입니다.');
+  await page.click('#customMailCopyBtn');
+  await page.waitForTimeout(200);
+  const copiedMail = await page.evaluate(() => window.__copiedMailText);
+  t('제목 + 본문 복사하기 클릭 시 클립보드에 담김',
+    !!copiedMail && copiedMail.includes('테스트 본문입니다'), copiedMail);
+  t('복사 완료 안내 메시지 표시', /복사했습니다/.test(await page.textContent('#customMailMsg')));
+
   await page.click('#customMailCancelBtn');
   await page.waitForTimeout(100);
   t('취소 시 폼 다시 숨김', !(await page.isVisible('#customMailForm')));
@@ -611,29 +624,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('공지문 로딩 실패 안내 메시지 표시', /공지문을 불러오지 못했습니다/.test(await page.textContent('#noticeMsg')));
   // 방금 콘솔에 찍힌 console.error는 이 테스트가 의도적으로 유발한 것이라 전체 "JS 오류" 집계에서 제외한다.
   errs.length = errsBeforeNoticeFail;
-
-  // 알림 메일 제목·본문 편집
-  t('기본 제목 자동 채움', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
-  await page.fill('#notifySubjectInput', '테스트 제목입니다');
-  await page.fill('#notifyBodyInput', '커스텀 본문입니다.\n링크: {{APP_URL}}');
-  await page.waitForTimeout(150);
-  t('편집 중 미리보기 즉시 반영', (await page.textContent('#notifyPreview')).includes('커스텀 본문입니다'));
-  t('플레이스홀더가 앱 주소로 치환됨', (await page.textContent('#notifyPreview')).includes('comingssoni.netlify.app'));
-  await page.click('#notifyTemplateSave');
-  await page.waitForTimeout(300);
-  t('템플릿 저장 완료 메시지', /저장했습니다/.test(await page.textContent('#notifyTemplateMsg')));
-
-  await page.reload();
-  await page.waitForTimeout(500);
-  await page.click('button[data-tab="notify"]');
-  await page.waitForTimeout(200);
-  t('새로고침 후에도 저장한 제목 유지', (await page.inputValue('#notifySubjectInput')) === '테스트 제목입니다');
-
-  await page.click('#notifyTemplateReset');
-  await page.waitForTimeout(150);
-  t('기본값 초기화', (await page.inputValue('#notifySubjectInput')).includes('오늘 인증하셨나요'));
-  await page.click('#notifyTemplateSave');
-  await page.waitForTimeout(300);
 
   // 데이터 탭
   await page.click('button[data-tab="data"]');
@@ -1326,7 +1316,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   }
   await fameCtx.close();
 
-  // ── 운영진: 미인증 경고 메일 (알림 메일 목록에 등록된 사람에게만 보낼 수 있음) ──
+  // ── 운영진: 미인증 경고 메일 (자동 발송 없이, 작성 후 복사해서 직접 보냄) ──
   const warnCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await warnCtx.route('**/js/config.js', async (route) => {
     const res = await route.fetch();
@@ -1337,7 +1327,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const warnPage = await warnCtx.newPage();
-  warnPage.on('dialog', (d) => d.accept()); // 일괄 발송 확인창(confirm)을 승인
 
   await warnPage.goto(BASE + '/admin.html');
   await warnPage.waitForTimeout(400);
@@ -1358,12 +1347,12 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const warnRow = warnPage.locator('#missedWarnTable tbody tr', { hasText: '미인증자' });
   t('미인증 횟수가 N/6(킥아웃 기준) 형식으로 표시됨',
     /\d+\/6/.test(await warnRow.textContent()), await warnRow.textContent());
-  t('알림 메일 목록에 등록된 사람은 메일 주소가 표시됨',
+  t('참여자 이메일이 없으면 알림 메일 목록에서 대신 찾아 표시됨',
     (await warnRow.textContent()).includes('warntest@example.com'));
 
   const unregRow = warnPage.locator('#missedWarnTable tbody tr', { hasText: '등록만됨' });
-  t('알림 메일 목록에 없는 사람은 안내 문구가 뜨고 작성 버튼이 없음',
-    (await unregRow.textContent()).includes('알림 메일 목록에 없음')
+  t('이메일을 어디서도 못 찾으면 안내 문구가 뜨고 작성 버튼이 없음',
+    (await unregRow.textContent()).includes('이메일 없음')
     && (await unregRow.locator('[data-warnmail]').count()) === 0);
 
   await warnRow.locator('[data-warnmail]').click();
@@ -1375,17 +1364,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await warnPage.inputValue('#customMailSubject'));
   t('본문에 킥아웃 기준(6회) 안내가 채워짐', (await warnPage.inputValue('#customMailBody')).includes('6회'));
 
-  // 일괄 발송 — 이 테스트 환경엔 실제 Netlify Function이 없으므로 fetch 응답을 흉내 낸다.
+  // 자동 발송 없이 복사해서 직접 보내는 방식 — 클립보드 복사 동작을 확인한다.
   await warnPage.evaluate(() => {
-    window.fetch = async (url, opts) => {
-      const body = JSON.parse(opts.body);
-      return { ok: true, json: async () => ({ sent: 1, email: body.email }) };
-    };
+    window.__copiedWarnText = null;
+    navigator.clipboard.writeText = (text) => { window.__copiedWarnText = text; return Promise.resolve(); };
   });
-  await warnPage.click('#missedWarnSendAllBtn');
-  await warnPage.waitForTimeout(400);
-  t('일괄 발송 완료 메시지', /1명 발송 완료/.test(await warnPage.textContent('#missedWarnMsg')),
-    await warnPage.textContent('#missedWarnMsg'));
+  await warnPage.click('#customMailCopyBtn');
+  await warnPage.waitForTimeout(200);
+  const copiedWarnText = await warnPage.evaluate(() => window.__copiedWarnText);
+  t('미인증 경고 메일도 복사하기로 클립보드에 담김',
+    !!copiedWarnText && copiedWarnText.includes('6회') && copiedWarnText.includes('미인증'), copiedWarnText);
 
   await warnCtx.close();
 
