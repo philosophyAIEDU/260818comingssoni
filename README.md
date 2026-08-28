@@ -200,12 +200,17 @@ netlify/functions/_lib/notify.js               공통 로직 (수신자 조회 +
 
 1. 발송용으로 쓸 구글 계정에서 **2단계 인증**을 켭니다. (계정 설정 → 보안 → 2단계 인증)
 2. https://myaccount.google.com/apppasswords 에서 **앱 비밀번호**를 발급받습니다. (16자리, 공백 없이)
-3. **Netlify 사이트 설정 → Environment variables**에 아래 값을 등록합니다.
+3. [Firebase 콘솔](https://console.firebase.google.com) → 이 프로젝트(`comingssoni-e7517`) → **프로젝트 설정**
+   (⚙️ 톱니바퀴) → **서비스 계정** 탭 → **"새 비공개 키 생성"** 버튼을 눌러 JSON 키 파일을 내려받습니다.
+   (Node.js가 기본 선택돼 있으면 그대로 생성하면 됩니다.) 이 파일은 **비밀 값**이니 깃허브 등 공개된 곳에
+   올리지 말고, 아래 4번에만 붙여넣으세요.
+4. **Netlify 사이트 설정 → Environment variables**에 아래 값을 등록합니다.
 
 | 변수 | 설명 |
 | --- | --- |
 | `GMAIL_USER` | 발송용 지메일 주소. 예) `personalmakers.reading@gmail.com` |
 | `GMAIL_APP_PASSWORD` | 1~2번에서 발급받은 앱 비밀번호 16자리 (일반 로그인 비밀번호 아님) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | 3번에서 내려받은 JSON 파일을 **열어서 내용 전체를 그대로 복사해** 붙여넣습니다 (파일 자체를 업로드하는 게 아니라 텍스트 값으로 등록). |
 
 지메일 개인 계정은 **하루 약 500통까지 무료**로 보낼 수 있어, 이 정도 규모의 챌린지에는 별도 비용이 들지 않습니다.
 등록된 수신자 전원에게 같은 내용의 메일을 한 통씩 따로 발송합니다. 메일 본문에는 인증 앱 주소
@@ -223,10 +228,9 @@ netlify/functions/_lib/notify.js               공통 로직 (수신자 조회 +
 > 다른 메일 발송 방식(회사 도메인 메일, Resend 등 유료 서비스)으로 바꾸고 싶다면
 > `netlify/functions/_lib/notify.js`의 `sendViaGmail` 함수만 교체하면 됩니다.
 
-> `send-daily-reminder.js`는 Firestore의 `notifyEmails` 컬렉션을 **REST API로 인증 없이** 조회합니다.
-> 이 프로젝트의 다른 컬렉션(참가자·제출 기록)도 클라이언트에서 로그인 없이 읽고 쓰는 구조이므로 동일하게 열어 둔
-> 것이지만, 더 엄격하게 막고 싶다면 서비스 계정을 이용한 Firebase Admin SDK 방식으로 바꾸고
-> `notifyEmails` 컬렉션의 Firestore 보안 규칙에서 서버(Admin) 읽기만 허용하도록 조정하세요.
+> Netlify 함수는 Firebase **Admin SDK**(서비스 계정 인증)로 Firestore의 `notifyEmails`·`meta/app`
+> 문서를 읽고 씁니다. `FIREBASE_SERVICE_ACCOUNT_KEY`를 등록하지 않으면 발송 시 "환경 변수가 설정되어
+> 있지 않습니다"라는 명확한 오류가 뜨니, 그 안내를 보면 3~4번을 다시 확인해 주세요.
 >
 > 알림을 원하지 않는 참여자는 운영진에게 요청하면 [알림 메일] 탭에서 목록에서 바로 삭제할 수 있습니다.
 
