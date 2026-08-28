@@ -750,6 +750,7 @@
   let ovOpenKey = null; // 'miss' | 'risk' | null(닫힘)
   let ovLists = { miss: [], risk: [] };
   let ovMissDetail = { missed: [], late: [] }; // 전일 미제출 / 지각 명단 (나눠서 보여준다)
+  let ovRiskDetail = [];  // 킥아웃 위험 인원 [{nickname, missed, kickout}] — 누락 많은 순
 
   const byKo = (a, b) => a.localeCompare(b, 'ko');
 
@@ -771,8 +772,12 @@
         <div class="ov-detail-row"><span class="ov-detail-key">지각 ${late.length}명</span> ${nameLine(late)}</div>`;
       return;
     }
-    const names = ovLists[ovOpenKey];
-    box.innerHTML = `<strong>킥아웃 위험 인원 (${names.length}명)</strong><br>${nameLine(names)}`;
+    // 이름만으로는 얼마나 위험한지 알 수 없으므로 누적 미인증 횟수를 함께 보여준다.
+    box.innerHTML = `<strong>킥아웃 위험 인원 (${ovRiskDetail.length}명)</strong>
+      <span class="muted">누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상</span>
+      <div class="ov-chips">${ovRiskDetail.length
+        ? ovRiskDetail.map((r) => `<span class="ov-chip${r.kickout ? ' out' : ''}">${esc(r.nickname)}<b>${r.missed}회</b></span>`).join('')
+        : '<span class="muted">해당하는 사람이 없습니다.</span>'}</div>`;
   }
 
   function toggleOvDetail(key) {
@@ -846,6 +851,10 @@
 
     ovLists = { miss: prevMissed.map((s) => s.participant.nickname).sort(byKo),
       risk: riskZone.map((s) => s.participant.nickname).sort(byKo) };
+    // 위험한 순서(누락 많은 순)로 놓고, 같으면 이름순
+    ovRiskDetail = riskZone
+      .map((s) => ({ nickname: s.participant.nickname, missed: s.missed, kickout: s.kickoutEligible }))
+      .sort((a, b) => b.missed - a.missed || byKo(a.nickname, b.nickname));
     ovMissDetail = {
       missed: prevMissed.filter((s) => !prevSubIds.has(s.participant.id))
         .map((s) => s.participant.nickname).sort(byKo),
