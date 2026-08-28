@@ -16,8 +16,13 @@
  */
 const nodemailer = require('nodemailer');
 
-// js/config.js 의 CS.FIREBASE_CONFIG.projectId 와 동일해야 합니다.
+// js/config.js 의 CS.FIREBASE_CONFIG.projectId / apiKey 와 동일해야 합니다.
+// (클라이언트용 Firebase apiKey는 비밀값이 아니라 이미 브라우저 번들에 그대로 노출되는
+//  값이라 여기 넣어도 새로운 노출은 아닙니다 — 실제 접근 제어는 Firestore 보안 규칙이 담당.
+//  이 키 없이 익명으로 Firestore REST를 호출하면 프로젝트 자체의 할당량과는 별도로 훨씬
+//  낮은 "인증 안 된 요청" 전용 한도에 걸려 429가 자주 나서, 반드시 붙여서 호출한다.)
 const FIREBASE_PROJECT_ID = 'comingssoni-e7517';
+const FIREBASE_API_KEY = 'AIzaSyDZU5Q6GTnFuZxu3NbPcWrM_pedoLA4frY';
 // js/config.js 의 CS.CONFIG.title / appUrl / startDate / endDate / timezone 과 동일해야 합니다.
 const CHALLENGE_TITLE = '퍼스널메이커스 독서 챌린지';
 const APP_URL = 'https://comingssoni.netlify.app/';
@@ -39,7 +44,7 @@ function todayInChallengeTz() {
  *  (별도 서비스 계정 없이 동작하려면 Firestore 보안 규칙에서 notifyEmails 컬렉션의
  *   읽기를 허용해 두어야 합니다.) */
 async function fetchNotifyEmails() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/notifyEmails`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/notifyEmails?key=${FIREBASE_API_KEY}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Firestore 조회 실패 (${res.status}): notifyEmails 컬렉션의 읽기 권한을 확인해 주세요.`);
@@ -87,7 +92,7 @@ function defaultBody() {
 /** Firestore REST API로 meta/app 문서에 저장된 운영진 커스텀 제목·본문을 읽는다.
  *  저장한 적이 없으면 null을 반환하고, 이 경우 호출부에서 기본값을 사용한다. */
 async function fetchNotifyTemplate() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app?key=${FIREBASE_API_KEY}`;
   const res = await fetch(url);
   if (res.status === 404) return null;
   if (!res.ok) {
@@ -158,7 +163,7 @@ async function sendViaGmail(recipients) {
  *  같은 날 예약 함수가 중복 실행되더라도(Netlify 재시도 등) 두 번째 실행은 이 값을 보고 건너뛴다. */
 async function markNotifySentToday(dateStr) {
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`
-    + '?updateMask.fieldPaths=notifyLastSentDate';
+    + `?updateMask.fieldPaths=notifyLastSentDate&key=${FIREBASE_API_KEY}`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -190,7 +195,7 @@ async function shouldRunScheduledReminder() {
 }
 
 async function fetchNotifyLastSentDate() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/meta/app?key=${FIREBASE_API_KEY}`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data = await res.json();
