@@ -766,6 +766,9 @@
     notifyEmails = await Store.listNotifyEmails();
     paintNotify();
     paintCustomMailResults();
+    // 미인증 경고 메일 발송 가능 여부는 notifyEmails 목록에 달려 있으므로, 그 목록이
+    // 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
+    paintMissedWarn();
   }
 
   /* ── 특정 대상에게 1회성 안내 메일 ─────── */
@@ -837,6 +840,116 @@
     } finally {
       btn.disabled = false;
       btn.textContent = old;
+    }
+  }
+
+  /* ── 미인증 경고 메일 ───────────────────
+   *  현재 미인증 횟수가 있는 참여자에게, 몇 회 미인증됐고 누적 kickoutThreshold회가 되면
+   *  킥아웃될 수 있다는 점을 안내하는 메일. 아웃 처리된 사람은 이미 조치가 끝난 상태라 제외한다.
+   *  send-custom-email 함수는 [알림 메일] 목록(notifyEmails)에 등록된 주소로만 발송하므로
+   *  (임의 주소 오발송 방지), 참여자 이메일이 그 목록에 없으면 이름으로도 한 번 더 찾아본다. */
+  function missedWarnCandidates() {
+    return stats
+      .filter((s) => s.missed > 0 && s.participant.status !== 'out')
+      .map((s) => ({ stat: s, email: findNotifyEmailFor(s.participant) }));
+  }
+
+  function findNotifyEmailFor(participant) {
+    const email = (participant.email || '').trim().toLowerCase();
+    if (email) {
+      const byEmail = notifyEmails.find((e) => (e.email || '').toLowerCase() === email);
+      if (byEmail) return byEmail.email;
+    }
+    const byName = notifyEmails.find((e) => e.name === participant.nickname);
+    return byName ? byName.email : '';
+  }
+
+  function missedWarnSubject(stat) {
+    return `[${CONFIG.title}] 미인증 안내 — 현재 ${stat.missed}회 미인증`;
+  }
+
+  function missedWarnBody(stat) {
+    return [
+      `안녕하세요, ${stat.participant.nickname}님,`,
+      '',
+      `현재까지 총 ${stat.missed}회 미인증되었습니다.`,
+      `누적 미인증이 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 처리될 수 있으니, ` +
+        '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다.',
+      '',
+      `인증하러 가기 → ${CONFIG.appUrl}`,
+      '',
+      '읽어주셔서 감사합니다. 🙌'
+    ].join('\n');
+  }
+
+  function paintMissedWarn() {
+    $('warnKickN').textContent = CONFIG.kickoutThreshold;
+    const rows = missedWarnCandidates();
+    const t = $('missedWarnTable');
+    t.innerHTML = rows.length
+      ? `<thead><tr><th>이름</th><th class="num">미인증</th><th>이메일</th><th></th></tr></thead><tbody>${
+        rows.map(({ stat: s, email }) => `<tr>
+          <td>${esc(s.participant.nickname)}</td>
+          <td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>
+          <td>${email ? esc(email) : '<span class="muted">알림 메일 목록에 없음</span>'}</td>
+          <td>${email
+            ? `<button class="small" data-warnmail="${esc(s.participant.id)}">메일 작성</button>`
+            : ''}</td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">현재 미인증이 있는 참여자가 없습니다.</td></tr></tbody>';
+
+    t.querySelectorAll('[data-warnmail]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const row = rows.find((r) => r.stat.participant.id === el.dataset.warnmail);
+        if (!row || !row.email) return;
+        selectCustomMailTarget(row.stat.participant.nickname, row.email);
+        $('customMailSubject').value = missedWarnSubject(row.stat);
+        $('customMailBody').value = missedWarnBody(row.stat);
+        $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    $('missedWarnSendAllBtn').disabled = !rows.some((r) => r.email);
+  }
+
+  async function sendMissedWarnAll() {
+    const rows = missedWarnCandidates().filter((r) => r.email);
+    if (!rows.length) return;
+    if (!confirm(`미인증이 있는 ${rows.length}명에게 미인증 경고 메일을 일괄 발송할까요?\n` +
+      '(각자의 현재 미인증 횟수가 자동으로 채워집니다)')) return;
+
+    const btn = $('missedWarnSendAllBtn');
+    btn.disabled = true;
+    const old = btn.textContent;
+    let sent = 0;
+    const failed = [];
+    try {
+      for (const { stat: s, email } of rows) {
+        btn.textContent = `발송 중… (${sent + failed.length + 1}/${rows.length})`;
+        try {
+          const res = await fetch('/.netlify/functions/send-custom-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              subject: missedWarnSubject(s),
+              body: missedWarnBody(s)
+            })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `서버 응답 오류 (${res.status})`);
+          sent++;
+        } catch (e) {
+          failed.push(`${s.participant.nickname}(${e.message})`);
+        }
+      }
+      msg($('missedWarnMsg'),
+        `${sent}명 발송 완료${failed.length ? ` · 실패 ${failed.length}건: ${esc(failed.join(', '))}` : ''}`,
+        failed.length ? 'warn' : 'ok');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+      paintMissedWarn();
     }
   }
 
@@ -1036,6 +1149,8 @@
     $('customMailSearch').addEventListener('input', paintCustomMailResults);
     $('customMailCancelBtn').addEventListener('click', cancelCustomMail);
     $('customMailSendBtn').addEventListener('click', sendCustomMail);
+
+    $('missedWarnSendAllBtn').addEventListener('click', sendMissedWarnAll);
 
     $('notifyTemplateSave').addEventListener('click', saveNotifyTemplate);
     $('notifyTemplateReset').addEventListener('click', resetNotifyTemplate);

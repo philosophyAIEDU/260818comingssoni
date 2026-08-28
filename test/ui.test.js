@@ -1326,6 +1326,69 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   }
   await fameCtx.close();
 
+  // ── 운영진: 미인증 경고 메일 (알림 메일 목록에 등록된 사람에게만 보낼 수 있음) ──
+  const warnCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await warnCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-4)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const warnPage = await warnCtx.newPage();
+  warnPage.on('dialog', (d) => d.accept()); // 일괄 발송 확인창(confirm)을 승인
+
+  await warnPage.goto(BASE + '/admin.html');
+  await warnPage.waitForTimeout(400);
+  await warnPage.click('button[data-tab="roster"]');
+  await warnPage.fill('#bulkNames', '미인증자\n등록만됨');
+  await warnPage.click('#bulkAdd');
+  await warnPage.waitForTimeout(300);
+  // 둘 다 아무 것도 제출하지 않은 채로 두면 지난 며칠이 모두 미인증(X)으로 쌓인다.
+
+  await warnPage.click('button[data-tab="notify"]');
+  await warnPage.waitForTimeout(200);
+  await warnPage.fill('#notifyEmailInput', '미인증자, warntest@example.com');
+  await warnPage.click('#notifyAddBtn');
+  await warnPage.waitForTimeout(300);
+
+  t('미인증 경고 메일 목록에 미인증자가 표시됨',
+    (await warnPage.locator('#missedWarnTable').textContent()).includes('미인증자'));
+  const warnRow = warnPage.locator('#missedWarnTable tbody tr', { hasText: '미인증자' });
+  t('미인증 횟수가 N/6(킥아웃 기준) 형식으로 표시됨',
+    /\d+\/6/.test(await warnRow.textContent()), await warnRow.textContent());
+  t('알림 메일 목록에 등록된 사람은 메일 주소가 표시됨',
+    (await warnRow.textContent()).includes('warntest@example.com'));
+
+  const unregRow = warnPage.locator('#missedWarnTable tbody tr', { hasText: '등록만됨' });
+  t('알림 메일 목록에 없는 사람은 안내 문구가 뜨고 작성 버튼이 없음',
+    (await unregRow.textContent()).includes('알림 메일 목록에 없음')
+    && (await unregRow.locator('[data-warnmail]').count()) === 0);
+
+  await warnRow.locator('[data-warnmail]').click();
+  await warnPage.waitForTimeout(200);
+  t('메일 작성 클릭 시 작성창이 해당 사람으로 채워짐',
+    (await warnPage.textContent('#customMailTarget')).includes('warntest@example.com'));
+  t('제목에 현재 미인증 횟수가 자동으로 채워짐',
+    /현재 \d+회 미인증/.test(await warnPage.inputValue('#customMailSubject')),
+    await warnPage.inputValue('#customMailSubject'));
+  t('본문에 킥아웃 기준(6회) 안내가 채워짐', (await warnPage.inputValue('#customMailBody')).includes('6회'));
+
+  // 일괄 발송 — 이 테스트 환경엔 실제 Netlify Function이 없으므로 fetch 응답을 흉내 낸다.
+  await warnPage.evaluate(() => {
+    window.fetch = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ sent: 1, email: body.email }) };
+    };
+  });
+  await warnPage.click('#missedWarnSendAllBtn');
+  await warnPage.waitForTimeout(400);
+  t('일괄 발송 완료 메시지', /1명 발송 완료/.test(await warnPage.textContent('#missedWarnMsg')),
+    await warnPage.textContent('#missedWarnMsg'));
+
+  await warnCtx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준
