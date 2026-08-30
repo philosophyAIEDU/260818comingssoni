@@ -762,6 +762,7 @@
     // notifyEmails 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
     paintMissedWarn();
     paintKickoutNotice();
+    await refreshKickoutTemplate();
   }
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
@@ -818,6 +819,31 @@
     await copyText(`제목: ${subject}\n\n${body}`, $('customMailCopyBtn'));
     msg($('customMailMsg'),
       `${esc(customMailTarget.name || customMailTarget.email)}님께 보낼 내용을 복사했습니다. 메일 앱에 붙여넣어 보내주세요.`,
+      'ok');
+  }
+
+  /** 서버를 거치지 않고, 받는 사람·제목·본문이 채워진 Gmail 새 메일 작성창을 새 탭으로 연다.
+   *  실제 발송은 그 Gmail 창에서 운영진이 로그인한 본인 구글 계정으로 [보내기]를 눌러야 이뤄진다 —
+   *  이 앱이나 서버는 메일을 대신 보내지 않으므로 별도 설정(OAuth 등)이 필요 없다. */
+  function openGmailCompose() {
+    if (!customMailTarget) return;
+    const subject = $('customMailSubject').value.trim();
+    const body = $('customMailBody').value.trim();
+    if (!subject || !body) {
+      msg($('customMailMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    const params = new URLSearchParams({
+      view: 'cm',
+      fs: '1',
+      to: customMailTarget.email,
+      su: subject,
+      body
+    });
+    window.open(`https://mail.google.com/mail/?${params.toString()}`, '_blank', 'noopener');
+    msg($('customMailMsg'),
+      `${esc(customMailTarget.name || customMailTarget.email)}님께 보낼 Gmail 작성창을 새 탭으로 열었습니다. ` +
+      '내용을 확인하고 거기서 [보내기]를 눌러주세요.',
       'ok');
   }
 
@@ -888,22 +914,28 @@
   /* ── 킥아웃 통보 메일 ───────────────────
    *  [명단 관리]에서 "킥아웃 처리"된(status:'out', kickReason:'kickout') 참여자에게,
    *  더 이상 이번 챌린지에 참여할 수 없다는 사실과 다음 챌린지 재신청 안내를 담은
-   *  메일 초안을 만들어 준다(자동 발송은 하지 않음). */
+   *  메일 초안을 만들어 준다(자동 발송은 하지 않음).
+   *
+   *  제목·본문 문구는 운영진이 [킥아웃 통보 메일 문구 편집]에서 직접 고쳐 저장할 수 있다.
+   *  저장한 문구는 meta 문서(Store.getMeta/setMeta — notices와 마찬가지로 기존에 이미 쓰던
+   *  저장소라 별도 컬렉션·권한 설정이 필요 없다)의 kickoutMailTemplate 필드에 저장되고,
+   *  저장한 적이 없으면(null) 기본 문구를 그대로 쓴다. {{이름}}·{{킥아웃기준}}은 참여자별로
+   *  실제 값으로 치환되는 자리표시자다. */
   function kickoutNoticeCandidates() {
     return participants
       .filter((p) => p.status === 'out' && p.kickReason === 'kickout')
       .map((p) => ({ participant: p, email: resolveEmailFor(p) }));
   }
 
-  function kickoutNoticeSubject() {
+  function defaultKickoutMailSubject() {
     return `[${CONFIG.title}] 챌린지 참여 종료 안내`;
   }
 
-  function kickoutNoticeBody(p) {
+  function defaultKickoutMailBody() {
     return [
-      `안녕하세요 ${p.nickname} 님, 퍼스널메이커스입니다.`,
+      '안녕하세요 {{이름}} 님, 퍼스널메이커스입니다.',
       '',
-      `${p.nickname}님은 이번 독서챌린지의 킥아웃 기준인 인증 누락 ${CONFIG.kickoutThreshold}회가 되어, ` +
+      '{{이름}}님은 이번 독서챌린지의 킥아웃 기준인 인증 누락 {{킥아웃기준}}회가 되어, ' +
         '아쉽게도 챌린지에서 더이상 참여가 어렵습니다.',
       '',
       '하지만 다음 챌린지가 오픈될때  얼마든 신청 가능하십니다. 참여 준비가 되셨을 때 다시 더 좋은 기회로 함께 했으면 좋겠습니다.',
@@ -912,6 +944,58 @@
       '',
       '퍼스널메이커스 드림.'
     ].join('\n');
+  }
+
+  let kickoutMailTemplate = null;   // meta.kickoutMailTemplate: {subject, body, updatedAt} | null(기본 문구 사용)
+  let kickoutTemplateDirty = false; // 편집 중인 내용을 다른 새로고침이 덮어쓰지 않도록
+
+  function kickoutMailSubjectTemplate() {
+    return (kickoutMailTemplate && kickoutMailTemplate.subject) || defaultKickoutMailSubject();
+  }
+  function kickoutMailBodyTemplate() {
+    return (kickoutMailTemplate && kickoutMailTemplate.body) || defaultKickoutMailBody();
+  }
+  function fillKickoutTemplate(raw, p) {
+    return raw
+      .replaceAll('{{이름}}', p.nickname)
+      .replaceAll('{{킥아웃기준}}', String(CONFIG.kickoutThreshold));
+  }
+  function kickoutNoticeSubject(p) { return fillKickoutTemplate(kickoutMailSubjectTemplate(), p); }
+  function kickoutNoticeBody(p) { return fillKickoutTemplate(kickoutMailBodyTemplate(), p); }
+
+  async function refreshKickoutTemplate() {
+    const meta = await Store.getMeta();
+    kickoutMailTemplate = meta.kickoutMailTemplate || null;
+    loadKickoutTemplateInputs();
+  }
+
+  function loadKickoutTemplateInputs() {
+    if (kickoutTemplateDirty) return;
+    $('kickoutTemplateSubject').value = kickoutMailSubjectTemplate();
+    $('kickoutTemplateBody').value = kickoutMailBodyTemplate();
+    $('kickoutTemplateStatus').textContent = kickoutMailTemplate
+      ? `저장된 문구 사용 중 · 최근 수정 ${U.stampLabel(kickoutMailTemplate.updatedAt)}`
+      : '기본 문구를 그대로 쓰는 중입니다(아직 저장한 적 없음).';
+  }
+
+  async function saveKickoutTemplate() {
+    const subject = $('kickoutTemplateSubject').value.trim();
+    const body = $('kickoutTemplateBody').value.trim();
+    if (!subject || !body) {
+      msg($('kickoutTemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    await Store.setMeta({ kickoutMailTemplate: { subject, body, updatedAt: U.nowStamp() } });
+    kickoutTemplateDirty = false;
+    msg($('kickoutTemplateMsg'), '킥아웃 통보 메일 문구를 저장했습니다. 다음부터 이 문구로 채워집니다.', 'ok');
+    await refreshKickoutTemplate();
+  }
+
+  async function resetKickoutTemplate() {
+    await Store.setMeta({ kickoutMailTemplate: null });
+    kickoutTemplateDirty = false;
+    msg($('kickoutTemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
+    await refreshKickoutTemplate();
   }
 
   function paintKickoutNotice() {
@@ -934,7 +1018,7 @@
         const row = rows.find((r) => r.participant.id === el.dataset.kickmail);
         if (!row || !row.email) return;
         selectCustomMailTarget(row.participant.nickname, row.email);
-        $('customMailSubject').value = kickoutNoticeSubject();
+        $('customMailSubject').value = kickoutNoticeSubject(row.participant);
         $('customMailBody').value = kickoutNoticeBody(row.participant);
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -1080,7 +1164,13 @@
 
     $('customMailSearch').addEventListener('input', paintCustomMailResults);
     $('customMailCancelBtn').addEventListener('click', cancelCustomMail);
+    $('customMailGmailBtn').addEventListener('click', openGmailCompose);
     $('customMailCopyBtn').addEventListener('click', copyCustomMail);
+
+    $('kickoutTemplateSubject').addEventListener('input', () => { kickoutTemplateDirty = true; });
+    $('kickoutTemplateBody').addEventListener('input', () => { kickoutTemplateDirty = true; });
+    $('kickoutTemplateSave').addEventListener('click', saveKickoutTemplate);
+    $('kickoutTemplateReset').addEventListener('click', resetKickoutTemplate);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
