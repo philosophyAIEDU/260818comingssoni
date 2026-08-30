@@ -231,7 +231,11 @@
         </td>
         <td>
           <div class="actions">
-            <button class="small" data-toggle="${p.id}">${p.status === 'out' ? '복귀' : '아웃 처리'}</button>
+            ${p.status === 'out'
+              ? `<button class="small" data-toggle="${p.id}">복귀</button>`
+              : (st.kickoutEligible
+                ? `<button class="small danger" data-kickout="${p.id}">킥아웃 처리</button>`
+                : `<button class="small" data-toggle="${p.id}">아웃 처리</button>`)}
             <button class="small danger" data-del="${p.id}">삭제</button>
           </div>
         </td>
@@ -276,9 +280,25 @@
         const out = p.status !== 'out';
         await Store.updateParticipant(p.id, {
           status: out ? 'out' : 'active',
-          outDate: out ? U.today() : null
+          outDate: out ? U.today() : null,
+          kickReason: null // 일반 아웃 처리·복귀는 킥아웃 사유를 남기지 않는다(복귀 시 이전 킥아웃 표시도 지움)
         });
         await refresh();
+      });
+    });
+    t.querySelectorAll('[data-kickout]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        const p = participants.find((x) => x.id === el.dataset.kickout);
+        if (!confirm(`${p.nickname} 님을 킥아웃 처리할까요?\n이후 그 이름으로는 인증을 제출할 수 없습니다.`)) return;
+        await Store.updateParticipant(p.id, {
+          status: 'out',
+          outDate: U.today(),
+          kickReason: 'kickout'
+        });
+        await refresh();
+        msg($('rosterMsg'),
+          `${esc(p.nickname)} 님을 킥아웃 처리했습니다. [알림 메일] 탭의 "킥아웃 통보 메일"에서 안내 메일을 작성할 수 있습니다.`,
+          'ok');
       });
     });
     t.querySelectorAll('[data-del]').forEach((el) => {
@@ -738,9 +758,10 @@
     notifyEmails = await Store.listNotifyEmails();
     paintNotify();
     paintCustomMailResults();
-    // 미인증 경고 메일의 이메일(참여자 이메일이 비어 있을 때의 대체 조회)은 notifyEmails
-    // 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
+    // 미인증 경고 메일·킥아웃 통보 메일의 이메일(참여자 이메일이 비어 있을 때의 대체 조회)은
+    // notifyEmails 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
     paintMissedWarn();
+    paintKickoutNotice();
   }
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
@@ -859,6 +880,62 @@
         selectCustomMailTarget(row.stat.participant.nickname, row.email);
         $('customMailSubject').value = missedWarnSubject(row.stat);
         $('customMailBody').value = missedWarnBody(row.stat);
+        $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
+  /* ── 킥아웃 통보 메일 ───────────────────
+   *  [명단 관리]에서 "킥아웃 처리"된(status:'out', kickReason:'kickout') 참여자에게,
+   *  더 이상 이번 챌린지에 참여할 수 없다는 사실과 다음 챌린지 재신청 안내를 담은
+   *  메일 초안을 만들어 준다(자동 발송은 하지 않음). */
+  function kickoutNoticeCandidates() {
+    return participants
+      .filter((p) => p.status === 'out' && p.kickReason === 'kickout')
+      .map((p) => ({ participant: p, email: resolveEmailFor(p) }));
+  }
+
+  function kickoutNoticeSubject() {
+    return `[${CONFIG.title}] 챌린지 참여 종료 안내`;
+  }
+
+  function kickoutNoticeBody(p) {
+    return [
+      `안녕하세요 ${p.nickname} 님, 퍼스널메이커스입니다.`,
+      '',
+      `${p.nickname}님은 이번 독서챌린지의 킥아웃 기준인 인증 누락 ${CONFIG.kickoutThreshold}회가 되어, ` +
+        '아쉽게도 챌린지에서 더이상 참여가 어렵습니다.',
+      '',
+      '하지만 다음 챌린지가 오픈될때  얼마든 신청 가능하십니다. 참여 준비가 되셨을 때 다시 더 좋은 기회로 함께 했으면 좋겠습니다.',
+      '',
+      '감사합니다.',
+      '',
+      '퍼스널메이커스 드림.'
+    ].join('\n');
+  }
+
+  function paintKickoutNotice() {
+    const rows = kickoutNoticeCandidates();
+    const t = $('kickoutNoticeTable');
+    t.innerHTML = rows.length
+      ? `<thead><tr><th>이름</th><th>킥아웃일</th><th>이메일</th><th></th></tr></thead><tbody>${
+        rows.map(({ participant: p, email }) => `<tr>
+          <td>${esc(p.nickname)}</td>
+          <td>${p.outDate ? esc(U.shortLabel(p.outDate)) : '-'}</td>
+          <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
+          <td>${email
+            ? `<button class="small" data-kickmail="${esc(p.id)}">메일 작성</button>`
+            : ''}</td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">킥아웃 처리된 참여자가 없습니다.</td></tr></tbody>';
+
+    t.querySelectorAll('[data-kickmail]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const row = rows.find((r) => r.participant.id === el.dataset.kickmail);
+        if (!row || !row.email) return;
+        selectCustomMailTarget(row.participant.nickname, row.email);
+        $('customMailSubject').value = kickoutNoticeSubject();
+        $('customMailBody').value = kickoutNoticeBody(row.participant);
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });

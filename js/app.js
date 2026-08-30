@@ -167,6 +167,12 @@
   let comboItems = [];   // 현재 목록에 보이는 참가자들
   let comboActive = -1;  // 키보드로 짚고 있는 항목
 
+  /** 아웃 처리된 이름 옆에 붙일 안내 — 미인증 누적으로 킥아웃된 경우는 '아웃'보다 명확하게 구분해 보여준다. */
+  function outSuffix(p) {
+    if (p.status !== 'out') return '';
+    return p.kickReason === 'kickout' ? ' (킥아웃)' : ' (아웃)';
+  }
+
   /** 화면 뒤의 select에는 항상 전체 명단을 넣어 둔다 — id로 값을 지정하는 코드가 언제든 먹히도록. */
   function syncParticipantSelect() {
     const sel = $('participant');
@@ -175,13 +181,13 @@
     for (const p of participants) {
       const o = document.createElement('option');
       o.value = p.id;
-      o.textContent = p.status === 'out' ? `${p.nickname} (아웃)` : p.nickname;
+      o.textContent = `${p.nickname}${outSuffix(p)}`;
       sel.appendChild(o);
     }
     sel.value = participants.some((p) => p.id === keepId) ? keepId : '';
   }
 
-  function comboLabel(p) { return p.status === 'out' ? `${p.nickname} (아웃)` : p.nickname; }
+  function comboLabel(p) { return `${p.nickname}${outSuffix(p)}`; }
 
   /** 검색어로 후보를 좁힌다. 참여 중인 사람이 위, 아웃은 아래. */
   function comboCandidates(term) {
@@ -379,9 +385,21 @@
     const p = participants.find((x) => x.id === pid);
     populateCertifyDateOptions(p);
     await loadEntryForm(pid, $('certifyDate').value);
+    applyOutLock(p);
 
     await paintMine(pid);
     await refreshSocialFeed();
+  }
+
+  /** 아웃(킥아웃 포함) 처리된 이름은 더 이상 인증을 제출할 수 없다 — 폼 자체를 잠근다.
+   *  loadEntryForm()이 canSubmitToday() 여부만 보고 버튼을 다시 켜 놓을 수 있어서,
+   *  그 뒤에 항상 마지막으로 호출해 잠금 상태를 덮어써야 한다. */
+  function applyOutLock(p) {
+    if (p && p.status === 'out') {
+      $('submitBtn').disabled = true;
+      $('submitBtn').textContent = '인증 불가 (참여 종료)';
+      msg($('formMsg'), '참여가 종료된 이름입니다. 이 이름으로는 더 이상 인증을 제출할 수 없습니다.', 'bad');
+    }
   }
 
   async function onCertifyDateChange() {
@@ -390,6 +408,7 @@
     const pid = $('participant').value;
     if (!pid) return;
     await loadEntryForm(pid, $('certifyDate').value);
+    applyOutLock(participants.find((x) => x.id === pid));
   }
 
   /** 입력한 만큼 textarea 높이가 자동으로 늘어나게 (min-height/max-height는 CSS가 담당) */
@@ -889,6 +908,12 @@
     }
 
     const p = participants.find((x) => x.id === pid);
+    if (p && p.status === 'out') {
+      msg($('formMsg'), '참여가 종료된 이름입니다. 이 이름으로는 더 이상 인증을 제출할 수 없습니다.', 'bad');
+      applyOutLock(p);
+      return;
+    }
+
     const date = $('certifyDate').value || U.today();
     const payload = {
       participantId: pid,

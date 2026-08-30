@@ -86,6 +86,7 @@ function t(name, cond, extra) {
   t('미인증 6', st.missed === 6, st.missed);
   t('위험군(riskThreshold=4 이상)', st.atRisk === true);
   t('킥아웃 대상(kickoutThreshold=6 이상)', st.kickoutEligible === true);
+  t('riskTag: 킥아웃 대상(아직 아웃 처리 전)', U.riskTag(st).label === '킥아웃 대상', U.riskTag(st));
   t('인증률 33%', st.rate === 33, st.rate);
   t('오늘 셀은 미확정', st.cells.find(c => c.date === '2026-09-02').status === '-');
   t('미래 셀은 미확정', st.cells.find(c => c.date === '2026-09-10').status === '-');
@@ -219,6 +220,20 @@ function t(name, cond, extra) {
     st.cells.slice(9,12).map(c=>c.status));
   // 8/24~8/30 7일 미인증, 8/31·9/1 인증, 9/2 이후는 아웃이라 집계 제외
   t('아웃 이후는 미인증으로 안 쌓임', st.missed === 7, st.missed);
+  t('riskTag: 일반 아웃 처리는 "아웃" 라벨', U.riskTag(st).label === '아웃', U.riskTag(st));
+
+  // 미인증 누적으로 킥아웃 처리(kickReason:'kickout')하면 "아웃"과 구분되는 "킥아웃" 라벨을 단다
+  await Store.updateParticipant(whale.id, { kickReason: 'kickout' });
+  st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === whale.id);
+  t('riskTag: 킥아웃 처리는 "킥아웃" 라벨로 구분', U.riskTag(st).label === '킥아웃', U.riskTag(st));
+
+  // 복귀시키면(status/kickReason 초기화) 다시 정상 참여중으로 돌아온다
+  await Store.updateParticipant(whale.id, { status: 'active', outDate: null, kickReason: null });
+  st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === whale.id);
+  t('복귀 후에는 아웃·킥아웃 라벨 모두 사라짐',
+    U.riskTag(st).label !== '킥아웃' && U.riskTag(st).label !== '아웃', U.riskTag(st));
 
 
   // 백업 / 복원 / 삭제
