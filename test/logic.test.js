@@ -195,6 +195,15 @@ function t(name, cond, extra) {
   t('일괄 등록 후 목록 2건', mails.length === 2, mails.map(m => m.email));
   for (const m of mails) await Store.removeNotifyEmail(m.id);
 
+  console.log('— meta(킥아웃 통보 메일 문구 저장) —');
+  t('저장 전에는 kickoutMailTemplate 없음', !(await Store.getMeta()).kickoutMailTemplate);
+  await Store.setMeta({ kickoutMailTemplate: { subject: '제목 테스트', body: '본문 {{이름}}', updatedAt: '2026-08-30T00:00:00.000Z' } });
+  const savedTpl = (await Store.getMeta()).kickoutMailTemplate;
+  t('저장한 제목·본문을 그대로 불러옴',
+    savedTpl && savedTpl.subject === '제목 테스트' && savedTpl.body === '본문 {{이름}}', savedTpl);
+  await Store.setMeta({ kickoutMailTemplate: null }); // 기본값으로 되돌리기
+  t('null로 저장하면 기본값 사용 상태로 되돌아감', !(await Store.getMeta()).kickoutMailTemplate);
+
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);
   await Store.setNotice('2026-08-24', '  8/24 공지 초안입니다  ');

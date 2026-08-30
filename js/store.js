@@ -18,6 +18,8 @@
  *   upvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   unvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   getMeta() / setMeta(patch)            → Promise<object>
+ *     (meta.kickoutMailTemplate: {subject, body, updatedAt}|null 에 [알림 메일] 탭의
+ *      "킥아웃 통보 메일 문구 편집"에서 저장한 제목·본문을 보관한다. null이면 기본 문구 사용)
  *   exportAll() / importAll(obj)          → Promise<object|void>
  *   clearAll()                            → Promise<void>
  *   listNotifyEmails()                    → Promise<NotifyEmail[]>

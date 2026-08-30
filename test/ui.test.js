@@ -577,6 +577,22 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     && (await page.textContent('#customMailTarget')).includes('reader1@example.com'));
   t('본문에 받는 사람 이름 초안 채움', (await page.inputValue('#customMailBody')).includes('홍길동님'));
 
+  // Gmail 새 작성창 자동으로 열기 — 실제로 새 탭을 열진 않고 window.open 호출만 가로채서 확인한다.
+  await page.evaluate(() => {
+    window.__openedGmailUrl = null;
+    window.open = (url) => { window.__openedGmailUrl = url; return null; };
+  });
+  await page.click('#customMailGmailBtn');
+  await page.waitForTimeout(200);
+  const gmailUrl = await page.evaluate(() => window.__openedGmailUrl);
+  t('Gmail로 작성하기 클릭 시 Gmail 작성 URL이 열림',
+    !!gmailUrl && gmailUrl.startsWith('https://mail.google.com/mail/?'), gmailUrl);
+  const gmailParams = new URL(gmailUrl).searchParams;
+  t('Gmail URL에 받는 사람 이메일 포함', gmailParams.get('to') === 'reader1@example.com', gmailUrl);
+  t('Gmail URL에 제목 포함', gmailParams.get('su').includes('안내드립니다'), gmailUrl);
+  t('Gmail URL에 본문 포함', gmailParams.get('body').includes('홍길동님'), gmailUrl);
+  t('Gmail 작성창 연 안내 메시지 표시', /Gmail 작성창을 새 탭으로 열었습니다/.test(await page.textContent('#customMailMsg')));
+
   // 발송 서버 없이, 제목+본문을 클립보드로 복사해서 직접 보내는 방식
   await page.evaluate(() => {
     window.__copiedMailText = null;
@@ -1449,6 +1465,39 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const copiedKickText = await koPage.evaluate(() => window.__copiedKickText);
   t('킥아웃 통보 메일도 복사하기로 클립보드에 담김',
     !!copiedKickText && copiedKickText.includes('6회'), copiedKickText);
+
+  // ── 킥아웃 통보 메일 문구 편집(저장 → 다음부터 그 문구로 채워짐 → 기본값으로 되돌리기) ──
+  t('편집창에 기본 문구가 자리표시자({{이름}} 등)와 함께 채워짐',
+    (await koPage.inputValue('#kickoutTemplateBody')).includes('{{이름}}'),
+    await koPage.inputValue('#kickoutTemplateBody'));
+  t('아직 저장 전이라 기본 문구 사용 중이라는 안내', /기본 문구/.test(await koPage.textContent('#kickoutTemplateStatus')));
+
+  await koPage.fill('#kickoutTemplateSubject', '[커스텀] {{이름}}님 안내');
+  await koPage.fill('#kickoutTemplateBody', '{{이름}}님, 커스텀 문구입니다. 기준: {{킥아웃기준}}회.');
+  await koPage.click('#kickoutTemplateSave');
+  await koPage.waitForTimeout(300);
+  t('저장 완료 메시지 표시', /저장했습니다/.test(await koPage.textContent('#kickoutTemplateMsg')));
+  t('저장 후에는 저장된 문구 사용 중이라는 안내로 바뀜',
+    /저장된 문구 사용 중/.test(await koPage.textContent('#kickoutTemplateStatus')));
+
+  // 새로 [메일 작성]을 누르면 저장한 문구가 참여자 이름·킥아웃 기준으로 치환되어 채워져야 한다
+  await kickNoticeRow.locator('[data-kickmail]').click();
+  await koPage.waitForTimeout(200);
+  t('저장한 제목 문구가 이름 치환되어 채워짐',
+    (await koPage.inputValue('#customMailSubject')) === '[커스텀] 킥대상님 안내',
+    await koPage.inputValue('#customMailSubject'));
+  t('저장한 본문 문구가 이름·킥아웃 기준 모두 치환되어 채워짐',
+    (await koPage.inputValue('#customMailBody')) === '킥대상님, 커스텀 문구입니다. 기준: 6회.',
+    await koPage.inputValue('#customMailBody'));
+
+  await koPage.click('#kickoutTemplateReset');
+  await koPage.waitForTimeout(300);
+  t('기본값으로 되돌리기 완료 메시지 표시', /되돌렸습니다/.test(await koPage.textContent('#kickoutTemplateMsg')));
+  t('되돌린 후에는 다시 기본 문구 사용 중 안내', /기본 문구/.test(await koPage.textContent('#kickoutTemplateStatus')));
+  t('되돌린 후 편집창도 기본 문구로 돌아옴',
+    (await koPage.inputValue('#kickoutTemplateBody')).includes('{{이름}}')
+    && !(await koPage.inputValue('#kickoutTemplateBody')).includes('커스텀'),
+    await koPage.inputValue('#kickoutTemplateBody'));
 
   // 킥아웃된 이름으로는 인증 화면에서도 더 이상 제출할 수 없어야 한다
   await koPage.goto(BASE + '/index.html');
