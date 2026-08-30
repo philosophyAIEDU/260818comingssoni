@@ -1377,6 +1377,103 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await warnCtx.close();
 
+  // ── 운영진: 킥아웃 처리 → 그 이름으로 인증 차단 + 킥아웃 통보 메일 ──
+  const koCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await koCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    // 10일 전 시작으로 잡아서, 제출 기록 없이도 자연히 킥아웃 기준(6회)을 넘기게 한다.
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-10)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  const koPage = await koCtx.newPage();
+  koPage.on('dialog', (d) => d.accept());
+
+  await koPage.goto(BASE + '/admin.html');
+  await koPage.waitForTimeout(400);
+  await koPage.click('button[data-tab="roster"]');
+  await koPage.fill('#bulkNames', '킥대상');
+  await koPage.click('#bulkAdd');
+  await koPage.waitForTimeout(300);
+
+  // 명단 표의 이름 칸은 <input value="..."> 라서 hasText(텍스트 콘텐츠 기준)로는 못 찾는다 —
+  // 이 컨텍스트에는 참가자를 한 명만 등록했으니 첫 행을 그대로 쓴다.
+  const koRow = koPage.locator('#rosterTable tbody tr').first();
+  t('제출 없이 10일 지나면 저절로 킥아웃 대상(6회 이상)이 됨',
+    (await koRow.textContent()).includes('킥아웃 대상'), await koRow.textContent());
+  t('킥아웃 대상자 행에는 "킥아웃 처리" 버튼이 뜸', (await koRow.locator('[data-kickout]').count()) === 1);
+  t('아직 처리 전이라 일반 "아웃 처리" 버튼은 없음', (await koRow.locator('[data-toggle]').count()) === 0);
+
+  // 이메일을 먼저 등록해 둬야 아래 킥아웃 통보 메일에서 대상으로 잡힌다
+  await koRow.locator('input[data-editemail]').fill('kicktest@example.com');
+  await koRow.locator('input[data-editemail]').dispatchEvent('change');
+  await koPage.waitForTimeout(300);
+
+  await koRow.locator('[data-kickout]').click(); // confirm()은 위에서 자동 수락
+  await koPage.waitForTimeout(300);
+
+  const koRow2 = koPage.locator('#rosterTable tbody tr').first();
+  t('킥아웃 처리 후에는 "킥아웃" 배지로 구분됨(일반 "아웃"이 아니라)',
+    (await koRow2.locator('.tag', { hasText: '킥아웃' }).textContent()) === '킥아웃',
+    await koRow2.textContent());
+  t('킥아웃 처리 후 버튼은 "복귀"로 바뀜', (await koRow2.locator('[data-toggle]', { hasText: '복귀' }).count()) === 1);
+
+  await koPage.click('button[data-tab="notify"]');
+  await koPage.waitForTimeout(200);
+  const kickNoticeRow = koPage.locator('#kickoutNoticeTable tbody tr', { hasText: '킥대상' });
+  t('킥아웃 통보 메일 목록에 방금 처리한 사람이 표시됨', await kickNoticeRow.count() === 1);
+  t('킥아웃 통보 메일 목록에 등록한 이메일이 표시됨',
+    (await kickNoticeRow.textContent()).includes('kicktest@example.com'));
+
+  await kickNoticeRow.locator('[data-kickmail]').click();
+  await koPage.waitForTimeout(200);
+  t('메일 작성 클릭 시 작성창이 해당 사람으로 채워짐',
+    (await koPage.textContent('#customMailTarget')).includes('kicktest@example.com'));
+  t('킥아웃 통보 메일 제목에 "참여 종료 안내"가 들어감',
+    (await koPage.inputValue('#customMailSubject')).includes('참여 종료 안내'),
+    await koPage.inputValue('#customMailSubject'));
+  const kickBody = await koPage.inputValue('#customMailBody');
+  t('본문에 이름과 킥아웃 기준(6회) 안내가 채워짐',
+    kickBody.includes('킥대상') && kickBody.includes('6회'), kickBody);
+  t('본문에 다음 챌린지 재신청 안내가 채워짐', kickBody.includes('다음 챌린지'), kickBody);
+  t('본문에 발신 서명이 채워짐', kickBody.includes('퍼스널메이커스 드림'), kickBody);
+
+  await koPage.evaluate(() => {
+    window.__copiedKickText = null;
+    navigator.clipboard.writeText = (text) => { window.__copiedKickText = text; return Promise.resolve(); };
+  });
+  await koPage.click('#customMailCopyBtn');
+  await koPage.waitForTimeout(200);
+  const copiedKickText = await koPage.evaluate(() => window.__copiedKickText);
+  t('킥아웃 통보 메일도 복사하기로 클립보드에 담김',
+    !!copiedKickText && copiedKickText.includes('6회'), copiedKickText);
+
+  // 킥아웃된 이름으로는 인증 화면에서도 더 이상 제출할 수 없어야 한다
+  await koPage.goto(BASE + '/index.html');
+  await koPage.waitForTimeout(400);
+  await koPage.click('#participantToggle');
+  await koPage.waitForSelector('#participantListbox:not([hidden])');
+  const koNames = await koPage.locator('#participantListbox .combo-option').allTextContents();
+  t('인증 화면 이름 목록에 (킥아웃) 표시가 붙음', koNames.some((n) => n.includes('킥대상') && n.includes('(킥아웃)')), koNames);
+  await koPage.locator('#participantListbox .combo-option', { hasText: '킥대상' }).click();
+  await koPage.waitForTimeout(200);
+  t('킥아웃된 이름을 고르면 인증 버튼이 잠김', await koPage.isDisabled('#submitBtn'));
+  t('킥아웃된 이름을 고르면 안내 문구가 뜸',
+    (await koPage.textContent('#formMsg')).includes('참여가 종료된'));
+
+  // 버튼 잠금을 우회해도(예: 확장프로그램 등) 실제 저장 단계에서 한 번 더 막혀야 한다
+  await koPage.evaluate(() => { document.getElementById('submitBtn').disabled = false; });
+  await koPage.fill('#sentence', '테스트 문장');
+  await koPage.fill('#reflection', '테스트 느낀 점');
+  await koPage.click('#submitBtn');
+  await koPage.waitForTimeout(300);
+  t('버튼을 강제로 풀어도 제출 시점에 다시 막힘',
+    (await koPage.textContent('#formMsg')).includes('참여가 종료된'));
+
+  await koCtx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준

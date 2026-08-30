@@ -29,6 +29,7 @@
  *   listNotices()                         → Promise<{date, text, updatedAt}[]>
  *
  *  Participant { id, nickname, email, kakaoJoined:''|'O'|'X', status:'active'|'out', joinDate, outDate,
+ *                kickReason:null|'kickout' (status가 'out'일 때, 미인증 누적으로 킥아웃 처리된 경우만 'kickout'),
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
@@ -81,6 +82,7 @@ CS.LocalStore = (function () {
       status: 'active',
       joinDate: CS.CONFIG.startDate,
       outDate: null,
+      kickReason: null,
       exemptDates: [],
       note: '',
       createdAt: CS.U.nowStamp()

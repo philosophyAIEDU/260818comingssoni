@@ -217,10 +217,16 @@ CS.U = (function () {
     });
   }
 
-  /** 참가자 한 명의 상태 뱃지 { cls, label } — 심한 순서로 아웃 > 킥아웃 대상 > 위험 > 참여중.
+  /** 참가자 한 명의 상태 뱃지 { cls, label } — 심한 순서로 킥아웃/아웃 > 킥아웃 대상 > 위험 > 참여중.
+   *  '아웃' 처리된 사람 중에서도 kickReason이 'kickout'이면(미인증 누적으로 실제 킥아웃된 경우)
+   *  더 명확하게 '킥아웃'으로 구분해서 보여준다.
    *  admin.js·app.js의 명단/매트릭스/전체현황/나의현황 화면이 공통으로 사용한다. */
   function riskTag(stat) {
-    if (stat.participant.status === 'out') return { cls: 'bad', label: '아웃' };
+    if (stat.participant.status === 'out') {
+      return stat.participant.kickReason === 'kickout'
+        ? { cls: 'bad', label: '킥아웃' }
+        : { cls: 'bad', label: '아웃' };
+    }
     if (stat.kickoutEligible) return { cls: 'bad', label: '킥아웃 대상' };
     if (stat.atRisk) return { cls: 'warn', label: '위험' };
     return { cls: 'ok', label: '참여중' };
