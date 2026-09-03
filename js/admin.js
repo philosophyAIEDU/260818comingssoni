@@ -1005,6 +1005,7 @@
     missed5MailTemplate = meta.missed5MailTemplate || null;
     loadMissed5TemplateInputs();
     paintMissed5LastRun(meta.missed5LastRun || null);
+    paintMissed5Current();
   }
 
   function loadMissed5TemplateInputs() {
@@ -1042,6 +1043,36 @@
     missed5TemplateDirty = false;
     msg($('missed5TemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
     await refreshMissed5Template();
+  }
+
+  /** Netlify 예약 함수가 그대로 채택할 대상과 완전히 같은 조건(정확히 5회, 아웃 아님, 아직 미경고)
+   *  — 지금 이 순간 자동 발송 대상이 될 사람 목록. 이미 다른 방법으로 안내한 사람을 골라
+   *  "자동 발송에서 제외"(= warned5At을 지금 날짜로 채워서 이미 보낸 것으로 표시)할 수 있게 해준다. */
+  function missed5CurrentCandidates() {
+    return stats.filter((s) =>
+      s.missed === CONFIG.autoWarnThreshold && s.participant.status !== 'out' && !s.participant.warned5At);
+  }
+
+  function paintMissed5Current() {
+    const rows = missed5CurrentCandidates();
+    const t = $('missed5CurrentTable');
+    t.innerHTML = rows.length
+      ? `<thead><tr><th>이름</th><th class="num">미인증</th></tr></thead><tbody>${
+        rows.map((s) => `<tr><td>${esc(s.participant.nickname)}</td><td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td></tr>`).join('')
+      }</tbody>`
+      : '<tbody><tr><td class="empty">지금 정확히 5회인 사람이 없습니다 — 다음 자동 발송 때는 새로 5회가 되는 사람에게만 나갑니다.</td></tr></tbody>';
+    $('missed5CurrentExcludeBtn').hidden = rows.length === 0;
+  }
+
+  async function excludeCurrentMissed5FromAuto() {
+    const rows = missed5CurrentCandidates();
+    if (!rows.length) return;
+    const names = rows.map((s) => s.participant.nickname).join(', ');
+    if (!confirm(`${rows.length}명(${names})을 자동 발송 대상에서 제외할까요?\n메일은 보내지 않고, 이미 보낸 것으로만 표시합니다.`)) return;
+
+    await Promise.all(rows.map((s) => Store.updateParticipant(s.participant.id, { warned5At: U.today() })));
+    msg($('missed5CurrentMsg'), `${rows.length}명을 자동 발송 대상에서 제외했습니다. 새로 5회가 되는 사람에게만 이제부터 자동 발송됩니다.`, 'ok');
+    await refresh();
   }
 
   function paintKickoutNotice() {
@@ -1217,6 +1248,8 @@
     $('kickoutTemplateBody').addEventListener('input', () => { kickoutTemplateDirty = true; });
     $('kickoutTemplateSave').addEventListener('click', saveKickoutTemplate);
     $('kickoutTemplateReset').addEventListener('click', resetKickoutTemplate);
+
+    $('missed5CurrentExcludeBtn').addEventListener('click', excludeCurrentMissed5FromAuto);
 
     $('missed5TemplateSubject').addEventListener('input', () => { missed5TemplateDirty = true; });
     $('missed5TemplateBody').addEventListener('input', () => { missed5TemplateDirty = true; });
