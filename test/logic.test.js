@@ -13,11 +13,11 @@ const sandbox = { window: {}, localStorage, console, Intl, Date, Math, JSON, Pro
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 const root = require('path').join(__dirname, '..');
-for (const f of ['js/config.js', 'js/utils.js', 'js/store.js'].map((x) => require('path').join(root, x))) {
+for (const f of ['js/config.js', 'js/utils.js', 'js/mailTemplates.js', 'js/store.js'].map((x) => require('path').join(root, x))) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), sandbox, { filename: f });
 }
 const { CS } = sandbox;
-const { U, Store, CONFIG } = CS;
+const { U, Store, CONFIG, MailTemplates } = CS;
 
 let pass = 0, fail = 0;
 function t(name, cond, extra) {
@@ -203,6 +203,31 @@ function t(name, cond, extra) {
     savedTpl && savedTpl.subject === '제목 테스트' && savedTpl.body === '본문 {{이름}}', savedTpl);
   await Store.setMeta({ kickoutMailTemplate: null }); // 기본값으로 되돌리기
   t('null로 저장하면 기본값 사용 상태로 되돌아감', !(await Store.getMeta()).kickoutMailTemplate);
+
+  t('저장 전에는 missed5MailTemplate 없음', !(await Store.getMeta()).missed5MailTemplate);
+  await Store.setMeta({ missed5MailTemplate: { subject: '경고 제목', body: '{{이름}} 경고 본문', updatedAt: '2026-08-30T00:00:00.000Z' } });
+  const savedMissed5Tpl = (await Store.getMeta()).missed5MailTemplate;
+  t('저장한 미인증 5회 경고 문구를 그대로 불러옴',
+    savedMissed5Tpl && savedMissed5Tpl.subject === '경고 제목' && savedMissed5Tpl.body === '{{이름}} 경고 본문', savedMissed5Tpl);
+  await Store.setMeta({ missed5MailTemplate: null });
+  t('missed5MailTemplate도 null로 저장하면 기본값 사용 상태로 되돌아감', !(await Store.getMeta()).missed5MailTemplate);
+
+  console.log('— 메일 문구 기본값·자리표시자 치환(CS.MailTemplates) —');
+  t('자동 경고 기준(5회)이 설정에 있음', CONFIG.autoWarnThreshold === 5, CONFIG.autoWarnThreshold);
+  t('킥아웃 기준(6회)보다 자동 경고 기준이 낮음(1회만 더 미인증되면 킥아웃)',
+    CONFIG.autoWarnThreshold < CONFIG.kickoutThreshold);
+  t('fill: {{키}} 자리표시자를 값으로 치환',
+    MailTemplates.fill('안녕 {{이름}}, 기준은 {{N}}회', { 이름: '테스터', N: 5 }) === '안녕 테스터, 기준은 5회');
+  t('킥아웃 메일 기본 제목에 챌린지 이름 포함', MailTemplates.defaultKickoutSubject().includes(CONFIG.title));
+  t('킥아웃 메일 기본 본문에 {{이름}}·{{킥아웃기준}} 자리표시자 포함',
+    MailTemplates.defaultKickoutBody().includes('{{이름}}') && MailTemplates.defaultKickoutBody().includes('{{킥아웃기준}}'));
+  t('미인증 5회 경고 메일 기본 본문에 {{이름}}·{{자동경고기준}}·{{킥아웃기준}}·{{앱주소}} 자리표시자 포함',
+    ['{{이름}}', '{{자동경고기준}}', '{{킥아웃기준}}', '{{앱주소}}'].every((ph) => MailTemplates.defaultMissed5Body().includes(ph)));
+  const filledMissed5 = MailTemplates.fill(MailTemplates.defaultMissed5Body(),
+    { 이름: '김철수', 자동경고기준: CONFIG.autoWarnThreshold, 킥아웃기준: CONFIG.kickoutThreshold, 앱주소: CONFIG.appUrl });
+  t('미인증 5회 경고 메일 치환 결과에 자리표시자가 남지 않음', !filledMissed5.includes('{{'), filledMissed5);
+  t('미인증 5회 경고 메일 치환 결과에 실제 이름·기준 횟수 반영',
+    filledMissed5.includes('김철수') && filledMissed5.includes('5회') && filledMissed5.includes('6회'), filledMissed5);
 
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);

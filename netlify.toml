@@ -1,2 +1,9 @@
 [build]
   publish = "."
+  functions = "netlify/functions"
+
+# 매일 00:10(KST) = 전날 15:10(UTC) 에, 그 시점 기준 누적 미인증이 정확히 5회(1회만
+# 더 미인증되면 킥아웃 대상)가 된 참여자에게 자동으로 경고 메일을 보냅니다.
+# (24:00 KST 마감 직후라 그날의 미인증 확정 여부가 이미 반영된 상태입니다.)
+[functions."send-missed5-warning"]
+  schedule = "10 15 * * *"

@@ -2,8 +2,12 @@
   "name": "personalmakers-reading-challenge",
   "private": true,
   "version": "1.0.0",
-  "description": "퍼스널메이커스 독서 챌린지 인증 시스템 (정적 사이트)",
+  "description": "퍼스널메이커스 독서 챌린지 인증 시스템 (정적 사이트 + Netlify Functions)",
   "scripts": {
     "test": "node test/logic.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.5.0",
+    "nodemailer": "^6.9.14"
   }
 }

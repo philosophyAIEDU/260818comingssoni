@@ -290,6 +290,32 @@
       <button id="kickoutTemplateReset">기본값으로 되돌리기</button>
     </div>
     <div id="kickoutTemplateMsg"></div>
+
+    <h2 style="margin-top:26px">미인증 5회 자동 경고 메일</h2>
+    <p class="hint">
+      누적 미인증이 정확히 <strong id="autoWarnN"></strong>회가 된 참여자에게, 1회만 더
+      미인증되면 킥아웃 대상이 될 수 있다는 안내 메일이 <strong>매일 자정 직후(KST) 자동으로</strong>
+      발송됩니다(Netlify 예약 함수 — 별도 배포·환경 변수 설정이 끝나야 실제로 동작합니다.
+      README 참고). 같은 사람에게 중복으로 가지는 않습니다. 아래에서 그 메일의 제목·본문을
+      직접 고쳐서 저장할 수 있습니다. <strong>{{이름}}</strong>·<strong>{{자동경고기준}}</strong>·
+      <strong>{{킥아웃기준}}</strong>·<strong>{{앱주소}}</strong>는 참여자별로 실제 값으로
+      자동 치환됩니다.
+    </p>
+    <p class="muted" id="missed5LastRun"></p>
+    <div class="field">
+      <label for="missed5TemplateSubject">메일 제목</label>
+      <input type="text" id="missed5TemplateSubject">
+    </div>
+    <div class="field">
+      <label for="missed5TemplateBody">메일 본문</label>
+      <textarea id="missed5TemplateBody" rows="10"></textarea>
+    </div>
+    <p class="muted" id="missed5TemplateStatus"></p>
+    <div class="actions">
+      <button class="primary" id="missed5TemplateSave">저장</button>
+      <button id="missed5TemplateReset">기본값으로 되돌리기</button>
+    </div>
+    <div id="missed5TemplateMsg"></div>
   </section>
 
   <!-- ── 데이터 ───────────────────────── -->
@@ -333,6 +359,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/mailTemplates.js"></script>
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
