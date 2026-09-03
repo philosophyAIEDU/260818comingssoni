@@ -1499,6 +1499,42 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     && !(await koPage.inputValue('#kickoutTemplateBody')).includes('커스텀'),
     await koPage.inputValue('#kickoutTemplateBody'));
 
+  // ── 미인증 5회 자동 경고 메일 문구 편집(실제 발송은 Netlify 예약 함수가 함 — 여기선 문구만 관리) ──
+  t('자동 경고 기준 횟수(5)가 안내에 표시됨', (await koPage.textContent('#autoWarnN')) === '5');
+  t('아직 자동 발송 실행 전이라는 안내 표시',
+    /아직 자동 발송이 실행된 적 없습니다/.test(await koPage.textContent('#missed5LastRun')));
+  const missed5DefaultBody = await koPage.inputValue('#missed5TemplateBody');
+  t('편집창에 기본 문구가 자리표시자와 함께 채워짐',
+    ['{{이름}}', '{{자동경고기준}}', '{{킥아웃기준}}', '{{앱주소}}'].every((ph) => missed5DefaultBody.includes(ph)),
+    missed5DefaultBody);
+  t('아직 저장 전이라 기본 문구 사용 중이라는 안내', /기본 문구/.test(await koPage.textContent('#missed5TemplateStatus')));
+
+  await koPage.fill('#missed5TemplateSubject', '[커스텀 경고] {{이름}}님');
+  await koPage.fill('#missed5TemplateBody', '{{이름}}님, 자동경고기준 {{자동경고기준}}회 · 킥아웃기준 {{킥아웃기준}}회 · {{앱주소}}');
+  await koPage.click('#missed5TemplateSave');
+  await koPage.waitForTimeout(300);
+  t('저장 완료 메시지 표시', /저장했습니다/.test(await koPage.textContent('#missed5TemplateMsg')));
+  t('저장 후에는 저장된 문구 사용 중이라는 안내로 바뀜',
+    /저장된 문구 사용 중/.test(await koPage.textContent('#missed5TemplateStatus')));
+
+  // 새로고침해도(다른 탭 이동 후 복귀) 저장한 문구가 유지되는지 확인
+  await koPage.click('button[data-tab="roster"]');
+  await koPage.waitForTimeout(150);
+  await koPage.click('button[data-tab="notify"]');
+  await koPage.waitForTimeout(200);
+  t('탭을 이동했다 돌아와도 저장한 문구가 유지됨',
+    (await koPage.inputValue('#missed5TemplateSubject')) === '[커스텀 경고] {{이름}}님',
+    await koPage.inputValue('#missed5TemplateSubject'));
+
+  await koPage.click('#missed5TemplateReset');
+  await koPage.waitForTimeout(300);
+  t('기본값으로 되돌리기 완료 메시지 표시', /되돌렸습니다/.test(await koPage.textContent('#missed5TemplateMsg')));
+  t('되돌린 후에는 다시 기본 문구 사용 중 안내', /기본 문구/.test(await koPage.textContent('#missed5TemplateStatus')));
+  t('되돌린 후 편집창도 기본 문구로 돌아옴',
+    (await koPage.inputValue('#missed5TemplateBody')).includes('{{이름}}')
+    && !(await koPage.inputValue('#missed5TemplateBody')).includes('자동경고기준 {{자동경고기준}}회 · 킥아웃기준'),
+    await koPage.inputValue('#missed5TemplateBody'));
+
   // 킥아웃된 이름으로는 인증 화면에서도 더 이상 제출할 수 없어야 한다
   await koPage.goto(BASE + '/index.html');
   await koPage.waitForTimeout(400);

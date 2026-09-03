@@ -18,6 +18,7 @@ CS.CONFIG = {
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
   kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 실제 킥아웃 대상
   riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"으로 분류(아직 킥아웃 대상은 아님)
+  autoWarnThreshold: 5,           // 누적 미인증이 정확히 이 횟수가 된 날, 자동으로 경고 메일 발송(Netlify 예약 함수)
 
   // 챌린지 기간(startDate~endDate) 밖에서도 인증 제출을 허용할지
   //  true  : 시작 전·종료 후에도 제출 가능 (시연/테스트용, 집계에는 반영되지 않음)

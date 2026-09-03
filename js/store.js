@@ -19,7 +19,10 @@
  *   unvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   getMeta() / setMeta(patch)            → Promise<object>
  *     (meta.kickoutMailTemplate: {subject, body, updatedAt}|null 에 [알림 메일] 탭의
- *      "킥아웃 통보 메일 문구 편집"에서 저장한 제목·본문을 보관한다. null이면 기본 문구 사용)
+ *      "킥아웃 통보 메일 문구 편집"에서 저장한 제목·본문을 보관한다. null이면 기본 문구 사용.
+ *      meta.missed5MailTemplate: 위와 같은 모양으로 "미인증 5회 자동 경고 메일" 문구를 보관.
+ *      meta.missed5LastRun: {at, today, sent, skippedNoEmail, failed} — Netlify 예약 함수
+ *      (send-missed5-warning)가 매일 실행 후 남기는 마지막 실행 결과. 화면에서 읽기 전용으로만 씀)
  *   exportAll() / importAll(obj)          → Promise<object|void>
  *   clearAll()                            → Promise<void>
  *   listNotifyEmails()                    → Promise<NotifyEmail[]>
@@ -32,6 +35,8 @@
  *
  *  Participant { id, nickname, email, kakaoJoined:''|'O'|'X', status:'active'|'out', joinDate, outDate,
  *                kickReason:null|'kickout' (status가 'out'일 때, 미인증 누적으로 킥아웃 처리된 경우만 'kickout'),
+ *                warned5At:null|'YYYY-MM-DD' (미인증 5회 자동 경고 메일을 보낸 날짜(KST) — 중복 발송
+ *                방지용. Netlify 예약 함수가 채우고, [명단 관리]에서 "복귀" 처리하면 다시 null로 지워진다),
  *                exemptDates:string[], note, createdAt }
  *  Submission  { id, participantId, nickname, date, sentence,
  *                reflection, upvotes, upvotedBy:string[], createdAt, updatedAt }
@@ -85,6 +90,7 @@ CS.LocalStore = (function () {
       joinDate: CS.CONFIG.startDate,
       outDate: null,
       kickReason: null,
+      warned5At: null,
       exemptDates: [],
       note: '',
       createdAt: CS.U.nowStamp()

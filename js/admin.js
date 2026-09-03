@@ -1,6 +1,6 @@
 /* 운영진 대시보드 */
 (function () {
-  const { CONFIG, U, Store } = CS;
+  const { CONFIG, U, Store, MailTemplates } = CS;
   const $ = (id) => document.getElementById(id);
   const CELL_CLASS = { O: 'cell-o', X: 'cell-x', P: 'cell-p', '-': 'cell-none', '·': 'cell-off' };
   const LABEL = { O: '인증', X: '미인증', P: '면제', '-': '마감 전', '·': '참여 기간 밖' };
@@ -281,7 +281,9 @@
         await Store.updateParticipant(p.id, {
           status: out ? 'out' : 'active',
           outDate: out ? U.today() : null,
-          kickReason: null // 일반 아웃 처리·복귀는 킥아웃 사유를 남기지 않는다(복귀 시 이전 킥아웃 표시도 지움)
+          kickReason: null, // 일반 아웃 처리·복귀는 킥아웃 사유를 남기지 않는다(복귀 시 이전 킥아웃 표시도 지움)
+          // 복귀(다시 활동 상태로) 시에는 미인증 5회 자동 경고도 새로 다시 받을 수 있게 초기화한다.
+          warned5At: out ? p.warned5At || null : null
         });
         await refresh();
       });
@@ -763,6 +765,7 @@
     paintMissedWarn();
     paintKickoutNotice();
     await refreshKickoutTemplate();
+    await refreshMissed5Template();
   }
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
@@ -927,41 +930,24 @@
       .map((p) => ({ participant: p, email: resolveEmailFor(p) }));
   }
 
-  function defaultKickoutMailSubject() {
-    return `[${CONFIG.title}] 챌린지 참여 종료 안내`;
-  }
-
-  function defaultKickoutMailBody() {
-    return [
-      '안녕하세요 {{이름}} 님, 퍼스널메이커스입니다.',
-      '',
-      '{{이름}}님은 이번 독서챌린지의 킥아웃 기준인 인증 누락 {{킥아웃기준}}회가 되어, ' +
-        '아쉽게도 챌린지에서 더이상 참여가 어렵습니다.',
-      '',
-      '하지만 다음 챌린지가 오픈될때  얼마든 신청 가능하십니다. 참여 준비가 되셨을 때 다시 더 좋은 기회로 함께 했으면 좋겠습니다.',
-      '',
-      '감사합니다.',
-      '',
-      '퍼스널메이커스 드림.'
-    ].join('\n');
-  }
-
+  // 기본 문구·{{자리표시자}} 치환 규칙은 js/mailTemplates.js(CS.MailTemplates)에 모아 두고
+  // Netlify 예약 함수(미인증 5회 자동 경고 메일)와 여기서 똑같이 가져다 쓴다 — 화면에 보이는
+  // 기본값과 실제 발송되는 기본값이 서로 다를 걱정이 없다.
   let kickoutMailTemplate = null;   // meta.kickoutMailTemplate: {subject, body, updatedAt} | null(기본 문구 사용)
   let kickoutTemplateDirty = false; // 편집 중인 내용을 다른 새로고침이 덮어쓰지 않도록
 
   function kickoutMailSubjectTemplate() {
-    return (kickoutMailTemplate && kickoutMailTemplate.subject) || defaultKickoutMailSubject();
+    return (kickoutMailTemplate && kickoutMailTemplate.subject) || MailTemplates.defaultKickoutSubject();
   }
   function kickoutMailBodyTemplate() {
-    return (kickoutMailTemplate && kickoutMailTemplate.body) || defaultKickoutMailBody();
+    return (kickoutMailTemplate && kickoutMailTemplate.body) || MailTemplates.defaultKickoutBody();
   }
-  function fillKickoutTemplate(raw, p) {
-    return raw
-      .replaceAll('{{이름}}', p.nickname)
-      .replaceAll('{{킥아웃기준}}', String(CONFIG.kickoutThreshold));
+  function kickoutNoticeSubject(p) {
+    return MailTemplates.fill(kickoutMailSubjectTemplate(), { 이름: p.nickname, 킥아웃기준: CONFIG.kickoutThreshold });
   }
-  function kickoutNoticeSubject(p) { return fillKickoutTemplate(kickoutMailSubjectTemplate(), p); }
-  function kickoutNoticeBody(p) { return fillKickoutTemplate(kickoutMailBodyTemplate(), p); }
+  function kickoutNoticeBody(p) {
+    return MailTemplates.fill(kickoutMailBodyTemplate(), { 이름: p.nickname, 킥아웃기준: CONFIG.kickoutThreshold });
+  }
 
   async function refreshKickoutTemplate() {
     const meta = await Store.getMeta();
@@ -996,6 +982,66 @@
     kickoutTemplateDirty = false;
     msg($('kickoutTemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
     await refreshKickoutTemplate();
+  }
+
+  /* ── 미인증 5회 자동 경고 메일 ───────────────
+   *  실제 발송은 이 화면이 아니라 Netlify 예약 함수(netlify/functions/send-missed5-warning.js,
+   *  매일 자정 직후 KST 실행)가 한다 — 여기서는 그 문구를 편집·저장하고, 최근 실행 결과를
+   *  확인만 할 수 있다. 문구·치환 규칙은 킥아웃 통보 메일과 마찬가지로 meta 문서에 저장되고,
+   *  Netlify 함수도 같은 문서를 읽어 쓰므로 화면에 보이는 문구와 실제 발송 문구가 같다. */
+  let missed5MailTemplate = null;
+  let missed5TemplateDirty = false;
+
+  function missed5MailSubjectTemplate() {
+    return (missed5MailTemplate && missed5MailTemplate.subject) || MailTemplates.defaultMissed5Subject();
+  }
+  function missed5MailBodyTemplate() {
+    return (missed5MailTemplate && missed5MailTemplate.body) || MailTemplates.defaultMissed5Body();
+  }
+
+  async function refreshMissed5Template() {
+    $('autoWarnN').textContent = CONFIG.autoWarnThreshold;
+    const meta = await Store.getMeta();
+    missed5MailTemplate = meta.missed5MailTemplate || null;
+    loadMissed5TemplateInputs();
+    paintMissed5LastRun(meta.missed5LastRun || null);
+  }
+
+  function loadMissed5TemplateInputs() {
+    if (missed5TemplateDirty) return;
+    $('missed5TemplateSubject').value = missed5MailSubjectTemplate();
+    $('missed5TemplateBody').value = missed5MailBodyTemplate();
+    $('missed5TemplateStatus').textContent = missed5MailTemplate
+      ? `저장된 문구 사용 중 · 최근 수정 ${U.stampLabel(missed5MailTemplate.updatedAt)}`
+      : '기본 문구를 그대로 쓰는 중입니다(아직 저장한 적 없음).';
+  }
+
+  function paintMissed5LastRun(lastRun) {
+    $('missed5LastRun').textContent = lastRun
+      ? `최근 자동 발송: ${U.stampLabel(lastRun.at)} · 대상 ${lastRun.sent + lastRun.skippedNoEmail}명 중 ` +
+        `발송 ${lastRun.sent}건` + (lastRun.failed ? ` · 실패 ${lastRun.failed}건` : '')
+        + (lastRun.skippedNoEmail ? ` · 이메일 없어 건너뜀 ${lastRun.skippedNoEmail}건` : '')
+      : '아직 자동 발송이 실행된 적 없습니다(Netlify 배포·설정이 끝나면 매일 자정 직후 자동으로 실행됩니다).';
+  }
+
+  async function saveMissed5Template() {
+    const subject = $('missed5TemplateSubject').value.trim();
+    const body = $('missed5TemplateBody').value.trim();
+    if (!subject || !body) {
+      msg($('missed5TemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    await Store.setMeta({ missed5MailTemplate: { subject, body, updatedAt: U.nowStamp() } });
+    missed5TemplateDirty = false;
+    msg($('missed5TemplateMsg'), '미인증 5회 자동 경고 메일 문구를 저장했습니다. 다음 자동 발송부터 이 문구로 나갑니다.', 'ok');
+    await refreshMissed5Template();
+  }
+
+  async function resetMissed5Template() {
+    await Store.setMeta({ missed5MailTemplate: null });
+    missed5TemplateDirty = false;
+    msg($('missed5TemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
+    await refreshMissed5Template();
   }
 
   function paintKickoutNotice() {
@@ -1171,6 +1217,11 @@
     $('kickoutTemplateBody').addEventListener('input', () => { kickoutTemplateDirty = true; });
     $('kickoutTemplateSave').addEventListener('click', saveKickoutTemplate);
     $('kickoutTemplateReset').addEventListener('click', resetKickoutTemplate);
+
+    $('missed5TemplateSubject').addEventListener('input', () => { missed5TemplateDirty = true; });
+    $('missed5TemplateBody').addEventListener('input', () => { missed5TemplateDirty = true; });
+    $('missed5TemplateSave').addEventListener('click', saveMissed5Template);
+    $('missed5TemplateReset').addEventListener('click', resetMissed5Template);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
