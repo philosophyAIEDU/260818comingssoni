@@ -1559,6 +1559,70 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await koCtx.close();
 
+  // ── 미인증 5회 자동 경고 메일: "지금 이미 5회인 사람" 자동 발송에서 제외하기 ──
+  const m5Ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await m5Ctx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    // 확정된 날(어제까지) 9일 중 며칠을 인증했는지로 미인증 횟수를 정확히 맞춘다(9 - done = missed).
+    const plan = [
+      ['오회대상', 4, {}],                                      // missed=5, 활성, 미경고 → 목록에 뜨고 제외 가능해야 함
+      ['삼회대상', 6, {}],                                      // missed=3 → 목록에 안 뜸
+      ['이미경고완료', 4, { warned5At: '2026-01-01' }],          // missed=5지만 이미 경고 → 목록에 안 뜸
+      ['아웃된사람', 4, { status: 'out', outDate: shift(18) }]   // missed=5지만 아웃 → 목록에 안 뜸
+    ];
+    const parts = plan.map(([n, , extra], i) => Object.assign({
+      id: 'p' + i, nickname: n, email: '', kakaoJoined: '', createdAt: shift(-9) + 'T00:00:00.000Z'
+    }, extra));
+    const subs = [];
+    plan.forEach(([n, done], i) => {
+      for (let d = 0; d < done; d++) {
+        const date = shift(-9 + d);
+        subs.push({
+          id: `s${i}_${d}`, participantId: 'p' + i, nickname: n, date,
+          sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [],
+          createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`
+        });
+      }
+    });
+    await m5Ctx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+  }
+  const m5Page = await m5Ctx.newPage();
+  m5Page.on('dialog', (d) => d.accept());
+
+  await m5Page.goto(BASE + '/admin.html');
+  await m5Page.waitForTimeout(400);
+  await m5Page.click('button[data-tab="notify"]');
+  await m5Page.waitForTimeout(300);
+
+  const m5TableText = await m5Page.textContent('#missed5CurrentTable');
+  t('지금 정확히 5회인 사람만 "자동 발송 제외" 목록에 뜸', m5TableText.includes('오회대상'), m5TableText);
+  t('3회인 사람은 목록에 안 뜸', !m5TableText.includes('삼회대상'), m5TableText);
+  t('이미 경고 보낸 사람은(같은 5회여도) 목록에 안 뜸', !m5TableText.includes('이미경고완료'), m5TableText);
+  t('아웃된 사람은(같은 5회여도) 목록에 안 뜸', !m5TableText.includes('아웃된사람'), m5TableText);
+  t('제외 대상이 있으면 버튼이 보임', await m5Page.isVisible('#missed5CurrentExcludeBtn'));
+
+  await m5Page.click('#missed5CurrentExcludeBtn'); // confirm()은 위에서 자동 수락
+  await m5Page.waitForTimeout(400);
+
+  t('제외 처리 완료 메시지 표시', /제외했습니다/.test(await m5Page.textContent('#missed5CurrentMsg')));
+  t('처리 후에는 목록에서 사라짐(다음부턴 새로 5회 되는 사람만)',
+    (await m5Page.textContent('#missed5CurrentTable')).includes('지금 정확히 5회인 사람이 없습니다'));
+  t('처리 후에는 버튼도 다시 숨겨짐', !(await m5Page.isVisible('#missed5CurrentExcludeBtn')));
+
+  await m5Ctx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준

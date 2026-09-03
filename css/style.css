@@ -220,6 +220,9 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 button.danger:hover { background: var(--bad-soft); }
 button.small { font-size: 12.5px; padding: 5px 10px; font-weight: 500; }
 button:disabled { opacity: .45; cursor: not-allowed; }
+/* button에 display:inline-flex를 줘서, hidden 속성만으로는 안 숨겨진다(브라우저 기본
+   [hidden]{display:none} 규칙보다 이 author 규칙이 우선됨) — 그래서 명시적으로 되살려 둔다. */
+button[hidden] { display: none; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 /* 인증 폼 액션: 인증하기 버튼을 가운데·크게 */

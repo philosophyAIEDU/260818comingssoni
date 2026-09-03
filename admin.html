@@ -302,7 +302,24 @@
       자동 치환됩니다.
     </p>
     <p class="muted" id="missed5LastRun"></p>
-    <div class="field">
+
+    <h3 style="margin-top:18px">지금 이미 5회인 사람 — 자동 발송에서 제외</h3>
+    <p class="hint">
+      아래 목록은 <strong>지금 이미</strong> 누적 미인증 5회이면서 아직 자동 경고를 받지 않은
+      참여자입니다. 이 사람들에게 이미 다른 방법으로 직접 안내했다면, <strong>[자동 발송 대상에서
+      제외]</strong>를 눌러 두세요 — 메일을 보내지 않고 "이미 보낸 것"으로만 표시해서, 다음
+      자동 발송 때 또 가지 않게 막아 줍니다. <strong>새로 5회가 되는 사람</strong>에게는 이 처리와
+      상관없이 계속 자동으로 발송됩니다.
+    </p>
+    <div id="missed5CurrentMsg"></div>
+    <div class="scroll">
+      <table id="missed5CurrentTable"></table>
+    </div>
+    <div class="actions" style="margin-top:8px">
+      <button id="missed5CurrentExcludeBtn" hidden>자동 발송 대상에서 제외</button>
+    </div>
+
+    <div class="field" style="margin-top:18px">
       <label for="missed5TemplateSubject">메일 제목</label>
       <input type="text" id="missed5TemplateSubject">
     </div>
