@@ -756,12 +756,67 @@
 
   /* ── 알림 메일 ───────────────────────── */
 
+  /* ── 표 정렬 ───────────────────────────
+   * 알림 메일 탭의 표들은 머리글을 눌러 오름/내림차순을 바꾼다. 같은 열을 다시 누르면 방향이
+   * 뒤집히고, 다른 열을 누르면 그 열 기준 오름차순으로 시작한다. 정렬 중인 열에는 ▲/▼가 붙는다. */
+  const sortState = {
+    notify: { key: 'name', dir: 'asc' },
+    warn: { key: 'missed', dir: 'desc' },
+    kick: { key: 'outDate', dir: 'desc' }
+  };
+
+  /** cols: [{ key, label, cls, get }] — key가 없으면 정렬하지 않는 열(버튼 칸 등) */
+  function sortHead(tableKey, cols) {
+    const st = sortState[tableKey];
+    return `<thead><tr>${cols.map((c) => {
+      if (!c.key) return `<th class="${c.cls || ''}"></th>`;
+      const on = st.key === c.key;
+      return `<th class="${c.cls || ''} sortable" data-sortkey="${c.key}" tabindex="0" role="button"
+        aria-sort="${on ? (st.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+        title="눌러서 정렬 방향 바꾸기">${esc(c.label)}<span class="sort-arrow">${on ? (st.dir === 'asc' ? '▲' : '▼') : ''}</span></th>`;
+    }).join('')}</tr></thead>`;
+  }
+
+  function sortRows(tableKey, cols, rows) {
+    const st = sortState[tableKey];
+    const col = cols.find((c) => c.key === st.key);
+    if (!col) return rows;
+    const dir = st.dir === 'asc' ? 1 : -1;
+    return rows.slice().sort((a, b) => {
+      const x = col.get(a);
+      const y = col.get(b);
+      if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+      return String(x == null ? '' : x).localeCompare(String(y == null ? '' : y), 'ko') * dir;
+    });
+  }
+
+  function bindSortHead(t, tableKey, repaint) {
+    t.querySelectorAll('[data-sortkey]').forEach((el) => {
+      const toggle = () => {
+        const st = sortState[tableKey];
+        if (st.key === el.dataset.sortkey) st.dir = st.dir === 'asc' ? 'desc' : 'asc';
+        else { st.key = el.dataset.sortkey; st.dir = 'asc'; }
+        repaint();
+      };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
   function paintNotify() {
     $('notifyCount').textContent = `${notifyEmails.length}명`;
+    const cols = [
+      { key: 'name', label: '이름', get: (e) => e.name || '' },
+      { key: 'email', label: '메일 주소', get: (e) => e.email || '' },
+      { key: 'createdAt', label: '등록일', get: (e) => e.createdAt || '' },
+      { key: '', label: '' }
+    ];
     const t = $('notifyTable');
     t.innerHTML = notifyEmails.length
-      ? `<thead><tr><th>이름</th><th>메일 주소</th><th>등록일</th><th></th></tr></thead><tbody>${
-        notifyEmails.map((e) => `<tr>
+      ? `${sortHead('notify', cols)}<tbody>${
+        sortRows('notify', cols, notifyEmails).map((e) => `<tr>
           <td>${e.name ? esc(e.name) : '<span class="muted">(이름 없음)</span>'}</td>
           <td>${esc(e.email)}</td>
           <td class="muted">${esc(U.stampLabel(e.createdAt))}</td>
@@ -769,6 +824,7 @@
         </tr>`).join('')}</tbody>`
       : '<tbody><tr><td class="empty">등록된 메일 주소가 없습니다.</td></tr></tbody>';
 
+    bindSortHead(t, 'notify', paintNotify);
     t.querySelectorAll('[data-delmail]').forEach((el) => {
       el.addEventListener('click', async () => {
         await Store.removeNotifyEmail(el.dataset.delmail);
@@ -910,10 +966,16 @@
   function paintMissedWarn() {
     $('warnKickN').textContent = CONFIG.kickoutThreshold;
     const rows = missedWarnCandidates();
+    const cols = [
+      { key: 'name', label: '이름', get: (r) => r.stat.participant.nickname },
+      { key: 'missed', label: '미인증', cls: 'num', get: (r) => r.stat.missed },
+      { key: 'email', label: '이메일', get: (r) => r.email || '' },
+      { key: '', label: '' }
+    ];
     const t = $('missedWarnTable');
     t.innerHTML = rows.length
-      ? `<thead><tr><th>이름</th><th class="num">미인증</th><th>이메일</th><th></th></tr></thead><tbody>${
-        rows.map(({ stat: s, email }) => `<tr>
+      ? `${sortHead('warn', cols)}<tbody>${
+        sortRows('warn', cols, rows).map(({ stat: s, email }) => `<tr>
           <td>${esc(s.participant.nickname)}</td>
           <td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>
           <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
@@ -923,6 +985,7 @@
         </tr>`).join('')}</tbody>`
       : '<tbody><tr><td class="empty">현재 미인증이 있는 참여자가 없습니다.</td></tr></tbody>';
 
+    bindSortHead(t, 'warn', paintMissedWarn);
     t.querySelectorAll('[data-warnmail]').forEach((el) => {
       el.addEventListener('click', () => {
         const row = rows.find((r) => r.stat.participant.id === el.dataset.warnmail);
@@ -1101,10 +1164,17 @@
    *  (participant.kickoutMailSentAt 에 'YYYY-MM-DD'로 저장) */
   function paintKickoutNotice() {
     const rows = kickoutNoticeCandidates();
+    const cols = [
+      { key: 'name', label: '이름', get: (r) => r.participant.nickname },
+      { key: 'outDate', label: '킥아웃일', get: (r) => r.participant.outDate || '' },
+      { key: 'email', label: '이메일', get: (r) => r.email || '' },
+      { key: 'sent', label: '통보 메일', get: (r) => r.participant.kickoutMailSentAt || '' },
+      { key: '', label: '' }
+    ];
     const t = $('kickoutNoticeTable');
     t.innerHTML = rows.length
-      ? `<thead><tr><th>이름</th><th>킥아웃일</th><th>이메일</th><th>통보 메일</th><th></th></tr></thead><tbody>${
-        rows.map(({ participant: p, email }) => {
+      ? `${sortHead('kick', cols)}<tbody>${
+        sortRows('kick', cols, rows).map(({ participant: p, email }) => {
           const sentAt = p.kickoutMailSentAt || '';
           return `<tr>
           <td>${esc(p.nickname)}</td>
@@ -1123,6 +1193,7 @@
         }).join('')}</tbody>`
       : '<tbody><tr><td class="empty">킥아웃 처리된 참여자가 없습니다.</td></tr></tbody>';
 
+    bindSortHead(t, 'kick', paintKickoutNotice);
     t.querySelectorAll('[data-kickmail]').forEach((el) => {
       el.addEventListener('click', () => {
         const row = rows.find((r) => r.participant.id === el.dataset.kickmail);

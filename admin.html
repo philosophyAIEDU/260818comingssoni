@@ -217,9 +217,12 @@
     </div>
 
     <h2 style="margin-top:26px">등록된 메일 주소 <span class="tag" id="notifyCount"></span></h2>
-    <div class="scroll">
-      <table id="notifyTable"></table>
-    </div>
+    <details class="fold" id="notifyListFold">
+      <summary>등록된 메일 주소 목록 펼치기</summary>
+      <div class="scroll">
+        <table id="notifyTable"></table>
+      </div>
+    </details>
 
     <h2 style="margin-top:26px">특정 대상에게 안내 메일 작성</h2>
     <p class="hint">
