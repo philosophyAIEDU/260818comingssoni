@@ -237,6 +237,7 @@
       return `<tr>
         <td><input type="text" value="${esc(p.nickname)}" data-rename="${p.id}" style="min-width:120px"></td>
         <td><input type="email" value="${esc(p.email || '')}" data-editemail="${p.id}" placeholder="이메일 (선택)" style="min-width:160px"></td>
+        <td><input type="tel" value="${esc(p.phone || '')}" data-editphone="${p.id}" placeholder="전화번호 (선택)" style="min-width:130px"></td>
         <td><select data-editkakao="${p.id}">
           ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
         </select></td>
@@ -265,7 +266,7 @@
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>이름</th><th>이메일</th><th>카톡방</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>이메일</th><th>전화번호</th><th>카톡방</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -283,6 +284,15 @@
         try {
           await Store.updateParticipant(el.dataset.editemail, { email: el.value });
           msg($('rosterMsg'), '이메일을 수정했습니다.', 'ok');
+        } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
+        await refresh();
+      });
+    });
+    t.querySelectorAll('[data-editphone]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        try {
+          await Store.updateParticipant(el.dataset.editphone, { phone: el.value.trim() });
+          msg($('rosterMsg'), '전화번호를 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refresh();
       });
@@ -384,15 +394,18 @@
     await refresh();
   }
 
-  /* ── 명단 시트 업로드 (CSV/엑셀: 이름, 이메일) ─────── */
+  /* ── 명단 시트 업로드 (CSV/엑셀: 이름, 이메일 [, 전화번호]) ─────── */
 
-  /** 한 행(셀 값 배열)을 { name, email }로 정리한다. 앞의 두 빈 칸 아닌 값을 이름·메일로 본다. */
+  /** 한 행(셀 값 배열)을 { name, email, phone }로 정리한다. "이름, 이메일" 두 칸도, 세 번째 칸에
+   *  전화번호가 있는 "이름, 이메일, 전화번호"도 지원한다. */
   function rowToEntry(cells) {
     const parts = cells.map((c) => String(c == null ? '' : c).trim()).filter(Boolean);
-    return parts.length >= 2 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] || '' };
+    if (parts.length >= 3) return { name: parts[0], email: parts[1], phone: parts[2] };
+    if (parts.length === 2) return { name: parts[0], email: parts[1], phone: '' };
+    return { name: '', email: parts[0] || '', phone: '' };
   }
 
-  /** CSV 한 줄을 "이름, 이메일"(또는 탭 구분)로 파싱한다. BOM·따옴표 감싼 값도 처리한다. */
+  /** CSV 한 줄을 "이름, 이메일[, 전화번호]"(또는 탭 구분)로 파싱한다. BOM·따옴표 감싼 값도 처리한다. */
   function parseRosterCsv(raw) {
     // 엑셀에서 저장한 CSV는 UTF-8 BOM(U+FEFF)으로 시작하는 경우가 있어 첫 글자로 걸러낸다.
     const text = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
@@ -404,7 +417,7 @@
       .map((line) => rowToEntry(line.split(/\t|,/).map(unquote)));
   }
 
-  /** 엑셀 파일(.xlsx/.xls)의 첫 시트를 { name, email } 목록으로 변환한다. (SheetJS 필요) */
+  /** 엑셀 파일(.xlsx/.xls)의 첫 시트를 { name, email, phone } 목록으로 변환한다. (SheetJS 필요) */
   function parseRosterWorkbook(arrayBuffer) {
     const wb = window.XLSX.read(arrayBuffer, { type: 'array' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -453,6 +466,22 @@
       const email = nameToEmail.get(p.nickname);
       if (email && !p.email) {
         await Store.updateParticipant(p.id, { email }).catch(() => {});
+        filled++;
+      }
+    }
+    return filled;
+  }
+
+  /** 이름 → 전화번호 매칭표를 받아, 아직 전화번호가 비어 있는 참가자에게만 채워 넣는다.
+   *  명단 시트 업로드가 fillMissingEmails()와 같은 방식으로 함께 쓰는 로직. */
+  async function fillMissingPhones(nameToPhone) {
+    if (!nameToPhone.size) return 0;
+    const roster = await Store.listParticipants();
+    let filled = 0;
+    for (const p of roster) {
+      const phone = nameToPhone.get(p.nickname);
+      if (phone && !p.phone) {
+        await Store.updateParticipant(p.id, { phone }).catch(() => {});
         filled++;
       }
     }
@@ -520,11 +549,17 @@
         entries.filter((e) => e.name && e.email).map((e) => [CS.U.normalizeNick(e.name), e.email]));
       await fillMissingEmails(nameToEmail);
 
+      // 이름+전화번호가 함께 있는 행은 [명단 관리] 표의 전화번호 칸에도 채워 넣는다.
+      const nameToPhone = new Map(
+        entries.filter((e) => e.name && e.phone).map((e) => [CS.U.normalizeNick(e.name), e.phone]));
+      const phonesFilled = await fillMissingPhones(nameToPhone);
+
       const parts = [
         `참여자 ${pAdded.length}명 등록${pSkipped.length ? ` (중복 ${pSkipped.length}명 건너뜀)` : ''}`,
         `알림 메일 ${mAdded.length}건 등록${mSkipped.length ? ` (중복 ${mSkipped.length}건 건너뜀)` : ''}` +
           `${mInvalid.length ? ` (형식 오류 ${mInvalid.length}건 건너뜀)` : ''}`
       ];
+      if (phonesFilled) parts.push(`전화번호 ${phonesFilled}건 채움`);
       msg($('rosterCsvMsg'), parts.join(' · '), (pAdded.length || mAdded.length) ? 'ok' : 'warn');
       input.value = '';
       await refresh();
@@ -1103,9 +1138,10 @@
 
   function paintMissed5LastRun(lastRun) {
     $('missed5LastRun').textContent = lastRun
-      ? `최근 자동 발송: ${U.stampLabel(lastRun.at)} · 대상 ${lastRun.sent + lastRun.skippedNoEmail}명 중 ` +
-        `발송 ${lastRun.sent}건` + (lastRun.failed ? ` · 실패 ${lastRun.failed}건` : '')
-        + (lastRun.skippedNoEmail ? ` · 이메일 없어 건너뜀 ${lastRun.skippedNoEmail}건` : '')
+      ? `최근 자동 발송: ${U.stampLabel(lastRun.at)} · 대상 ${lastRun.candidates}명 중 ` +
+        `이메일 ${lastRun.sentEmail}건 · 문자 ${lastRun.sentSms}건 발송` +
+        (lastRun.failed ? ` · 실패 ${lastRun.failed}건` : '') +
+        (lastRun.skippedNoContact ? ` · 연락처 없어 건너뜀 ${lastRun.skippedNoContact}건` : '')
       : '아직 자동 발송이 실행된 적 없습니다(Netlify 배포·설정이 끝나면 매일 자정 직후 자동으로 실행됩니다).';
   }
 
@@ -1141,8 +1177,12 @@
     const rows = missed5CurrentCandidates();
     const t = $('missed5CurrentTable');
     t.innerHTML = rows.length
-      ? `<thead><tr><th>이름</th><th class="num">미인증</th></tr></thead><tbody>${
-        rows.map((s) => `<tr><td>${esc(s.participant.nickname)}</td><td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td></tr>`).join('')
+      ? `<thead><tr><th>이름</th><th class="num">미인증</th><th>연락 방법</th></tr></thead><tbody>${
+        rows.map((s) => {
+          const ways = [resolveEmailFor(s.participant) && '메일', s.participant.phone && '문자'].filter(Boolean);
+          return `<tr><td>${esc(s.participant.nickname)}</td><td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>` +
+            `<td>${ways.length ? esc(ways.join(' · ')) : '<span class="muted">이메일·전화번호 없음</span>'}</td></tr>`;
+        }).join('')
       }</tbody>`
       : '<tbody><tr><td class="empty">지금 정확히 5회인 사람이 없습니다 — 다음 자동 발송 때는 새로 5회가 되는 사람에게만 나갑니다.</td></tr></tbody>';
     $('missed5CurrentExcludeBtn').hidden = rows.length === 0;

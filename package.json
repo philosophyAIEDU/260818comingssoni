@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "solapi": "^6.0.1"
   }
 }

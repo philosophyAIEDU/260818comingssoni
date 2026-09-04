@@ -65,6 +65,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(300);
   t('잘못된 이메일 형식은 거부됨', /올바른 메일 주소/.test(await page.textContent('#rosterMsg')));
 
+  // 명단 관리 — 전화번호도 이메일처럼 표에서 바로 수정 가능(문자 자동 발송용)
+  const phoneInputs = page.locator('#rosterTable tbody tr td input[data-editphone]');
+  t('전화번호 칸 기본값은 비어 있음', (await phoneInputs.first().inputValue()) === '');
+  await phoneInputs.first().fill('010-1234-5678');
+  await phoneInputs.first().dispatchEvent('change');
+  await page.waitForTimeout(300);
+  t('전화번호 수정 완료 메시지', /전화번호를 수정했습니다/.test(await page.textContent('#rosterMsg')));
+  t('명단 표에 수정한 전화번호가 반영됨',
+    (await page.locator('#rosterTable tbody tr td input[data-editphone]').first().inputValue()) === '010-1234-5678');
+
   // 명단 관리 — 카톡방 참여 여부를 드롭다운(미정/O/X)으로 표시
   const kakaoSelects = page.locator('#rosterTable tbody tr td select[data-editkakao]');
   t('카톡방 참여 여부 드롭다운 기본값은 미정', (await kakaoSelects.first().inputValue()) === '');
@@ -887,7 +897,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.goto(BASE + '/admin.html');
   await page.waitForTimeout(400);
   await page.click('button[data-tab="roster"]');
-  const csvContent = '이름,이메일\n글벗,csvreader1@example.com\n책모임,csvreader2@example.com\n';
+  const csvContent = '이름,이메일,전화번호\n글벗,csvreader1@example.com,010-1111-2222\n책모임,csvreader2@example.com,010-3333-4444\n';
   await page.setInputFiles('#rosterCsvInput', {
     name: 'roster.csv', mimeType: 'text/csv', buffer: Buffer.from(csvContent, 'utf-8')
   });
@@ -896,6 +906,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const csvMsg = await page.textContent('#rosterCsvMsg');
   t('CSV 업로드 결과 메시지(참여자·알림 메일 동시 등록)',
     /참여자 2명 등록/.test(csvMsg) && /알림 메일 2건 등록/.test(csvMsg), csvMsg.trim());
+  t('CSV 업로드 결과 메시지에 전화번호 채움 건수도 표시됨', /전화번호 2건 채움/.test(csvMsg), csvMsg.trim());
   // 이름 칸은 인라인 수정용 <input>이라 textContent에는 잡히지 않으므로 값을 직접 읽는다.
   const rosterNames = await page.locator('#rosterTable tbody tr td input[data-rename]').evaluateAll(
     (els) => els.map((e) => e.value));
@@ -905,6 +916,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     (els) => els.map((e) => e.value));
   t('CSV로 올린 이메일이 명단 표 이메일 칸에도 채워짐',
     rosterEmails.includes('csvreader1@example.com') && rosterEmails.includes('csvreader2@example.com'), rosterEmails);
+  // 세 번째 열(전화번호)도 명단 표의 전화번호 칸에 채워져야 함
+  const rosterPhones = await page.locator('#rosterTable tbody tr td input[data-editphone]').evaluateAll(
+    (els) => els.map((e) => e.value));
+  t('CSV로 올린 전화번호가 명단 표 전화번호 칸에도 채워짐',
+    rosterPhones.includes('010-1111-2222') && rosterPhones.includes('010-3333-4444'), rosterPhones);
   await page.click('button[data-tab="notify"]');
   await page.waitForTimeout(200);
   t('CSV로 올린 메일이 알림 메일 목록에도 추가됨', (await page.textContent('#notifyTable')).includes('csvreader1@example.com'));
