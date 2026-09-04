@@ -183,7 +183,18 @@ CS.U = (function () {
 
     return participants.map((p) => {
       const subMap = byPid.get(p.id) || new Map();
-      const cells = dates.map((d) => ({ date: d, status: statusFor(p, d, subMap, todayISO) }));
+
+      // 킥아웃이 확정된 날(누적 미인증이 kickoutThreshold에 도달한 날)에서 집계를 멈춘다.
+      // 그 뒤 날짜는 '·'(해당 없음)로 두어 미인증이 계속 쌓이지 않게 한다.
+      let running = 0;
+      let kickoutDate = null;
+      const cells = dates.map((d) => {
+        if (kickoutDate) return { date: d, status: '·' };
+        const status = statusFor(p, d, subMap, todayISO);
+        if (status === 'X' && ++running >= CS.CONFIG.kickoutThreshold) kickoutDate = d;
+        return { date: d, status };
+      });
+
       const missed = cells.filter((c) => c.status === 'X').length;
       const verified = cells.filter((c) => c.status === 'O').length;
       const exempt = cells.filter((c) => c.status === 'P').length;
@@ -191,11 +202,9 @@ CS.U = (function () {
 
       // 연속 인증 (오늘 또는 어제부터 거슬러 올라가며, 면제는 연속을 끊지 않음)
       let streak = 0;
-      const upto = dates.filter((d) => d <= todayISO).reverse();
-      for (const d of upto) {
-        const st = statusFor(p, d, subMap, todayISO);
-        if (st === 'O') streak++;
-        else if (st === 'P' || (d === todayISO && st === '-')) continue;
+      for (const c of cells.filter((x) => x.date <= todayISO).reverse()) {
+        if (c.status === 'O') streak++;
+        else if (c.status === 'P' || (c.date === todayISO && c.status === '-')) continue;
         else break;
       }
 
@@ -212,7 +221,9 @@ CS.U = (function () {
         // 분리해서, "위험" 단계를 킥아웃보다 먼저 경고로 보여줄 수 있게 한다. kickoutEligible이면
         // atRisk도 항상 true다(더 심한 상태를 포함).
         atRisk: missed >= CS.CONFIG.riskThreshold,
-        kickoutEligible: missed >= CS.CONFIG.kickoutThreshold
+        kickoutEligible: missed >= CS.CONFIG.kickoutThreshold,
+        // 킥아웃이 확정된 날짜 (아직 아니면 null) — 이 날 이후는 집계하지 않는다
+        kickoutDate
       };
     });
   }

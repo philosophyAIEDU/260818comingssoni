@@ -88,8 +88,11 @@ function t(name, cond, extra) {
   t('킥아웃 대상(kickoutThreshold=6 이상)', st.kickoutEligible === true);
   t('riskTag: 킥아웃 대상(아직 아웃 처리 전)', U.riskTag(st).label === '킥아웃 대상', U.riskTag(st));
   t('인증률 33%', st.rate === 33, st.rate);
-  t('오늘 셀은 미확정', st.cells.find(c => c.date === '2026-09-02').status === '-');
-  t('미래 셀은 미확정', st.cells.find(c => c.date === '2026-09-10').status === '-');
+  // 6회째 미인증(9/1)에 킥아웃이 확정되므로, 그 뒤 날짜는 집계에서 빠진다
+  t('킥아웃 확정일이 6회째 미인증한 날', st.kickoutDate === '2026-09-01', st.kickoutDate);
+  t('킥아웃 다음 날부터는 집계 제외', st.cells.find(c => c.date === '2026-09-02').status === '·');
+  t('그 뒤 날짜도 계속 집계 제외', st.cells.find(c => c.date === '2026-09-10').status === '·');
+  t('미인증이 킥아웃 기준에서 멈춤', st.missed === 6, st.missed);
 
   // 면제 등록 → 미인증 감소
   await Store.updateParticipant(sony.id, { exemptDates: ['2026-08-27', '2026-08-28'] });
@@ -101,14 +104,18 @@ function t(name, cond, extra) {
   t('면제 후 킥아웃 대상에서는 해제(4 < kickoutThreshold=6)', st.kickoutEligible === false);
   t('면제는 인증률 계산에서 제외', st.rate === Math.round(3/7*100), st.rate);
 
-  // 연속 인증: 8/31, 9/1 인증 추가 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)
+  // 연속 인증: 8/31, 9/1 인증 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)
+  // 합류일을 8/31로 둬서 그 전 날짜는 집계 대상이 아니게 한다(킥아웃 동결과 무관하게 검증).
+  const streaker = await Store.addParticipant('연속이');
+  await Store.updateParticipant(streaker.id, { joinDate: '2026-08-31' });
   for (const d of ['2026-08-31','2026-09-01']) {
-    await Store.saveSubmission({ participantId: whale.id, nickname: '책읽는고래', date: d,
+    await Store.saveSubmission({ participantId: streaker.id, nickname: '연속이', date: d,
       sentence: 's', reflection: 'r', createdAt: `${d}T10:00:00.000Z` });
   }
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
-    .find(s => s.participant.id === whale.id);
+    .find(s => s.participant.id === streaker.id);
   t('연속 인증 2', st.streak === 2, st.streak);
+  t('연속 인증자는 킥아웃 확정 없음', st.kickoutDate === null, st.kickoutDate);
 
   // 닉네임 변경 시 제출 기록의 표시 닉네임도 갱신
   await Store.updateParticipant(whale.id, { nickname: '고래' });
@@ -153,7 +160,7 @@ function t(name, cond, extra) {
   t('isLate: 마감 1ms만 넘어도 지각', U.isLate('2026-08-24', '2026-08-24T15:00:00.001Z') === true);
 
   console.log('— 엄지척 추천/취소 —');
-  const firstSub = (await Store.listSubmissions({ participantId: whale.id }))[0];
+  const firstSub = (await Store.listSubmissions({ participantId: streaker.id }))[0];
   const up = await Store.upvoteSubmission(firstSub.id, 'cli_test');
   t('추천 반영', up.upvotes === 1 && up.upvotedBy.includes('cli_test'), up);
   let dupVoteErr = null;
@@ -244,39 +251,44 @@ function t(name, cond, extra) {
   t('삭제 후 목록 1건', (await Store.listNotices()).length === 1);
   await Store.setNotice('2026-08-25', '');
 
-  // 아웃 처리 후 이후 날짜는 '·'
-  await Store.updateParticipant(whale.id, { status: 'out', outDate: '2026-09-01' });
+  // 아웃 처리 후 이후 날짜는 '·' (8/29 합류 → 8/29·8/30 미인증 2회, 8/31·9/1 인증)
+  const outer = await Store.addParticipant('아웃이');
+  await Store.updateParticipant(outer.id, { joinDate: '2026-08-29' });
+  for (const d of ['2026-08-31','2026-09-01']) {
+    await Store.saveSubmission({ participantId: outer.id, nickname: '아웃이', date: d,
+      sentence: 's', reflection: 'r', createdAt: `${d}T10:00:00.000Z` });
+  }
+  await Store.updateParticipant(outer.id, { status: 'out', outDate: '2026-09-01' });
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
-    .find(s => s.participant.id === whale.id);
+    .find(s => s.participant.id === outer.id);
   t('아웃 당일까지는 집계', st.cells.find(c => c.date === '2026-09-01').status === 'O');
   t('아웃 이후 날짜 제외', st.cells.find(c => c.date === '2026-09-02').status === '·'
     && st.cells.find(c => c.date === '2026-09-03').status === '·',
     st.cells.slice(9,12).map(c=>c.status));
-  // 8/24~8/30 7일 미인증, 8/31·9/1 인증, 9/2 이후는 아웃이라 집계 제외
-  t('아웃 이후는 미인증으로 안 쌓임', st.missed === 7, st.missed);
+  t('아웃 이후는 미인증으로 안 쌓임', st.missed === 2, st.missed);
   t('riskTag: 일반 아웃 처리는 "아웃" 라벨', U.riskTag(st).label === '아웃', U.riskTag(st));
 
   // 미인증 누적으로 킥아웃 처리(kickReason:'kickout')하면 "아웃"과 구분되는 "킥아웃" 라벨을 단다
-  await Store.updateParticipant(whale.id, { kickReason: 'kickout' });
+  await Store.updateParticipant(outer.id, { kickReason: 'kickout' });
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
-    .find(s => s.participant.id === whale.id);
+    .find(s => s.participant.id === outer.id);
   t('riskTag: 킥아웃 처리는 "킥아웃" 라벨로 구분', U.riskTag(st).label === '킥아웃', U.riskTag(st));
 
   // 복귀시키면(status/kickReason 초기화) 다시 정상 참여중으로 돌아온다
-  await Store.updateParticipant(whale.id, { status: 'active', outDate: null, kickReason: null });
+  await Store.updateParticipant(outer.id, { status: 'active', outDate: null, kickReason: null });
   st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
-    .find(s => s.participant.id === whale.id);
+    .find(s => s.participant.id === outer.id);
   t('복귀 후에는 아웃·킥아웃 라벨 모두 사라짐',
     U.riskTag(st).label !== '킥아웃' && U.riskTag(st).label !== '아웃', U.riskTag(st));
 
 
   // 백업 / 복원 / 삭제
   const dump = await Store.exportAll();
-  t('백업에 참가자 포함', dump.participants.length === 3, dump.participants.length);
+  t('백업에 참가자 포함', dump.participants.length === 5, dump.participants.length);
   await Store.clearAll();
   t('전체 삭제', (await Store.listParticipants()).length === 0);
   await Store.importAll(dump);
-  t('복원', (await Store.listParticipants()).length === 3
+  t('복원', (await Store.listParticipants()).length === 5
     && (await Store.listSubmissions()).length === dump.submissions.length);
 
   await Store.removeParticipant(sony.id);

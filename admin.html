@@ -122,6 +122,16 @@
     <div id="syncEmailMsg"></div>
     <div class="row" style="margin-bottom:12px">
       <div>
+        <label class="muted" for="rosterStatusFilter">상태로 보기</label>
+        <select id="rosterStatusFilter">
+          <option value="">전체 보기 (심한 순)</option>
+          <option value="out">아웃만 보기</option>
+          <option value="kickout">킥아웃 대상만 보기</option>
+          <option value="risk">위험만 보기</option>
+          <option value="active">참여중만 보기</option>
+        </select>
+      </div>
+      <div>
         <label class="muted" for="rosterKakaoFilter">카톡방 참여 여부로 보기</label>
         <select id="rosterKakaoFilter">
           <option value="">전체 보기</option>
@@ -263,6 +273,8 @@
       [명단 관리]에서 <strong>킥아웃 처리</strong>된 참여자 목록입니다. <strong>[메일 작성]</strong>을 누르면
       더 이상 이번 챌린지에 참여할 수 없다는 안내와 다음 챌린지 재신청 안내를 담은 제목·본문이 위
       작성창에 채워집니다 — 확인 후 [Gmail로 작성하기]나 [복사하기]로 보내주세요.
+      메일은 직접 보내는 방식이라 앱이 발송 여부를 알 수 없으니, 보낸 뒤 <strong>[보냄 표시]</strong>를
+      눌러 두면 <strong>보낸 날짜</strong>가 기록되어 두 번 보내는 일을 막을 수 있습니다.
     </p>
     <div id="kickoutNoticeMsg"></div>
     <div class="scroll">

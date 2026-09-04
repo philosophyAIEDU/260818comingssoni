@@ -25,6 +25,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${START}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${END}'`)
                .replace(/otAt: '[^']+'/, `otAt: '${shift(-9)}T10:00'`)
+               // 이 컨텍스트는 챌린지가 이미 8일 지난 상태에서 참가자를 새로 만들기 때문에,
+               // 실제 킥아웃 기준(6회)이면 등록하자마자 킥아웃이 확정돼 집계가 얼어붙는다.
+               // 킥아웃 동결 자체는 logic 테스트에서 따로 검증하므로 여기서는 기준을 높여 둔다.
+               .replace(/kickoutThreshold: \d+/, 'kickoutThreshold: 60')
+               .replace(/riskThreshold: \d+/, 'riskThreshold: 40')
                // 테스트는 네트워크·구글 로그인 없이 돌도록 localStorage 백엔드로 고정
                .replace(/backend: '[^']+'/, `backend: 'local'`);
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
@@ -1035,6 +1040,97 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await finishCtx.close();
 
+  // ── 운영진: 킥아웃 동결 / 명단 상태 필터 / 통보 메일 발송 기록 ──
+  const adminCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await adminCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    // 인증 일수: 성실이 9(미인증 0) / 위험이 5(4) / 대상이 3(6→동결) / 아웃이 0(킥아웃 처리됨)
+    const plan = [['성실이', 9], ['위험이', 5], ['대상이', 3], ['아웃이', 0]];
+    const parts = plan.map(([n], i) => ({
+      id: 'p' + i, nickname: n, email: `${i}@ex.com`, kakaoJoined: '',
+      createdAt: shift(-9) + 'T00:00:00.000Z',
+    }));
+    parts[3].status = 'out'; parts[3].outDate = shift(-4); parts[3].kickReason = 'kickout';
+    const subs = [];
+    plan.forEach(([n, done], i) => {
+      for (let d = 0; d < done; d++) {
+        const date = shift(-9 + d);
+        subs.push({
+          id: `s${i}_${d}`, participantId: 'p' + i, nickname: n, date,
+          sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [],
+          createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`,
+        });
+      }
+    });
+    await adminCtx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+
+    const ap = await adminCtx.newPage();
+    ap.on('dialog', (d) => d.accept());
+    await ap.goto(BASE + '/admin.html');
+    await ap.waitForTimeout(700);
+
+    const mrows = await ap.locator('#matrix tbody tr').evaluateAll((trs) => trs.map((tr) => ({
+      name: tr.querySelector('.name').textContent.replace(/\s+/g, ' ').trim(),
+      missed: tr.children[1].textContent.trim(),
+      cells: [...tr.querySelectorAll('.cell')].map((c) => c.textContent.trim()).join(''),
+    })));
+    const target = mrows.find((r) => r.name.startsWith('대상이'));
+    t('킥아웃 기준에 닿으면 미인증이 더 쌓이지 않음', target.missed === '6', target);
+    t('킥아웃 확정일 다음 날부터는 셀이 비어 있음(집계 정지)',
+      /^OOOXXXXXX\.*$/.test(target.cells.replace(/·/g, '.')), target.cells);
+    t('매트릭스에 집계가 멈춘 날짜를 적어 줌', target.name.includes('이후 집계 멈춤'), target.name);
+
+    // 명단: 상태로 보기
+    await ap.click('button[data-tab="roster"]');
+    await ap.waitForTimeout(400);
+    const rosterNames = () => ap.locator('#rosterTable tbody tr td:first-child input')
+      .evaluateAll((els) => els.map((e) => e.value));
+    t('명단이 심한 순(아웃 → 킥아웃 → 위험 → 참여중)으로 정렬됨',
+      JSON.stringify(await rosterNames()) === JSON.stringify(['아웃이', '대상이', '위험이', '성실이']),
+      await rosterNames());
+    await ap.selectOption('#rosterStatusFilter', 'risk');
+    await ap.waitForTimeout(300);
+    t('위험만 보기', JSON.stringify(await rosterNames()) === JSON.stringify(['위험이']), await rosterNames());
+    await ap.selectOption('#rosterStatusFilter', 'kickout');
+    await ap.waitForTimeout(300);
+    t('킥아웃 대상만 보기', JSON.stringify(await rosterNames()) === JSON.stringify(['대상이']), await rosterNames());
+    await ap.selectOption('#rosterStatusFilter', 'out');
+    await ap.waitForTimeout(300);
+    t('아웃만 보기', JSON.stringify(await rosterNames()) === JSON.stringify(['아웃이']), await rosterNames());
+
+    // 통보 메일 발송 기록
+    await ap.click('button[data-tab="notify"]');
+    await ap.waitForTimeout(500);
+    t('보내기 전에는 미발송으로 표시',
+      (await ap.textContent('#kickoutNoticeTable')).includes('미발송'));
+    await ap.click('[data-kicksent]');
+    await ap.waitForTimeout(600);
+    const sentText = (await ap.textContent('#kickoutNoticeTable')).replace(/\s+/g, ' ');
+    t('보냄 표시를 누르면 보낸 날짜가 기록됨', /보냄 · \d+\/\d+\(.\)/.test(sentText), sentText);
+    await ap.click('[data-kickmail]');
+    await ap.waitForTimeout(400);
+    t('이미 보낸 사람은 메일 작성 시 경고',
+      (await ap.textContent('#kickoutNoticeMsg')).includes('이미'),
+      await ap.textContent('#kickoutNoticeMsg'));
+    await ap.click('[data-kickunsent]');
+    await ap.waitForTimeout(600);
+    t('보냄 취소로 기록을 지울 수 있음',
+      (await ap.textContent('#kickoutNoticeTable')).includes('미발송'));
+  }
+  await adminCtx.close();
+
   // ── 킥아웃 위험 인원: 이름만이 아니라 누적 미인증 횟수까지 ──
   const riskCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await riskCtx.route('**/js/config.js', async (route) => {
@@ -1081,7 +1177,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       chips.every((c) => /\d+회$/.test(c)) && chips.length > 0, chips);
     t('9일 다 인증한 사람은 위험 명단에 없음', !chips.some((c) => c.startsWith('성실이')), chips);
     t('누락이 많은 사람이 위로', chips[0].startsWith('거의안함'), chips);
-    t('누락 횟수가 실제 값과 맞음(9일 중 2일 인증 → 7회)', chips[0] === '거의안함7회', chips);
+    // 킥아웃이 확정되면 그 날에서 집계가 멈추므로 미인증은 기준(6회)을 넘지 않는다
+    t('누락 횟수는 킥아웃 기준에서 멈춤(최대 6회)',
+      chips.every((c) => Number(c.match(/(\d+)회$/)[1]) <= 6), chips);
+    t('가장 많이 누락한 사람이 킥아웃 기준까지 찍힘', chips[0] === '거의안함6회', chips);
     t('킥아웃 대상(6회 이상)은 따로 표시됨',
       (await rp.locator('#ovDetail .ov-chip.out').count()) === 2,
       await rp.locator('#ovDetail .ov-chip.out').allTextContents());
