@@ -122,6 +122,16 @@
     <div id="syncEmailMsg"></div>
     <div class="row" style="margin-bottom:12px">
       <div>
+        <label class="muted" for="rosterStatusFilter">상태로 보기</label>
+        <select id="rosterStatusFilter">
+          <option value="">전체 보기 (심한 순)</option>
+          <option value="out">아웃만 보기</option>
+          <option value="kickout">킥아웃 대상만 보기</option>
+          <option value="risk">위험만 보기</option>
+          <option value="active">참여중만 보기</option>
+        </select>
+      </div>
+      <div>
         <label class="muted" for="rosterKakaoFilter">카톡방 참여 여부로 보기</label>
         <select id="rosterKakaoFilter">
           <option value="">전체 보기</option>

@@ -104,12 +104,15 @@
       const risk = s.atRisk && p.status !== 'out'; // 위험(4회~) 또는 킥아웃 대상(6회~) 모두 포함 — 행 강조용
       const rt = U.riskTag(s);
       const nameTag = p.status === 'out' || risk ? ` <span class="tag ${rt.cls}">${rt.label}</span>` : '';
+      // 킥아웃이 확정된 날을 적어 준다 — 그 날 이후는 집계가 멈춰 '·'로 표시된다
+      const outNote = s.kickoutDate
+        ? ` <span class="muted" style="font-size:11px">${U.shortLabel(s.kickoutDate)} 멈춤</span>` : '';
       const cells = s.cells.map((c) =>
         `<td><span class="cell ${CELL_CLASS[c.status]}" data-pid="${p.id}" data-date="${c.date}" ` +
         `title="${esc(p.nickname)} · ${U.shortLabel(c.date)} · ${LABEL[c.status]}" style="cursor:pointer">` +
         `${c.status === '-' || c.status === '·' ? '·' : c.status}</span></td>`).join('');
       return `<tr class="${risk ? 'risk' : ''}">
-        <td class="name" title="${esc(p.nickname)}">${esc(p.nickname)}${nameTag}</td>
+        <td class="name" title="${esc(p.nickname)}">${esc(p.nickname)}${nameTag}${outNote}</td>
         <td class="num">${s.missed}</td>
         <td class="num">${s.rate}%</td>${cells}</tr>`;
     }).join('');
@@ -196,9 +199,28 @@
 
     // 카톡방 참여 여부로 보기 필터: '' 전체, 'unset' 미정, 'O'/'X' 그대로 일치
     const kakaoFilter = $('rosterKakaoFilter').value;
-    const visible = kakaoFilter
+    let visible = kakaoFilter
       ? participants.filter((p) => (kakaoFilter === 'unset' ? !p.kakaoJoined : p.kakaoJoined === kakaoFilter))
       : participants;
+
+    // 상태로 보기 필터 + 심한 순 정렬 (아웃 > 킥아웃 대상 > 위험 > 참여중)
+    const statOf = (p) => stats.find((x) => x.participant.id === p.id)
+      || { participant: p, missed: 0, atRisk: false, kickoutEligible: false };
+    const statusKey = (p) => {
+      const st = statOf(p);
+      if (p.status === 'out') return 'out';
+      if (st.kickoutEligible) return 'kickout';
+      if (st.atRisk) return 'risk';
+      return 'active';
+    };
+    const statusFilter = $('rosterStatusFilter').value;
+    if (statusFilter) visible = visible.filter((p) => statusKey(p) === statusFilter);
+    // 손봐야 할 사람이 위로 오도록 항상 심한 순 → 미인증 많은 순 → 이름순
+    const rank = { out: 0, kickout: 1, risk: 2, active: 3 };
+    visible = visible.slice().sort((a, b) =>
+      rank[statusKey(a)] - rank[statusKey(b)]
+      || statOf(b).missed - statOf(a).missed
+      || a.nickname.localeCompare(b.nickname, 'ko'));
     if (!visible.length) {
       t.innerHTML = '<tbody><tr><td class="empty">조건에 맞는 참가자가 없습니다.</td></tr></tbody>';
       return;
@@ -1222,6 +1244,7 @@
     $('rosterCsvUploadBtn').addEventListener('click', uploadRosterCsv);
     $('syncEmailFromNotify').addEventListener('click', syncEmailFromNotify);
     $('rosterKakaoFilter').addEventListener('change', paintRoster);
+    $('rosterStatusFilter').addEventListener('change', paintRoster);
 
     $('noticeDate').addEventListener('change', () => { noticeDirty = false; loadNoticeForDate(); });
     $('noticeOut').addEventListener('input', () => { noticeDirty = true; });

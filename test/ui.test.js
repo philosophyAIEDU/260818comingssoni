@@ -25,6 +25,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${START}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${END}'`)
                .replace(/otAt: '[^']+'/, `otAt: '${shift(-9)}T10:00'`)
+               // 이 컨텍스트는 챌린지가 이미 8일 지난 상태에서 참가자를 새로 만들기 때문에,
+               // 실제 킥아웃 기준(6회)이면 등록하자마자 킥아웃이 확정돼 집계가 얼어붙는다.
+               // 킥아웃 동결 자체는 logic 테스트에서 따로 검증하므로 여기서는 기준을 높여 둔다.
+               .replace(/kickoutThreshold: \d+/, 'kickoutThreshold: 60')
+               .replace(/riskThreshold: \d+/, 'riskThreshold: 40')
                // 테스트는 네트워크·구글 로그인 없이 돌도록 localStorage 백엔드로 고정
                .replace(/backend: '[^']+'/, `backend: 'local'`);
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
@@ -1081,7 +1086,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       chips.every((c) => /\d+회$/.test(c)) && chips.length > 0, chips);
     t('9일 다 인증한 사람은 위험 명단에 없음', !chips.some((c) => c.startsWith('성실이')), chips);
     t('누락이 많은 사람이 위로', chips[0].startsWith('거의안함'), chips);
-    t('누락 횟수가 실제 값과 맞음(9일 중 2일 인증 → 7회)', chips[0] === '거의안함7회', chips);
+    // 킥아웃이 확정되면 그 날에서 집계가 멈추므로 미인증은 기준(6회)을 넘지 않는다
+    t('누락 횟수는 킥아웃 기준에서 멈춤(최대 6회)',
+      chips.every((c) => Number(c.match(/(\d+)회$/)[1]) <= 6), chips);
+    t('가장 많이 누락한 사람이 킥아웃 기준까지 찍힘', chips[0] === '거의안함6회', chips);
     t('킥아웃 대상(6회 이상)은 따로 표시됨',
       (await rp.locator('#ovDetail .ov-chip.out').count()) === 2,
       await rp.locator('#ovDetail .ov-chip.out').allTextContents());
