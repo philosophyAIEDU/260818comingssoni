@@ -563,6 +563,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     /중복 1건/.test(await page.textContent('#notifyMsg')) &&
     /형식 오류 1건/.test(await page.textContent('#notifyMsg')),
     await page.textContent('#notifyMsg'));
+  // 목록이 길어 접이식으로 감쌌으므로, 표를 만지는 검증 전에 펼쳐 둔다
+  await page.locator('#notifyListFold summary').click();
+  await page.waitForTimeout(200);
+  t('등록된 메일 주소 목록은 접이식으로 접혀 있다가 펼칠 수 있음',
+    await page.locator('#notifyListFold').evaluate((el) => el.open));
   t('메일 주소 2건 등록됨', /2명/.test(await page.textContent('#notifyCount')));
   t('이름이 목록에 표시됨', (await page.textContent('#notifyTable')).includes('홍길동'));
   // [명단 관리]와 마찬가지로 이름 가나다순 — 김철수(ㄱ)가 홍길동(ㅎ)보다 먼저 나와야 함
@@ -1036,6 +1041,94 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     finishText.includes('전체 완주하셨습니다'), finishText.slice(0, 200));
 
   await finishCtx.close();
+
+  // ── 알림 메일 탭: 표 머리글로 오름/내림 정렬, 긴 메일 목록은 접이식 ──
+  const sortCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await sortCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    const plan = [['성실이', 9], ['가나다', 5], ['하나둘', 3], ['마바사', 2]];
+    const parts = plan.map(([n], i) => ({
+      id: 'p' + i, nickname: n, email: `${'zyxw'[i]}${i}@ex.com`, kakaoJoined: '',
+      createdAt: shift(-9) + 'T00:00:00.000Z',
+    }));
+    // 킥아웃 통보 대상 2명(킥아웃일이 서로 달라야 날짜 정렬을 확인할 수 있다)
+    parts.push({ id: 'k0', nickname: '아웃하나', email: 'a0@ex.com', kakaoJoined: '',
+      status: 'out', outDate: shift(-5), kickReason: 'kickout', createdAt: shift(-9) + 'T00:00:00.000Z' });
+    parts.push({ id: 'k1', nickname: '아웃둘', email: 'a1@ex.com', kakaoJoined: '',
+      status: 'out', outDate: shift(-2), kickReason: 'kickout', createdAt: shift(-9) + 'T00:00:00.000Z' });
+    const subs = [];
+    plan.forEach(([n, done], i) => {
+      for (let d = 0; d < done; d++) {
+        const date = shift(-9 + d);
+        subs.push({
+          id: `s${i}_${d}`, participantId: 'p' + i, nickname: n, date,
+          sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [],
+          createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`,
+        });
+      }
+    });
+    const mails = [['하늘', 'sky@ex.com', 3], ['가람', 'garam@ex.com', 1], ['바다', 'sea@ex.com', 2]]
+      .map(([n, e, i]) => ({ id: 'm' + i, name: n, email: e, createdAt: `2026-08-2${i}T10:00:00.000Z` }));
+    await sortCtx.addInitScript(({ parts, subs, mails }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.notifyEmails', JSON.stringify(mails));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs, mails });
+
+    const sp = await sortCtx.newPage();
+    await sp.goto(BASE + '/admin.html');
+    await sp.waitForTimeout(700);
+    await sp.click('button[data-tab="notify"]');
+    await sp.waitForTimeout(400);
+    const colOf = (sel, n) => sp.locator(`${sel} tbody tr td:nth-child(${n})`).allTextContents();
+
+    t('등록된 메일 주소 목록은 접힌 채로 시작',
+      !(await sp.locator('#notifyListFold').evaluate((el) => el.open)));
+    await sp.click('#notifyListFold summary');
+    await sp.waitForTimeout(200);
+
+    t('메일 목록 기본은 이름 오름차순',
+      JSON.stringify(await colOf('#notifyTable', 1)) === JSON.stringify(['가람', '바다', '하늘']),
+      await colOf('#notifyTable', 1));
+    await sp.click('#notifyTable th[data-sortkey="name"]');
+    await sp.waitForTimeout(200);
+    t('같은 머리글을 다시 누르면 내림차순',
+      JSON.stringify(await colOf('#notifyTable', 1)) === JSON.stringify(['하늘', '바다', '가람']),
+      await colOf('#notifyTable', 1));
+    t('정렬 중인 머리글에 방향 표시(aria-sort)',
+      (await sp.locator('#notifyTable th[data-sortkey="name"]').getAttribute('aria-sort')) === 'descending');
+    await sp.click('#notifyTable th[data-sortkey="email"]');
+    await sp.waitForTimeout(200);
+    t('다른 열을 누르면 그 열 오름차순으로 시작',
+      JSON.stringify(await colOf('#notifyTable', 2))
+        === JSON.stringify(['garam@ex.com', 'sea@ex.com', 'sky@ex.com']),
+      await colOf('#notifyTable', 2));
+
+    t('미인증 경고는 기본이 미인증 많은 순',
+      (await colOf('#missedWarnTable', 2))[0].startsWith('6'), await colOf('#missedWarnTable', 2));
+    await sp.click('#missedWarnTable th[data-sortkey="missed"]');
+    await sp.waitForTimeout(200);
+    t('미인증 열을 누르면 적은 순으로 뒤집힘',
+      (await colOf('#missedWarnTable', 2))[0].startsWith('4'), await colOf('#missedWarnTable', 2));
+
+    const kickDates = await colOf('#kickoutNoticeTable', 2);
+    t('킥아웃 통보는 기본이 최근 킥아웃 순', kickDates.length === 2, kickDates);
+    await sp.click('#kickoutNoticeTable th[data-sortkey="outDate"]');
+    await sp.waitForTimeout(200);
+    t('킥아웃일 열을 누르면 순서가 뒤집힘',
+      JSON.stringify(await colOf('#kickoutNoticeTable', 2)) === JSON.stringify(kickDates.slice().reverse()),
+      await colOf('#kickoutNoticeTable', 2));
+  }
+  await sortCtx.close();
 
   // ── 운영진: 킥아웃 동결 / 명단 상태 필터 / 통보 메일 발송 기록 ──
   const adminCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });

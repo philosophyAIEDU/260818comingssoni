@@ -299,6 +299,11 @@ button[hidden] { display: none; }
 
 .nowrap { white-space: nowrap; }
 
+/* 눌러서 정렬하는 표 머리글 */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover, th.sortable:focus-visible { color: var(--accent); }
+th.sortable .sort-arrow { margin-left: 4px; font-size: 10px; }
+
 /* ── 표 ───────────────────────────────── */
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13.5px; }
