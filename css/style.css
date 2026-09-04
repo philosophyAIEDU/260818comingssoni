@@ -267,6 +267,7 @@ button[hidden] { display: none; }
 .stat.ok .n { color: var(--ok); }
 .stat.bad .n { color: var(--bad); }
 .stat.warn .n { color: var(--warn); }
+.stat.info .n { color: var(--info); }
 .stat.clickable { cursor: pointer; transition: border-color .15s, background .15s; }
 .stat.clickable:hover, .stat.clickable:focus-visible { border-color: var(--accent); background: var(--surface); }
 .stat.clickable[aria-expanded="true"] { border-color: var(--accent); }
@@ -470,7 +471,7 @@ footer.foot {
 .strip-cell .d { font-size: 9.5px; line-height: 1.2; color: var(--text-faint); }
 
 /* 통계 타일 4개가 한 줄에 들어오도록 */
-#myCard .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#myCard .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 /* ── 최근 기록 목록 ───────────────────── */
 .entry-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; overscroll-behavior: contain; }
