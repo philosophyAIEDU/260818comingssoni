@@ -106,7 +106,7 @@
       const nameTag = p.status === 'out' || risk ? ` <span class="tag ${rt.cls}">${rt.label}</span>` : '';
       // 킥아웃이 확정된 날을 적어 준다 — 그 날 이후는 집계가 멈춰 '·'로 표시된다
       const outNote = s.kickoutDate
-        ? ` <span class="muted" style="font-size:11px">${U.shortLabel(s.kickoutDate)} 멈춤</span>` : '';
+        ? `<div class="stop-note">${U.shortLabel(s.kickoutDate)} 이후 집계 멈춤</div>` : '';
       const cells = s.cells.map((c) =>
         `<td><span class="cell ${CELL_CLASS[c.status]}" data-pid="${p.id}" data-date="${c.date}" ` +
         `title="${esc(p.nickname)} · ${U.shortLabel(c.date)} · ${LABEL[c.status]}" style="cursor:pointer">` +
@@ -1097,19 +1097,31 @@
     await refresh();
   }
 
+  /** 통보 메일은 운영진이 Gmail·복사로 직접 보내므로 앱이 발송을 알 수 없다.
+   *  그래서 보낸 뒤 [보냄 표시]를 눌러 기록해 두고, 그 날짜를 목록에 보여 준다.
+   *  (participant.kickoutMailSentAt 에 'YYYY-MM-DD'로 저장) */
   function paintKickoutNotice() {
     const rows = kickoutNoticeCandidates();
     const t = $('kickoutNoticeTable');
     t.innerHTML = rows.length
-      ? `<thead><tr><th>이름</th><th>킥아웃일</th><th>이메일</th><th></th></tr></thead><tbody>${
-        rows.map(({ participant: p, email }) => `<tr>
+      ? `<thead><tr><th>이름</th><th>킥아웃일</th><th>이메일</th><th>통보 메일</th><th></th></tr></thead><tbody>${
+        rows.map(({ participant: p, email }) => {
+          const sentAt = p.kickoutMailSentAt || '';
+          return `<tr>
           <td>${esc(p.nickname)}</td>
           <td>${p.outDate ? esc(U.shortLabel(p.outDate)) : '-'}</td>
           <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
-          <td>${email
-            ? `<button class="small" data-kickmail="${esc(p.id)}">메일 작성</button>`
+          <td>${sentAt
+            ? `<span class="tag ok">보냄 · ${esc(U.shortLabel(sentAt))}</span>`
+            : '<span class="tag warn">미발송</span>'}</td>
+          <td class="nowrap">${email
+            ? `<button class="small" data-kickmail="${esc(p.id)}">메일 작성</button> `
+              + (sentAt
+                ? `<button class="small ghost" data-kickunsent="${esc(p.id)}">보냄 취소</button>`
+                : `<button class="small" data-kicksent="${esc(p.id)}">보냄 표시</button>`)
             : ''}</td>
-        </tr>`).join('')}</tbody>`
+        </tr>`;
+        }).join('')}</tbody>`
       : '<tbody><tr><td class="empty">킥아웃 처리된 참여자가 없습니다.</td></tr></tbody>';
 
     t.querySelectorAll('[data-kickmail]').forEach((el) => {
@@ -1119,8 +1131,28 @@
         selectCustomMailTarget(row.participant.nickname, row.email);
         $('customMailSubject').value = kickoutNoticeSubject(row.participant);
         $('customMailBody').value = kickoutNoticeBody(row.participant);
+        // 이미 보낸 사람이면 두 번 보내지 않도록 먼저 알려 준다
+        msg($('kickoutNoticeMsg'), row.participant.kickoutMailSentAt
+          ? `${esc(row.participant.nickname)} 님에게는 이미 `
+            + `<strong>${esc(U.shortLabel(row.participant.kickoutMailSentAt))}</strong>에 보낸 것으로 표시돼 있습니다.`
+          : '', row.participant.kickoutMailSentAt ? 'warn' : '');
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
+    });
+
+    const markSent = async (id, sentAt) => {
+      const p = participants.find((x) => x.id === id);
+      await Store.updateParticipant(id, { kickoutMailSentAt: sentAt });
+      msg($('kickoutNoticeMsg'), sentAt
+        ? `${esc(p ? p.nickname : '')} 님을 <strong>${esc(U.shortLabel(sentAt))} 발송</strong>으로 기록했습니다.`
+        : `${esc(p ? p.nickname : '')} 님의 발송 기록을 지웠습니다.`, 'ok');
+      await refresh();
+    };
+    t.querySelectorAll('[data-kicksent]').forEach((el) => {
+      el.addEventListener('click', () => markSent(el.dataset.kicksent, U.today()));
+    });
+    t.querySelectorAll('[data-kickunsent]').forEach((el) => {
+      el.addEventListener('click', () => markSent(el.dataset.kickunsent, ''));
     });
   }
 

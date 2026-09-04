@@ -297,6 +297,8 @@ button[hidden] { display: none; }
   color: var(--text-faint); white-space: nowrap;
 }
 
+.nowrap { white-space: nowrap; }
+
 /* ── 표 ───────────────────────────────── */
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13.5px; }
@@ -314,6 +316,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   min-width: 118px; max-width: 160px; overflow: hidden; text-overflow: ellipsis;
 }
 .matrix tbody tr:hover td.name { background: var(--surface-2); }
+/* 킥아웃으로 집계가 멈춘 날 — 이름 아래 한 줄로 (이름 칸이 좁아 옆에 붙이면 잘린다) */
+.matrix td.name .stop-note {
+  font-size: 10.5px; font-weight: 500; color: var(--text-faint);
+  white-space: nowrap; margin-top: 2px;
+}
 .matrix thead th { position: sticky; top: 0; z-index: 3; }
 .matrix thead th.name { z-index: 4; }
 .cell {
