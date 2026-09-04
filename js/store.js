@@ -33,7 +33,7 @@
  *   setNotice(date, text)                 → Promise<void>  (text가 빈 값이면 저장분 삭제)
  *   listNotices()                         → Promise<{date, text, updatedAt}[]>
  *
- *  Participant { id, nickname, email, kakaoJoined:''|'O'|'X', status:'active'|'out', joinDate, outDate,
+ *  Participant { id, nickname, email, phone(문자 발송용, 선택), kakaoJoined:''|'O'|'X', status:'active'|'out', joinDate, outDate,
  *                kickReason:null|'kickout' (status가 'out'일 때, 미인증 누적으로 킥아웃 처리된 경우만 'kickout'),
  *                warned5At:null|'YYYY-MM-DD' (미인증 5회 자동 경고 메일을 보낸 날짜(KST) — 중복 발송
  *                방지용. Netlify 예약 함수가 채우고, [명단 관리]에서 "복귀" 처리하면 다시 null로 지워진다),
@@ -85,6 +85,7 @@ CS.LocalStore = (function () {
       id: CS.U.uid('p'),
       nickname: CS.U.normalizeNick(nickname),
       email: '',
+      phone: '',        // 문자(SMS) 발송용 전화번호(선택) — 숫자만 저장(하이픈 등은 발송 시 정리)
       kakaoJoined: '',  // '' 미정 | 'O' 참여 | 'X' 미참여 — 카톡방 참여 여부(운영진이 [명단 관리]에서 직접 표시)
       status: 'active',
       joinDate: CS.CONFIG.startDate,

@@ -57,6 +57,11 @@ function t(name, cond, extra) {
   t('카톡방 참여 여부 저장(O)',
     (await Store.listParticipants()).find(p => p.id === sony.id).kakaoJoined === 'O');
 
+  t('전화번호 기본값은 빈 문자열', sony.phone === '', sony.phone);
+  await Store.updateParticipant(sony.id, { phone: '010-1234-5678' });
+  t('전화번호 저장',
+    (await Store.listParticipants()).find(p => p.id === sony.id).phone === '010-1234-5678');
+
   let dupErr = null;
   try { await Store.addParticipant('커밍쏜'); } catch (e) { dupErr = e.message; }
   t('중복 닉네임 거부', !!dupErr, dupErr);
