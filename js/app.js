@@ -458,6 +458,7 @@
     $('myCard').hidden = false;
     $('stVerified').textContent = stat.verified;
     $('stMissed').textContent = stat.missed;
+    $('stExempt').textContent = stat.exempt;
     $('stStreak').textContent = stat.streak;
     $('stRate').textContent = `${stat.rate}%`;
 

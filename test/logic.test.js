@@ -108,6 +108,27 @@ function t(name, cond, extra) {
   t('면제 후에도 위험군은 유지(4회 = riskThreshold)', st.atRisk === true);
   t('면제 후 킥아웃 대상에서는 해제(4 < kickoutThreshold=6)', st.kickoutEligible === false);
   t('면제는 인증률 계산에서 제외', st.rate === Math.round(3/7*100), st.rate);
+  // 인증 / 미인증 / 면제 3가지로 나뉘고, 킥아웃은 '미인증'만 센다
+  t('면제일 셀은 P로 표시', st.cells.find(c => c.date === '2026-08-27').status === 'P');
+  t('면제는 미인증에 포함되지 않음',
+    st.cells.filter(c => c.status === 'X').length === st.missed
+    && st.cells.filter(c => c.status === 'P').length === st.exempt, { missed: st.missed, exempt: st.exempt });
+  t('셀 개수 = 인증 + 미인증 + 면제 + 나머지(미확정·해당없음)',
+    st.verified + st.missed + st.exempt
+      === st.cells.filter(c => ['O','X','P'].includes(c.status)).length,
+    { v: st.verified, m: st.missed, e: st.exempt });
+  // 면제를 더 걸어도 미인증만 줄어들 뿐, 면제 자체는 킥아웃 기준을 올리지 않는다
+  await Store.updateParticipant(sony.id, { exemptDates: ['2026-08-27','2026-08-28','2026-08-29','2026-08-30','2026-08-31','2026-09-01'] });
+  st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === sony.id);
+  t('면제 6일이어도 미인증 0이면 킥아웃 대상 아님',
+    st.exempt === 6 && st.missed === 0 && st.kickoutEligible === false && st.atRisk === false,
+    { exempt: st.exempt, missed: st.missed });
+  t('면제만 있는 사람은 킥아웃 확정일도 없음', st.kickoutDate === null, st.kickoutDate);
+  // 원래 상태로 되돌려 뒤 테스트에 영향이 없게 한다
+  await Store.updateParticipant(sony.id, { exemptDates: ['2026-08-27', '2026-08-28'] });
+  st = U.buildStats(await Store.listParticipants(), await Store.listSubmissions(), T)
+    .find(s => s.participant.id === sony.id);
 
   // 연속 인증: 8/31, 9/1 인증 → streak 2 (9/2는 아직 미제출이지만 마감 전이라 연속 유지)
   // 합류일을 8/31로 둬서 그 전 날짜는 집계 대상이 아니게 한다(킥아웃 동결과 무관하게 검증).

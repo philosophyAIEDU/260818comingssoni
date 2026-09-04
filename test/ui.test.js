@@ -1058,6 +1058,53 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   await finishCtx.close();
 
+  // ── 나의 현황: 인증 / 미인증 / 면제 3가지가 모두 보이고, 면제는 미인증과 구분된다 ──
+  const exemptCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await exemptCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(20)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    // 5일 확정 중 1일 인증 / 2일 면제 / 2일 미인증
+    const parts = [{ id: 'e0', nickname: '면제받은이', email: '', kakaoJoined: '',
+      exemptDates: [shift(-4), shift(-3)], createdAt: shift(-5) + 'T00:00:00.000Z' }];
+    const d = shift(-5);
+    const subs = [{ id: 'es0', participantId: 'e0', nickname: '면제받은이', date: d,
+      sentence: '문장', reflection: '느낀 점', upvotes: 0, upvotedBy: [],
+      createdAt: `${d}T05:00:00.000Z`, updatedAt: `${d}T05:00:00.000Z` }];
+    await exemptCtx.addInitScript(({ parts, subs }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+
+    const ep = await exemptCtx.newPage();
+    await ep.goto(BASE + '/index.html');
+    await ep.waitForTimeout(600);
+    await ep.fill('#participantSearch', '면제받은이');
+    await ep.waitForTimeout(200);
+    await ep.press('#participantSearch', 'Enter');
+    await ep.waitForTimeout(600);
+
+    t('나의 현황에 면제 타일이 있음', (await ep.locator('#stExempt').count()) === 1);
+    t('면제 2일이 면제 타일에 잡힘', (await ep.textContent('#stExempt')) === '2',
+      await ep.textContent('#stExempt'));
+    t('면제는 미인증에 섞이지 않음(미인증 2)', (await ep.textContent('#stMissed')) === '2',
+      await ep.textContent('#stMissed'));
+    t('인증은 그대로 1', (await ep.textContent('#stVerified')) === '1',
+      await ep.textContent('#stVerified'));
+    t('범례에 P 면제가 다시 표시됨',
+      (await ep.textContent('.legend')).includes('면제'), await ep.textContent('.legend'));
+    const strip = await ep.locator('#myStrip .cell').allTextContents();
+    t('스트립에 면제일이 P로 찍힘', strip.filter((c) => c === 'P').length === 2, strip.slice(0, 6));
+  }
+  await exemptCtx.close();
+
   // ── 알림 메일 탭: 표 머리글로 오름/내림 정렬, 긴 메일 목록은 접이식 ──
   const sortCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await sortCtx.route('**/js/config.js', async (route) => {
