@@ -9,7 +9,6 @@ CS.CONFIG = {
   subtitle: '프로세스 이코노미 인증 시스템',
   logo: 'logo-header.jpg',               // 좌측 상단 로고 이미지 경로
   appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
-  otAt: '2026-08-23T10:00',       // OT 일시 (KST)
   startDate: '2026-08-24',        // 챌린지 시작일 (포함)
   endDate: '2026-09-20',          // 챌린지 종료일 (포함)
 

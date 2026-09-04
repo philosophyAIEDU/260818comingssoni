@@ -24,7 +24,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     let body = await res.text();
     body = body.replace(/startDate: '[^']+'/, `startDate: '${START}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${END}'`)
-               .replace(/otAt: '[^']+'/, `otAt: '${shift(-9)}T10:00'`)
                // 이 컨텍스트는 챌린지가 이미 8일 지난 상태에서 참가자를 새로 만들기 때문에,
                // 실제 킥아웃 기준(6회)이면 등록하자마자 킥아웃이 확정돼 집계가 얼어붙는다.
                // 킥아웃 동결 자체는 logic 테스트에서 따로 검증하므로 여기서는 기준을 높여 둔다.
@@ -675,7 +674,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     let body = await res.text();
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(4)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(32)}'`)
-               .replace(/otAt: '[^']+'/, `otAt: '${shift(3)}T10:00'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
@@ -711,7 +709,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     let body = await res.text();
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-30)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(-2)}'`)
-               .replace(/otAt: '[^']+'/, `otAt: '${shift(-31)}T10:00'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
     await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
