@@ -575,11 +575,10 @@
     if (U.phase(date) === 'before') {
       const d = U.diffDays(date, CONFIG.startDate);
       L.push(`챌린지 시작까지 D-${d} 입니다.`);
-      L.push(`OT : ${U.longLabel(CONFIG.otAt.slice(0, 10))} 오전 10시`);
       L.push(`기간 : ${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)} (4주)`);
       L.push('');
       L.push('신청 시 등록하신 이름이 인증의 기준이 됩니다.');
-      L.push('OT에서 인증 방법을 자세히 안내드릴게요. 🙌');
+      L.push('인증 방법은 시작 전에 자세히 안내드릴게요. 🙌');
       return L.join('\n');
     }
 
