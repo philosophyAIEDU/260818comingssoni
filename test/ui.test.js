@@ -1679,6 +1679,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await koRow.locator('input[data-editemail]').dispatchEvent('change');
   await koPage.waitForTimeout(300);
 
+  // 전화번호도 등록해 둬야 "문자도 함께 보내기" 버튼이 나타난다
+  await koRow.locator('input[data-editphone]').fill('010-1234-5678');
+  await koRow.locator('input[data-editphone]').dispatchEvent('change');
+  await koPage.waitForTimeout(300);
+
   await koRow.locator('[data-kickout]').click(); // confirm()은 위에서 자동 수락
   await koPage.waitForTimeout(300);
 
@@ -1707,6 +1712,36 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     kickBody.includes('킥대상') && kickBody.includes('6회'), kickBody);
   t('본문에 다음 챌린지 재신청 안내가 채워짐', kickBody.includes('다음 챌린지'), kickBody);
   t('본문에 발신 서명이 채워짐', kickBody.includes('퍼스널메이커스 드림'), kickBody);
+
+  // 전화번호가 있는 대상이라 "문자도 함께 보내기" 버튼이 나타나야 한다(자동 발송 없이, 실제로 즉시 보냄)
+  t('전화번호가 있는 대상이면 문자도 함께 보내기 버튼이 보임', await koPage.isVisible('#customMailSmsBtn'));
+
+  const smsCall = await koPage.evaluate(() => {
+    window.confirm = () => true; // 발송 전 확인창은 항상 수락
+    return new Promise((resolve) => {
+      window.fetch = (url, opts) => {
+        resolve({ url, body: JSON.parse(opts.body) });
+        return Promise.resolve({ ok: true, json: async () => ({ sent: true }) });
+      };
+      document.getElementById('customMailSmsBtn').click();
+    });
+  });
+  t('문자도 함께 보내기 클릭 시 send-sms 함수를 호출함', smsCall.url === '/.netlify/functions/send-sms', smsCall.url);
+  t('문자 발송 요청에 전화번호·제목·본문이 담김',
+    smsCall.body.to === '010-1234-5678' && smsCall.body.subject.includes('참여 종료 안내') && smsCall.body.text.includes('6회'),
+    smsCall.body);
+  await koPage.waitForTimeout(200);
+  t('문자 발송 성공 메시지 표시', /문자를 보냈습니다/.test(await koPage.textContent('#customMailMsg')));
+
+  // 실패 응답이 오면 실패 메시지를 보여 준다
+  await koPage.evaluate(() => {
+    window.fetch = () => Promise.resolve({ ok: false, status: 403, json: async () => ({ error: '등록된 참여자 전화번호로만 보낼 수 있습니다.' }) });
+  });
+  await koPage.click('#customMailSmsBtn');
+  await koPage.waitForTimeout(200);
+  t('문자 발송 실패 시 안내 메시지 표시',
+    (await koPage.textContent('#customMailMsg')).includes('등록된 참여자 전화번호로만 보낼 수 있습니다'),
+    await koPage.textContent('#customMailMsg'));
 
   await koPage.evaluate(() => {
     window.__copiedKickText = null;

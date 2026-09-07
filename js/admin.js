@@ -882,7 +882,7 @@
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
 
-  let customMailTarget = null; // 검색 결과에서 선택된 { name, email }
+  let customMailTarget = null; // 검색 결과에서 선택된 { name, email, phone }
 
   function paintCustomMailResults() {
     const kw = $('customMailSearch').value.trim().toLowerCase();
@@ -900,17 +900,22 @@
       : '<tbody><tr><td class="empty">일치하는 이름이 없습니다.</td></tr></tbody>';
 
     box.querySelectorAll('[data-pickmail]').forEach((el) => {
-      el.addEventListener('click', () => selectCustomMailTarget(el.dataset.pickname, el.dataset.pickmail));
+      el.addEventListener('click', () => {
+        // 알림 메일 목록엔 전화번호가 없으니, 같은 이름의 참가자 명단에서 전화번호를 찾아본다.
+        const p = participants.find((x) => x.nickname === el.dataset.pickname);
+        selectCustomMailTarget(el.dataset.pickname, el.dataset.pickmail, p && p.phone);
+      });
     });
   }
 
-  function selectCustomMailTarget(name, email) {
-    customMailTarget = { name, email };
+  function selectCustomMailTarget(name, email, phone) {
+    customMailTarget = { name, email, phone: (phone || '').trim() };
     $('customMailTarget').textContent = name ? `${name} (${email})` : email;
     $('customMailSubject').value = `[${CONFIG.title}] 안내드립니다`;
     $('customMailBody').value = name ? `안녕하세요, ${name}님,\n\n` : '안녕하세요,\n\n';
     $('customMailMsg').innerHTML = '';
     $('customMailForm').hidden = false;
+    $('customMailSmsBtn').hidden = !customMailTarget.phone;
     $('customMailBody').focus();
   }
 
@@ -920,6 +925,7 @@
     $('customMailSubject').value = '';
     $('customMailBody').value = '';
     $('customMailMsg').innerHTML = '';
+    $('customMailSmsBtn').hidden = true;
   }
 
   /** 자동 발송 없이, 제목+본문을 클립보드에 복사해서 운영진이 본인 메일 앱으로 직접 보내게 한다. */
@@ -960,6 +966,44 @@
       `${esc(customMailTarget.name || customMailTarget.email)}님께 보낼 Gmail 작성창을 새 탭으로 열었습니다. ` +
       '내용을 확인하고 거기서 [보내기]를 눌러주세요.',
       'ok');
+  }
+
+  /** 지금 작성창에 있는 제목·본문을, 대상의 전화번호로 문자(솔라피)를 통해 실제로 보낸다.
+   *  Gmail 작성하기·복사하기와 달리 이건 서버(Netlify Function)를 거쳐 즉시 발송되므로,
+   *  실수로 두 번 누르지 않도록 확인창을 한 번 띄운다. 임의 번호로 남용되지 않게, 서버 쪽에서
+   *  등록된 참여자 전화번호인지 한 번 더 확인한다. */
+  async function sendCustomMailSms() {
+    if (!customMailTarget || !customMailTarget.phone) return;
+    const subject = $('customMailSubject').value.trim();
+    const text = $('customMailBody').value.trim();
+    if (!subject || !text) {
+      msg($('customMailMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    if (!confirm(`${customMailTarget.name || customMailTarget.phone}님(${customMailTarget.phone})께 지금 바로 문자를 보낼까요?\n건당 요금이 발생합니다.`)) return;
+
+    const btn = $('customMailSmsBtn');
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '문자 보내는 중…';
+    try {
+      const res = await fetch('/.netlify/functions/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: customMailTarget.phone, subject, text })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `문자 발송 실패 (HTTP ${res.status})`);
+      msg($('customMailMsg'),
+        `${esc(customMailTarget.name || customMailTarget.phone)}님께 문자를 보냈습니다.`, 'ok');
+    } catch (e) {
+      msg($('customMailMsg'),
+        `문자 발송 실패: ${esc(e.message)}. Netlify Function이 배포·설정(SOLAPI_API_KEY/SOLAPI_API_SECRET/` +
+        'SOLAPI_SENDER)되어 있는지 확인해 주세요. (README 참고)', 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
   }
 
   /* ── 미인증 경고 메일 ───────────────────
@@ -1025,7 +1069,7 @@
       el.addEventListener('click', () => {
         const row = rows.find((r) => r.stat.participant.id === el.dataset.warnmail);
         if (!row || !row.email) return;
-        selectCustomMailTarget(row.stat.participant.nickname, row.email);
+        selectCustomMailTarget(row.stat.participant.nickname, row.email, row.stat.participant.phone);
         $('customMailSubject').value = missedWarnSubject(row.stat);
         $('customMailBody').value = missedWarnBody(row.stat);
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1238,7 +1282,7 @@
       el.addEventListener('click', () => {
         const row = rows.find((r) => r.participant.id === el.dataset.kickmail);
         if (!row || !row.email) return;
-        selectCustomMailTarget(row.participant.nickname, row.email);
+        selectCustomMailTarget(row.participant.nickname, row.email, row.participant.phone);
         $('customMailSubject').value = kickoutNoticeSubject(row.participant);
         $('customMailBody').value = kickoutNoticeBody(row.participant);
         // 이미 보낸 사람이면 두 번 보내지 않도록 먼저 알려 준다
@@ -1408,6 +1452,7 @@
     $('customMailCancelBtn').addEventListener('click', cancelCustomMail);
     $('customMailGmailBtn').addEventListener('click', openGmailCompose);
     $('customMailCopyBtn').addEventListener('click', copyCustomMail);
+    $('customMailSmsBtn').addEventListener('click', sendCustomMailSms);
 
     $('kickoutTemplateSubject').addEventListener('input', () => { kickoutTemplateDirty = true; });
     $('kickoutTemplateBody').addEventListener('input', () => { kickoutTemplateDirty = true; });
