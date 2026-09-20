@@ -4,11 +4,12 @@
  * 등록된 주소로만 보내게 제한했던 것과 같은 취지. */
 const { getDb } = require('./_lib/firebaseAdmin');
 const { sendSms, normalizePhone } = require('./_lib/solapi');
+const { collectionName } = require('./_lib/appLogic');
 
 async function isRegisteredPhone(phone) {
   const clean = normalizePhone(phone);
   if (!clean) return false;
-  const snap = await getDb().collection('participants').get();
+  const snap = await getDb().collection(collectionName('participants')).get();
   return snap.docs.some((d) => normalizePhone(d.data().phone) === clean);
 }
 

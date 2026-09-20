@@ -18,6 +18,6 @@ require('../../../js/config.js');
 require('../../../js/utils.js');
 require('../../../js/mailTemplates.js');
 
-const { CONFIG, U, MailTemplates } = global.CS;
+const { CONFIG, U, MailTemplates, collectionName } = global.CS;
 
-module.exports = { CONFIG, U, MailTemplates };
+module.exports = { CONFIG, U, MailTemplates, collectionName };

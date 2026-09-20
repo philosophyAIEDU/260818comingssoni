@@ -10,6 +10,14 @@ const fs = require('fs');
 const BASE = process.env.BASE || 'http://127.0.0.1:8765';
 const errs = [];
 let pass = 0, fail = 0;
+
+/* 활성 시즌은 배포가 아니라 시계가 고른다(js/config.js). 테스트는 시즌0(프로세스 이코노미)의
+ * 날짜·기준값을 갈아끼워 쓰므로, 실제 날짜가 시즌 경계를 넘는 순간 그 값들이 엉뚱한 시즌에
+ * 얹혀서 통째로 깨진다. 아래 컨텍스트들이 config를 어떻게 고쳐 쓰든 시즌은 항상 시즌0으로
+ * 못박는다 — 시즌 선택 자체는 logic 테스트에서 따로 검증한다. */
+const pinSeason = (body) => body.replace(
+  'CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)',
+  "CS.pickSeason(CS.seasonNowKST(), 's1')");
 const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console.log('  FAIL', n, x === undefined ? '' : JSON.stringify(x)));
 
 (async () => {
@@ -31,7 +39,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
                .replace(/riskThreshold: \d+/, 'riskThreshold: 40')
                // 테스트는 네트워크·구글 로그인 없이 돌도록 localStorage 백엔드로 고정
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
 
   const page = await ctx.newPage();
@@ -690,7 +698,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(4)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(32)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const beforePage = await beforeCtx.newPage();
   await beforePage.goto(BASE + '/index.html');
@@ -725,7 +733,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-30)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(-2)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const afterPage = await afterCtx.newPage();
   await afterPage.goto(BASE + '/index.html');
@@ -747,7 +755,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const dayPage = await dayCtx.newPage();
 
@@ -1012,7 +1020,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-2)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(0)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const finishPage = await finishCtx.newPage();
 
@@ -1066,7 +1074,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(20)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     // 5일 확정 중 1일 인증 / 2일 면제 / 2일 미인증
@@ -1113,7 +1121,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     const plan = [['성실이', 9], ['가나다', 5], ['하나둘', 3], ['마바사', 2]];
@@ -1201,7 +1209,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     // 인증 일수: 성실이 9(미인증 0) / 위험이 5(4) / 대상이 3(6→동결) / 아웃이 0(킥아웃 처리됨)
@@ -1292,7 +1300,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     // 확정된 날(어제까지) 9일 중 며칠을 인증했는지로 미인증 횟수를 만든다.
@@ -1350,7 +1358,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     const names = ['필로소피', '피리부는소년', '김보화', '이지예', '나간사람'];
@@ -1445,7 +1453,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     const yest = shift(-1);
@@ -1501,7 +1509,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     const yest = shift(-1);
@@ -1592,7 +1600,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-4)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const warnPage = await warnCtx.newPage();
 
@@ -1654,7 +1662,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-10)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(19)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   const koPage = await koCtx.newPage();
   koPage.on('dialog', (d) => d.accept());
@@ -1854,7 +1862,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-9)}'`)
                .replace(/endDate: '[^']+'/, `endDate: '${shift(18)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     // 확정된 날(어제까지) 9일 중 며칠을 인증했는지로 미인증 횟수를 정확히 맞춘다(9 - done = missed).

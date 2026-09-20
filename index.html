@@ -33,31 +33,34 @@
 
   <main class="wrap">
 
+    <!-- 지난 시즌을 읽기 전용으로 열어 둔 경우에만 보이는 안내 -->
+    <div id="seasonBanner" hidden></div>
+
     <!-- 책 소개 -->
     <section class="card intro">
-      <img class="intro-cover" src="프로세스이코노미.png" alt="프로세스 이코노미 책 표지">
+      <!-- 내용은 js/config.js의 활성 시즌 설정에서 채운다(app.js paintIntro) -->
+      <img class="intro-cover" id="introCover" src="" alt="">
       <div class="intro-body">
-        <h2>프로세스 이코노미</h2>
-        <p class="author">오바라 가즈히로 지음</p>
-        <p class="meta">
-          📅 <strong>챌린지 기간</strong> 2026년 8월 24일(월) ~ 9월 20일(일), 4주간<br>
-          📢 <strong>독서모임</strong> 매주 일요일 22:00 - 22:30
-        </p>
-        <p class="fineprint">* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요</p>
-        <p class="desc">결과보다 과정을 파는 시대, 매일 독서 인증으로 과정을 공유하며 나만의 성장 팬덤을 함께 만들어 갑니다.</p>
+        <h2 id="introTitle"></h2>
+        <p class="tagline" id="introTagline" hidden></p>
+        <p class="author" id="introByline"></p>
+        <p class="meta" id="introMeta"></p>
+        <p class="fineprint" id="introFineprint"></p>
+        <p class="desc" id="introDesc"></p>
       </div>
     </section>
 
     <!-- 안내 -->
     <section class="card">
-      <h2>안내 · 챌린지 규칙</h2>
-      <ul class="muted">
+      <h2 id="ruleHeading">안내 · 챌린지 규칙</h2>
+      <ul class="muted" id="ruleList">
         <li>마감은 <strong>24시 정각</strong>입니다. 지각 시 누락으로 체크되니 유의해주세요.</li>
-        <li>누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
+        <li id="ruleKick">누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
         <li>같은 날짜에 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.) <strong>인증할 날짜</strong>에서 예전 날짜를 골라도 마찬가지로, 이미 낸 인증글을 나중에 다시 고칠 수 있습니다.</li>
         <li>반드시 <strong>당일 일정을 드롭다운 박스에서 선택</strong>해서 인증해 주셔야 합니다. (예: 2일차 분량을 자정 넘겨 인증하는 경우, 3일차가 아닌 <strong>2일차</strong>로 선택)</li>
         <li>다만 <strong>마감(24:00)을 넘긴 제출은 어떤 날짜를 선택하든 계속 미인증(X)으로 집계</strong>됩니다. 지각으로 판정된 글에는 "지각" 표시가 함께 붙습니다.</li>
       </ul>
+      <p class="ot-link" id="otLink" hidden></p>
     </section>
 
     <section class="banner">
@@ -90,7 +93,7 @@
     <div id="phaseNote"></div>
 
     <!-- 오늘의 인증 -->
-    <section class="card">
+    <section class="card" id="certifyCard">
       <h2>오늘의 인증</h2>
       <p class="hint">
         매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 미인증으로 처리되니 미리 인증해주세요.
@@ -125,12 +128,12 @@
 
         <div class="field">
           <label for="sentence">오늘 읽은 챕터에서 가장 인상 깊었던 핵심 내용을 적어주세요</label>
-          <textarea id="sentence" placeholder="ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. 흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. 그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 되어 응원해주는 것이다. - 185쪽" required></textarea>
+          <textarea id="sentence" required></textarea>
         </div>
 
         <div class="field">
           <label for="reflection">오늘 책을 읽고 느낀 점</label>
-          <textarea id="reflection" placeholder="짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요." required></textarea>
+          <textarea id="reflection" required></textarea>
         </div>
 
         <!-- 제출 직전, 이 인증이 무엇으로 쌓이는지 한 번 짚어 주는 자리 -->
@@ -217,7 +220,7 @@
         </div>
         <div class="stat bad clickable" id="ovRiskTile" role="button" tabindex="0" aria-expanded="false">
           <div class="n" id="ovRisk">0</div>
-          <div class="k">킥아웃 위험 인원</div>
+          <div class="k" id="ovRiskLabel">킥아웃 위험 인원</div>
         </div>
       </div>
       <div id="ovDetail" class="ov-detail" hidden></div>

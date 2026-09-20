@@ -32,10 +32,76 @@
     ));
   }
 
+  /* 지난 시즌을 "보기만" 하는 중인지. boot()에서 시즌 잠금 상태를 확인한 뒤 켜진다.
+   * 켜지면 인증 폼과 추천 버튼이 모두 잠겨서 예전 기록이 손대지 않은 채로 남는다. */
+  let READONLY = false;
+
+  /* 세 번째 타일의 이름표. 킥아웃이 있는 시즌은 "위험 인원", 없는 시즌은 누락 집계만 한다. */
+  const RISK_TILE = CONFIG.kickoutEnabled
+    ? { label: '킥아웃 위험 인원',
+      note: `누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상` }
+    : { label: '누적 누락 인원', note: '누적 미인증이 1회 이상인 참여자' };
+
+  /* 책 소개 카드 — 시즌 설정(js/config.js)에서 통째로 채운다.
+   * 책이 바뀔 때 HTML을 고치는 대신 설정만 갈아 끼우면 되도록 했다. */
+  function paintIntro() {
+    const b = CONFIG.book;
+    const cover = $('introCover');
+    cover.src = b.cover;
+    cover.alt = `${b.name} 책 표지`;
+    $('introTitle').textContent = b.name;
+    if (b.tagline) {
+      $('introTagline').textContent = b.tagline;
+      $('introTagline').hidden = false;
+    }
+    $('introByline').textContent = b.byline;
+
+    const weeks = Math.round(U.challengeDates().length / 7);
+    $('introMeta').innerHTML =
+      `📅 <strong>${esc(CONFIG.periodLabel)}</strong> ${esc(U.longLabel(CONFIG.startDate))} ~ `
+      + `${esc(U.longLabel(CONFIG.endDate))}, ${weeks}주간<br>`
+      + `📢 <strong>독서모임</strong> ${esc(CONFIG.live.label)}`;
+    $('introFineprint').textContent = CONFIG.live.note;
+    $('introDesc').textContent = b.desc;
+
+    // 이 시즌에만 붙는 규칙을 공통 규칙 뒤에 이어 붙인다.
+    const list = $('ruleList');
+    (CONFIG.extraRules || []).forEach((html) => {
+      const li = document.createElement('li');
+      li.innerHTML = html;
+      list.appendChild(li);
+    });
+
+    $('ruleHeading').textContent = CONFIG.rulesHeading;
+    $('sentence').placeholder = CONFIG.sentencePlaceholder;
+    $('reflection').placeholder = CONFIG.reflectionPlaceholder;
+
+    // 규칙 아래 한 줄짜리 바깥 링크(OT 영상 등)
+    if (CONFIG.otLink) {
+      const { label, url } = CONFIG.otLink;
+      $('otLink').innerHTML =
+        `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">`
+        + `${U.icon('play')}<span>${esc(label)}</span></a>`;
+      $('otLink').hidden = false;
+    }
+
+    document.title = `${CONFIG.title} · 인증하기`;
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute('content', `${CONFIG.title} ${b.name} 인증 시스템`);
+  }
+
   /* ── 헤더 / 배너 ─────────────────────── */
   function paintHeader() {
     $('brandTitle').textContent = CONFIG.title;
-    $('kickN').textContent = CONFIG.kickoutThreshold;
+    // 킥아웃이 없는 시즌에는 킥아웃 규칙 줄을 아예 내린다(빈 값이나 Infinity가 보이지 않게).
+    if (CONFIG.kickoutEnabled) {
+      $('kickN').textContent = CONFIG.kickoutThreshold;
+    } else {
+      $('ruleKick').hidden = true;
+      // 위험 경고가 아니라 단순 집계이므로 빨강(bad) 대신 주황(warn)으로 낮춘다.
+      $('ovRiskLabel').textContent = RISK_TILE.label;
+      $('ovRiskTile').classList.replace('bad', 'warn');
+    }
     $('footRange').textContent =
       `${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)}`;
 
@@ -468,11 +534,15 @@
     tag.textContent = rt.label;
 
     const left = CONFIG.kickoutThreshold - stat.missed;
+    // 킥아웃이 있는 시즌에서만 "몇 회 남았는지"를 덧붙인다.
+    const missLine = CONFIG.kickoutEnabled
+      ? `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`
+      : `누적 미인증 <strong>${stat.missed}회</strong>입니다. 남은 날에 다시 채워 가세요.`;
     $('myHint').innerHTML = p.status === 'out'
       ? '참여가 종료된 상태입니다. 문의는 운영진에게 남겨 주세요.'
       : (stat.missed === 0
         ? '아직 미인증이 없습니다. 이 페이스를 지켜 주세요! 💪'
-        : `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`);
+        : missLine);
 
     // 날짜 스트립 (화면 폭에 맞춰 자동 줄바꿈)
     const strip = $('myStrip');
@@ -554,6 +624,7 @@
   }
 
   function bindUpvoteButtons(container) {
+    if (READONLY) return; // 지난 시즌을 들여다보는 중 — 기록을 바꾸지 않는다
     container.querySelectorAll('.upvote-btn').forEach((btn) => {
       if (btn.classList.contains('self')) return; // 본인 글: 클릭 자체를 막는다
       btn.addEventListener('click', async () => {
@@ -578,7 +649,9 @@
     const own = isOwnSubmission(s);
     const late = U.isLate(s.date, s.createdAt);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
-    const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
+    const btnAttr = READONLY
+      ? 'disabled title="지난 시즌 기록이라 추천할 수 없습니다"'
+      : (own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '');
     // 왼쪽에는 글(이름·시간·본문)만, 오른쪽에는 버튼만 모아 둔다 — 본문이 버튼 사이로 파고들지 않게.
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-main">
@@ -770,7 +843,7 @@
   let ovOpenKey = null; // 'miss' | 'risk' | null(닫힘)
   let ovLists = { miss: [], risk: [] };
   let ovMissDetail = { missed: [], late: [] }; // 전일 미제출 / 지각 명단 (나눠서 보여준다)
-  let ovRiskDetail = [];  // 킥아웃 위험 인원 [{nickname, missed, kickout}] — 누락 많은 순
+  let ovRiskDetail = [];  // 세 번째 타일의 명단 [{nickname, missed, kickout}] — 누락 많은 순
 
   const byKo = (a, b) => a.localeCompare(b, 'ko');
 
@@ -792,9 +865,9 @@
         <div class="ov-detail-row"><span class="ov-detail-key">지각 ${late.length}명</span> ${nameLine(late)}</div>`;
       return;
     }
-    // 이름만으로는 얼마나 위험한지 알 수 없으므로 누적 미인증 횟수를 함께 보여준다.
-    box.innerHTML = `<strong>킥아웃 위험 인원 (${ovRiskDetail.length}명)</strong>
-      <span class="muted">누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상</span>
+    // 이름만으로는 얼마나 밀렸는지 알 수 없으므로 누적 미인증 횟수를 함께 보여준다.
+    box.innerHTML = `<strong>${esc(RISK_TILE.label)} (${ovRiskDetail.length}명)</strong>
+      <span class="muted">${esc(RISK_TILE.note)}</span>
       <div class="ov-chips">${ovRiskDetail.length
         ? ovRiskDetail.map((r) => `<span class="ov-chip${r.kickout ? ' out' : ''}">${esc(r.nickname)}<b>${r.missed}회</b></span>`).join('')
         : '<span class="muted">해당하는 사람이 없습니다.</span>'}</div>`;
@@ -865,9 +938,12 @@
     const prevMissed = prevGraded.filter((s) => prevCell(s).status === 'X');
     const prevSubIds = new Set(allSubs.filter((s) => s.date === prevDate).map((s) => s.participantId));
 
-    // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
+    // 킥아웃이 있는 시즌: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
     // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
-    const riskZone = active.filter((s) => s.atRisk);
+    // 킥아웃이 없는 시즌: 위험이라는 개념 자체가 없으므로, 누락이 한 번이라도 있는 사람을 모은다.
+    const riskZone = CONFIG.kickoutEnabled
+      ? active.filter((s) => s.atRisk)
+      : active.filter((s) => s.missed > 0);
 
     ovLists = { miss: prevMissed.map((s) => s.participant.nickname).sort(byKo),
       risk: riskZone.map((s) => s.participant.nickname).sort(byKo) };
@@ -957,8 +1033,43 @@
   }
 
   /* ── 초기화 ──────────────────────────── */
+  /* 지난 시즌을 볼 수 있는지 판단한다.
+   *  - 잠기지 않았으면 평소대로.
+   *  - 잠겼고 운영진이 "읽기 전용 공개"를 켜 뒀으면 보기만 가능.
+   *  - 잠겼는데 공개도 아니면 화면을 열지 않고 안내만 남긴다(운영진 화면에서 볼 수 있다).
+   * 반환값 false = 이 화면을 더 그리지 않는다.
+   */
+  async function applySeasonLock() {
+    if (!CS.seasonLocked(CS.SEASON)) return true;
+
+    let flags = {};
+    try { flags = await Store.getSeasonFlags(); } catch (e) { /* 못 읽으면 잠긴 것으로 본다 */ }
+    const opened = Array.isArray(flags.openSeasons) && flags.openSeasons.includes(CS.SEASON.id);
+
+    const banner = $('seasonBanner');
+    banner.hidden = false;
+    if (!opened) {
+      // 기록은 그대로 있고, 다만 이 화면에서 열지 않는다.
+      document.querySelector('main.wrap').innerHTML = '';
+      document.querySelector('main.wrap').appendChild(banner);
+      msg(banner, `<strong>${esc(CONFIG.title)} · ${esc(CONFIG.book.name)}</strong> 시즌은 종료되었습니다.<br>`
+        + '기록은 그대로 보관되어 있습니다. 예전 인증 내용이 필요하시면 운영진에게 말씀해 주세요.<br>'
+        + '<a href="index.html">현재 진행 중인 시즌 보기</a>', 'warn');
+      return false;
+    }
+
+    READONLY = true;
+    msg(banner, `<strong>지난 시즌(${esc(CONFIG.book.name)}) 기록을 보는 중입니다.</strong><br>`
+      + '읽기 전용이라 인증 제출과 추천은 할 수 없습니다. '
+      + '<a href="index.html">현재 진행 중인 시즌 보기</a>', 'warn');
+    $('certifyCard').hidden = true;
+    return true;
+  }
+
   async function boot() {
     await Store.init();
+    if (!(await applySeasonLock())) return;
+    paintIntro();
     paintHeader();
     renderTodayRange();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));

@@ -12,25 +12,29 @@
 const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
 const { sendSms } = require('./solapi');
-const { CONFIG, U, MailTemplates } = require('./appLogic');
+const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+
+/* 활성 시즌의 컬렉션만 읽고 쓴다 — 앱 화면(js/store-firebase.js)과 같은 이름 규칙이다. */
+const col = (name) => getDb().collection(collectionName(name));
+const metaDoc = () => getDb().collection(collectionName('meta')).doc('app');
 
 async function fetchParticipants() {
-  const snap = await getDb().collection('participants').get();
+  const snap = await col('participants').get();
   return snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
 }
 
 async function fetchSubmissions() {
-  const snap = await getDb().collection('submissions').get();
+  const snap = await col('submissions').get();
   return snap.docs.map((d) => d.data());
 }
 
 async function fetchNotifyEmails() {
-  const snap = await getDb().collection('notifyEmails').get();
+  const snap = await col('notifyEmails').get();
   return snap.docs.map((d) => d.data()).filter((d) => d.email);
 }
 
 async function fetchMeta() {
-  const doc = await getDb().doc('meta/app').get();
+  const doc = await metaDoc().get();
   return doc.exists ? doc.data() : {};
 }
 
@@ -52,7 +56,11 @@ function missed5Template(meta) {
 }
 
 async function runMissed5Warning() {
-  const db = getDb();
+  // 킥아웃이 없는 시즌에는 이 경고 자체가 존재하지 않는다 — 아무에게도 보내지 않는다.
+  if (!CONFIG.kickoutEnabled) {
+    return { skipped: 'kickout-disabled', season: CONFIG.seasonId, today: U.today() };
+  }
+
   const [participants, submissions, notifyEmails, meta] = await Promise.all([
     fetchParticipants(), fetchSubmissions(), fetchNotifyEmails(), fetchMeta()
   ]);
@@ -107,7 +115,7 @@ async function runMissed5Warning() {
     }
     // 한 채널이라도 성공했으면 "경고 보냄"으로 기록한다 — 둘 다 실패한 사람만 다음 실행 때 재시도된다.
     if (anySucceeded) {
-      await db.collection('participants').doc(p.id).update({ warned5At: todayISO });
+      await col('participants').doc(p.id).update({ warned5At: todayISO });
     }
     await sleep(300); // 지메일·솔라피 모두 발송 속도 제한을 배려한 짧은 간격
   }
@@ -123,7 +131,7 @@ async function runMissed5Warning() {
   };
 
   // 운영진 화면에서 "자동 발송이 실제로 동작하는지" 확인할 수 있도록 마지막 실행 결과를 남겨 둔다.
-  await db.doc('meta/app').set({
+  await metaDoc().set({
     missed5LastRun: {
       at: U.nowStamp(), today: todayISO, candidates: candidates.length,
       sentEmail, sentSms, skippedNoContact, failed: failures.length

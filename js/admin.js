@@ -62,7 +62,10 @@
     $('kToday').textContent = todayDone;
     $('kTodayRate').textContent = active.length ? `${Math.round((todayDone / active.length) * 100)}%` : '0%';
     $('kYesterday').textContent = (yest >= CONFIG.startDate) ? yestMissed : 0;
-    $('kRisk').textContent = active.filter((s) => s.atRisk).length;
+    // 킥아웃이 없는 시즌에는 "위험"이라는 단계가 없으므로 누락이 있는 사람 수만 센다.
+    $('kRisk').textContent = CONFIG.kickoutEnabled
+      ? active.filter((s) => s.atRisk).length
+      : active.filter((s) => s.missed > 0).length;
 
     $('todayLabel').textContent = U.shortLabel(today);
     const idx = U.dayIndex(today);
@@ -211,12 +214,14 @@
       if (p.status === 'out') return 'out';
       if (st.kickoutEligible) return 'kickout';
       if (st.atRisk) return 'risk';
+      // 킥아웃이 없는 시즌에서는 위험/대상 대신 "누락이 있는지"로만 가른다.
+      if (!CONFIG.kickoutEnabled && st.missed > 0) return 'missed';
       return 'active';
     };
     const statusFilter = $('rosterStatusFilter').value;
     if (statusFilter) visible = visible.filter((p) => statusKey(p) === statusFilter);
     // 손봐야 할 사람이 위로 오도록 항상 심한 순 → 미인증 많은 순 → 이름순
-    const rank = { out: 0, kickout: 1, risk: 2, active: 3 };
+    const rank = { out: 0, kickout: 1, risk: 2, missed: 2, active: 3 };
     visible = visible.slice().sort((a, b) =>
       rank[statusKey(a)] - rank[statusKey(b)]
       || statOf(b).missed - statOf(a).missed
@@ -878,6 +883,7 @@
     paintKickoutNotice();
     await refreshKickoutTemplate();
     await refreshMissed5Template();
+    await refreshReminderTemplate();
   }
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
@@ -1029,12 +1035,16 @@
   }
 
   function missedWarnBody(stat) {
+    // 킥아웃이 없는 시즌에는 "몇 회가 되면 킥아웃" 같은 경고가 성립하지 않는다.
+    const nudge = CONFIG.kickoutEnabled
+      ? `누적 미인증이 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 처리될 수 있으니, `
+        + '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다.'
+      : '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다. 남은 날이 아직 많습니다!';
     return [
       `안녕하세요, ${stat.participant.nickname}님,`,
       '',
       `현재까지 총 ${stat.missed}회 미인증되었습니다.`,
-      `누적 미인증이 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 처리될 수 있으니, ` +
-        '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다.',
+      nudge,
       '',
       `인증하러 가기 → ${CONFIG.appUrl}`,
       '',
@@ -1043,7 +1053,7 @@
   }
 
   function paintMissedWarn() {
-    $('warnKickN').textContent = CONFIG.kickoutThreshold;
+    if (CONFIG.kickoutEnabled) $('warnKickN').textContent = CONFIG.kickoutThreshold;
     const rows = missedWarnCandidates();
     const cols = [
       { key: 'name', label: '이름', get: (r) => r.stat.participant.nickname },
@@ -1207,6 +1217,60 @@
     missed5TemplateDirty = false;
     msg($('missed5TemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
     await refreshMissed5Template();
+  }
+
+  /* ── 당일 인증 리마인드 메일 ─────────────────
+   *  실제 발송은 Netlify 예약 함수(netlify/functions/send-daily-reminder.js, 매일 21시 KST)가
+   *  한다 — 여기서는 문구를 편집·저장하고 최근 실행 결과를 확인만 한다. 문구는 킥아웃·경고
+   *  메일과 마찬가지로 meta 문서에 저장되고 예약 함수도 같은 문서를 읽으므로,
+   *  화면에 보이는 문구와 실제 발송 문구가 언제나 같다. */
+  let reminderMailTemplate = null;
+  let reminderTemplateDirty = false;
+
+  async function refreshReminderTemplate() {
+    const meta = await Store.getMeta();
+    reminderMailTemplate = meta.reminderMailTemplate || null;
+    loadReminderTemplateInputs();
+    paintReminderLastRun(meta.reminderLastRun || null);
+  }
+
+  function loadReminderTemplateInputs() {
+    if (reminderTemplateDirty) return;
+    $('reminderTemplateSubject').value =
+      (reminderMailTemplate && reminderMailTemplate.subject) || MailTemplates.defaultReminderSubject();
+    $('reminderTemplateBody').value =
+      (reminderMailTemplate && reminderMailTemplate.body) || MailTemplates.defaultReminderBody();
+    $('reminderTemplateStatus').textContent = reminderMailTemplate
+      ? `저장된 문구 사용 중 · 최근 수정 ${U.stampLabel(reminderMailTemplate.updatedAt)}`
+      : '기본 문구를 그대로 쓰는 중입니다(아직 저장한 적 없음).';
+  }
+
+  function paintReminderLastRun(lastRun) {
+    $('reminderLastRun').textContent = lastRun
+      ? `최근 자동 발송: ${U.stampLabel(lastRun.at)} · 대상 ${lastRun.candidates}명 중 ${lastRun.sent}건 발송`
+        + (lastRun.failed ? ` · 실패 ${lastRun.failed}건` : '')
+        + (lastRun.skippedNoEmail ? ` · 이메일 없어 건너뜀 ${lastRun.skippedNoEmail}건` : '')
+      : '아직 자동 발송이 실행된 적 없습니다(Netlify 배포·설정이 끝나면 매일 21시에 자동으로 실행됩니다).';
+  }
+
+  async function saveReminderTemplate() {
+    const subject = $('reminderTemplateSubject').value.trim();
+    const body = $('reminderTemplateBody').value.trim();
+    if (!subject || !body) {
+      msg($('reminderTemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    await Store.setMeta({ reminderMailTemplate: { subject, body, updatedAt: U.nowStamp() } });
+    reminderTemplateDirty = false;
+    msg($('reminderTemplateMsg'), '리마인드 메일 문구를 저장했습니다. 다음 자동 발송부터 이 문구로 나갑니다.', 'ok');
+    await refreshReminderTemplate();
+  }
+
+  async function resetReminderTemplate() {
+    await Store.setMeta({ reminderMailTemplate: null });
+    reminderTemplateDirty = false;
+    msg($('reminderTemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
+    await refreshReminderTemplate();
   }
 
   /** Netlify 예약 함수가 그대로 채택할 대상과 완전히 같은 조건(정확히 5회, 아웃 아님, 아직 미경고)
@@ -1411,11 +1475,102 @@
   }
 
   /* ── 초기화 ──────────────────────────── */
+
+  /* ── 시즌 전환 · 지난 시즌 열람 ────────────────────────────
+   * 운영진 화면은 로그인 뒤에만 열리므로, 지난 시즌을 여는 통로도 여기에 둔다.
+   * 시즌을 고르면 ?season=<id>로 다시 열리고, 그때부터 모든 탭이 그 시즌의
+   * 데이터만 읽고 쓴다(컬렉션 이름이 통째로 갈라져 있다).
+   */
+  async function initSeasonBar() {
+    const sel = $('seasonSelect');
+    const toggle = $('seasonOpenToggle');
+    const hint = $('seasonBarHint');
+
+    // "기간이 끝났다"와 "운영진만 볼 수 있게 잠겼다"는 다른 얘기라 따로 표시한다.
+    const today = U.today();
+    sel.innerHTML = CS.SEASONS.map((s) => {
+      const mark = CS.seasonLocked(s) ? ' · 운영진 전용'
+        : (today > s.endDate ? ' · 기간 종료' : '');
+      const here = s.id === CS.SEASON.id ? ' selected' : '';
+      return `<option value="${s.id}"${here}>${esc(s.label)} · ${esc(s.book.name)} `
+        + `(${U.shortLabel(s.startDate)}~${U.shortLabel(s.endDate)})${mark}</option>`;
+    }).join('');
+
+    // 지금 어느 시즌을 보고 있는지는 배너에 항상 띄워 둔다 — 지난 시즌을 열어 둔 채
+    // 명단을 올리거나 고치는 일이 없도록.
+    $('seasonBadge').textContent = CS.SEASON.label;
+    $('seasonBadge').title = `${CS.SEASON.label} · ${CS.SEASON.book.name}`;
+
+    sel.addEventListener('change', () => {
+      // 시즌은 페이지 단위로 갈리므로(설정·저장소 모두) 새로고침이 가장 확실하다.
+      location.search = `?season=${encodeURIComponent(sel.value)}`;
+    });
+
+    const locked = CS.seasonLocked(CS.SEASON);
+    let flags = {};
+    try { flags = await Store.getSeasonFlags(); } catch (e) { /* 못 읽으면 닫힌 것으로 본다 */ }
+    const openSeasons = Array.isArray(flags.openSeasons) ? flags.openSeasons : [];
+    toggle.checked = openSeasons.includes(CS.SEASON.id);
+    toggle.disabled = !locked;
+
+    // 시계가 고르는 시즌과 다른 시즌을 보고 있으면 눈에 띄게 알려 준다.
+    const auto = CS.pickSeason(CS.seasonNowKST());
+    const viewingOther = auto.id !== CS.SEASON.id
+      ? `지금 진행 중인 시즌은 <strong>${esc(auto.label)} · ${esc(auto.book.name)}</strong>입니다. `
+        + '여기서 명단을 고치면 <strong>지금 보고 있는 시즌</strong>에만 반영됩니다. '
+      : '';
+    let state;
+    if (locked) {
+      state = '운영진만 볼 수 있는 시즌입니다. 기록은 그대로 보관되어 있고, 여기서는 읽기·검색·내려받기가 '
+        + '모두 됩니다. 체크하면 참여자도 인증 화면에서 이 시즌을 읽기 전용으로 볼 수 있습니다.';
+    } else if (today > CS.SEASON.endDate) {
+      state = `기간이 끝난 시즌입니다. ${CS.SEASON.lockAt ? CS.SEASON.lockAt.replace('T', ' ') + ' 이후' : '잠금 시각이 지나면'}`
+        + ' 참여자 화면에서 닫히고 운영진만 볼 수 있게 됩니다. 그때부터 공개 여부를 고를 수 있습니다.';
+    } else {
+      state = '진행 중인 시즌입니다. 종료(잠금) 시각이 지나면 이 시즌도 운영진만 볼 수 있게 되고, '
+        + '그때 공개 여부를 고를 수 있습니다.';
+    }
+    hint.innerHTML = viewingOther + state;
+
+    toggle.addEventListener('change', async () => {
+      const next = toggle.checked
+        ? openSeasons.concat(CS.SEASON.id).filter((v, i, a) => a.indexOf(v) === i)
+        : openSeasons.filter((id) => id !== CS.SEASON.id);
+      try {
+        await Store.setSeasonFlags({ openSeasons: next });
+        openSeasons.length = 0;
+        next.forEach((id) => openSeasons.push(id));
+        msg($('seasonBarMsg'), toggle.checked
+          ? '이제 참여자도 이 시즌 기록을 읽기 전용으로 볼 수 있습니다.'
+          : '이 시즌은 다시 운영진만 볼 수 있습니다.', 'ok');
+      } catch (err) {
+        toggle.checked = !toggle.checked;
+        msg($('seasonBarMsg'), '저장하지 못했습니다: ' + err.message, 'bad');
+      }
+    });
+  }
+
   async function boot() {
     await Store.init();
     tick();
     setInterval(tick, 1000);
     initTabs();
+
+    await initSeasonBar();
+
+    // 킥아웃이 없는 시즌에서는 킥아웃/위험이라는 단계가 없다 — 그 선택지를 감추고,
+    // 대신 "누락 있는 사람만 보기"를 꺼내 운영진이 누락 인원을 바로 추릴 수 있게 한다.
+    if (!CONFIG.kickoutEnabled) {
+      $('kRiskLabel').textContent = '누락 인원';
+      // 킥아웃 통보·미인증 경고 메일은 이 시즌에 존재하지 않는다(예약 함수도 건너뛴다).
+      $('kickoutMailSection').hidden = true;
+      $('missedWarnHint').hidden = true;
+      $('missedWarnHintNoKick').hidden = false;
+      document.querySelectorAll('#rosterStatusFilter [data-kickout-only]')
+        .forEach((el) => { el.hidden = true; });
+      document.querySelectorAll('#rosterStatusFilter [data-no-kickout]')
+        .forEach((el) => { el.hidden = false; });
+    }
 
     $('fDate').min = CONFIG.startDate;
     $('fDate').max = CONFIG.endDate;
@@ -1465,6 +1620,11 @@
     $('missed5TemplateBody').addEventListener('input', () => { missed5TemplateDirty = true; });
     $('missed5TemplateSave').addEventListener('click', saveMissed5Template);
     $('missed5TemplateReset').addEventListener('click', resetMissed5Template);
+
+    $('reminderTemplateSubject').addEventListener('input', () => { reminderTemplateDirty = true; });
+    $('reminderTemplateBody').addEventListener('input', () => { reminderTemplateDirty = true; });
+    $('reminderTemplateSave').addEventListener('click', saveReminderTemplate);
+    $('reminderTemplateReset').addEventListener('click', resetReminderTemplate);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);

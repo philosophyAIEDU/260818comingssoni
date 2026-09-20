@@ -9,7 +9,11 @@ const localStorage = {
   removeItem: (k) => mem.delete(k)
 };
 
-const sandbox = { window: {}, localStorage, console, Intl, Date, Math, JSON, Promise, setTimeout };
+// 시즌을 시즌0(프로세스 이코노미)으로 고정한다. 활성 시즌은 시계가 고르므로, 고정하지
+// 않으면 실제 날짜가 시즌 경계를 넘는 순간 아래 날짜·기준값 기대가 통째로 어긋난다.
+// (config.js의 CS_SEASON 오버라이드를 그대로 쓴다 — 실제 동작 경로와 같다)
+const sandbox = { window: {}, localStorage, console, Intl, Date, Math, JSON, Promise, setTimeout,
+  process: { env: { CS_SEASON: 's1' } } };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 const root = require('path').join(__dirname, '..');
@@ -26,6 +30,24 @@ function t(name, cond, extra) {
 }
 
 (async () => {
+  console.log('— 시즌 —');
+  const s1 = CS.SEASONS.find((x) => x.id === 's1');
+  const s2 = CS.SEASONS.find((x) => x.id === 's2');
+  t('시즌이 두 개(프로세스 이코노미 / 꿈과 돈)', !!s1 && !!s2 && CS.SEASONS.length === 2);
+  t('전환 1분 전에는 아직 시즌1', CS.pickSeason('2026-09-21T01:59').id === 's1');
+  t('전환 시각(새벽 2시)부터 시즌2', CS.pickSeason('2026-09-21T02:00').id === 's2');
+  t('그 이후로도 계속 시즌2', CS.pickSeason('2026-11-30T12:00').id === 's2');
+  t('?season= 으로 시즌 고정 가능', CS.pickSeason('2026-11-30T12:00', 's1').id === 's1');
+  t('없는 시즌 id는 무시하고 자동 선택', CS.pickSeason('2026-11-30T12:00', 'nope').id === 's2');
+
+  // 시즌1은 접두사가 없어야 한다 — 기존 데이터를 옮기지 않고 그대로 쓰기 위한 조건.
+  t('시즌1 컬렉션 이름은 예전 그대로', s1.dataPrefix === '');
+  t('시즌2 컬렉션은 s2_ 접두사', s2.dataPrefix === 's2');
+  t('두 시즌의 저장소 접두사가 서로 다름', s1.storagePrefix !== s2.storagePrefix);
+  t('시즌2에는 킥아웃이 없음', s2.kickoutEnabled === false && s1.kickoutEnabled === true);
+  t('CONFIG은 공통값 + 활성 시즌값', CONFIG.seasonId === CS.SEASON.id
+    && CONFIG.timezone === CS.COMMON.timezone && CONFIG.book.name === CS.SEASON.book.name);
+
   console.log('— 날짜 유틸 —');
   t('챌린지 기간 28일', U.challengeDates().length === 28, U.challengeDates().length);
   t('시작일 요일 = 월', U.weekday('2026-08-24') === '월', U.weekday('2026-08-24'));
@@ -261,6 +283,34 @@ function t(name, cond, extra) {
   t('미인증 5회 경고 메일 치환 결과에 자리표시자가 남지 않음', !filledMissed5.includes('{{'), filledMissed5);
   t('미인증 5회 경고 메일 치환 결과에 실제 이름·기준 횟수 반영',
     filledMissed5.includes('김철수') && filledMissed5.includes('5회') && filledMissed5.includes('6회'), filledMissed5);
+
+  console.log('— 당일 인증 리마인드 메일 (매일 21시 KST) —');
+  // 예약 함수(netlify/functions/_lib/dailyReminder.js)가 대상을 고르는 규칙과 같은 조건이다.
+  const rToday = U.today();
+  const rParticipants = [
+    { id: 'r1', nickname: '이미냄', status: '', exemptDates: [] },
+    { id: 'r2', nickname: '아직안냄', status: '', exemptDates: [] },
+    { id: 'r3', nickname: '오늘면제', status: '', exemptDates: [rToday] },
+    { id: 'r4', nickname: '아웃', status: 'out', exemptDates: [] },
+    { id: 'r5', nickname: '오늘이미받음', status: '', exemptDates: [], remindedAt: rToday }
+  ];
+  const rSubs = [{ participantId: 'r1', date: rToday, sentence: 'x', reflection: 'y', createdAt: U.nowStamp() }];
+  const rPicked = U.buildStats(rParticipants, rSubs, rToday).filter((st) => {
+    const p = st.participant;
+    if (p.status === 'out') return false;
+    if (st.submittedToday) return false;
+    if ((p.exemptDates || []).includes(rToday)) return false;
+    return p.remindedAt !== rToday;
+  }).map((st) => st.participant.nickname);
+  t('오늘 아직 안 낸 사람만 대상(이미 냄·면제·아웃·오늘 이미 받음은 제외)',
+    rPicked.length === 1 && rPicked[0] === '아직안냄', rPicked);
+
+  const filledReminder = MailTemplates.fill(MailTemplates.defaultReminderBody(),
+    { 이름: '소니', 날짜: U.longLabel(rToday), 남은시간: '약 3시간', 앱주소: CONFIG.appUrl });
+  t('리마인드 메일 치환 결과에 자리표시자가 남지 않음', !/\{\{/.test(filledReminder), filledReminder);
+  t('리마인드 메일에 이름·남은 시간·앱 주소 반영',
+    filledReminder.includes('소니') && filledReminder.includes('약 3시간')
+    && filledReminder.includes(CONFIG.appUrl), filledReminder);
 
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);

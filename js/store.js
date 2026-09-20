@@ -238,6 +238,19 @@ CS.LocalStore = (function () {
   async function getMeta() { return read(M, {}); }
   async function setMeta(patch) { return write(M, Object.assign(read(M, {}), patch)); }
 
+  /* 시즌 공용 설정. 다른 데이터와 달리 시즌 접두사를 붙이지 않는다 — 지난 시즌을
+   * 열어 둘지 같은 판단은 "지금 어느 시즌을 보고 있는지"와 무관하게 같은 답이어야 하기 때문. */
+  const SEASON_FLAGS_KEY = 'comingsoon.reading.seasonFlags';
+  async function getSeasonFlags() {
+    try { return JSON.parse(localStorage.getItem(SEASON_FLAGS_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  async function setSeasonFlags(patch) {
+    const next = Object.assign(await getSeasonFlags(), patch);
+    localStorage.setItem(SEASON_FLAGS_KEY, JSON.stringify(next));
+    return next;
+  }
+
   /* ── 인증 알림 메일 수신자 목록 ───────── */
   const N = 'notifyEmails';
 
@@ -334,7 +347,8 @@ CS.LocalStore = (function () {
     name: 'local',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
+    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
+    getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
     getNotice, setNotice, listNotices
   };

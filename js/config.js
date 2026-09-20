@@ -1,23 +1,22 @@
-/* 퍼스널메이커스 독서 챌린지 - 전역 설정
- * 이 파일의 값만 바꾸면 챌린지 기간/기준을 재사용할 수 있습니다.
+/* 퍼스널메이커스 독서 멤버십 - 전역 설정
+ *
+ * ── 시즌 구조 ────────────────────────────────────────────────
+ * 멤버십이 매달 새 책으로 이어지므로, 책마다 "시즌"을 하나씩 둔다.
+ * 시즌마다 저장소가 갈라져서(아래 dataPrefix) 이전 시즌 기록은 그대로 남고
+ * 새 시즌은 빈 상태에서 다시 쌓인다.
+ *
+ * 활성 시즌은 배포가 아니라 "시계"가 고른다 — startsAt이 지난 시즌 중 가장 나중 것.
+ * 그래서 미리 배포해 두면 전환 시각에 사람이 아무것도 하지 않아도 저절로 바뀐다.
+ * (시연·테스트 중에 시즌을 고정하고 싶으면 URL에 ?season=s1 을 붙인다)
  */
 window.CS = window.CS || {};
 
-CS.CONFIG = {
-  // 챌린지 기본 정보
-  title: '퍼스널메이커스 독서 챌린지',
-  subtitle: '프로세스 이코노미 인증 시스템',
+/* 시즌과 무관하게 항상 같은 값 */
+CS.COMMON = {
   logo: 'logo-header.jpg',               // 좌측 상단 로고 이미지 경로
   appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
-  startDate: '2026-08-24',        // 챌린지 시작일 (포함)
-  endDate: '2026-09-20',          // 챌린지 종료일 (포함)
-
-  // 운영 기준
   timezone: 'Asia/Seoul',         // 마감/날짜 판정 기준 시간대
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
-  kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 실제 킥아웃 대상
-  riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"으로 분류(아직 킥아웃 대상은 아님)
-  autoWarnThreshold: 5,           // 누적 미인증이 정확히 이 횟수가 된 날, 자동으로 경고 메일 발송(Netlify 예약 함수)
 
   // 챌린지 기간(startDate~endDate) 밖에서도 인증 제출을 허용할지
   //  true  : 시작 전·종료 후에도 제출 가능 (시연/테스트용, 집계에는 반영되지 않음)
@@ -25,12 +24,9 @@ CS.CONFIG = {
   allowSubmitOutsidePeriod: true,
 
   // 저장소 백엔드: 'local' | 'firebase'
-  //  - local    : 브라우저 localStorage (현재 기본값)
+  //  - local    : 브라우저 localStorage
   //  - firebase : js/store-firebase.js 의 Firestore 어댑터 사용
   backend: 'firebase',
-
-  // 로컬 저장소 키 접두사 (버전 올리면 기존 데이터와 분리됨)
-  storagePrefix: 'comingsoon.reading.v1',
 
   // 관리자 구글 계정 화이트리스트
   adminEmails: ['warmcomfortforyou@gmail.com', 'comingssoni@gmail.com'],
@@ -39,7 +35,54 @@ CS.CONFIG = {
   links: {
     applyForm: 'https://docs.google.com/forms/d/1W1ElxSd80uDmjByiS_pOwdFhq8HiOqb5Y0EzVU9PuHI/edit',
     verifyForm: 'https://docs.google.com/forms/d/1F0SRIGR82TWdSM9ADmM9LCGzk6jSg6EblzY01IWy7qs/edit'
+  }
+};
+
+/* 시즌 목록 — startsAt이 이른 것부터 적는다 */
+CS.SEASONS = [{
+  id: 's1',
+  label: '시즌 0',                 // 운영진 화면에서 부르는 이름
+  startsAt: null,                 // 첫 시즌: 기준 시각 없이 항상 후보
+  title: '퍼스널메이커스 독서 챌린지',
+  subtitle: '프로세스 이코노미 인증 시스템',
+  periodLabel: '챌린지 기간',
+  book: {
+    name: '프로세스 이코노미',
+    tagline: '',
+    byline: '오바라 가즈히로 지음',
+    cover: '프로세스이코노미.png',
+    desc: '결과보다 과정을 파는 시대, 매일 독서 인증으로 과정을 공유하며 나만의 성장 팬덤을 함께 만들어 갑니다.'
   },
+  live: {
+    label: '매주 일요일 22:00 - 22:30',
+    note: '* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요'
+  },
+  rulesHeading: '안내 · 챌린지 규칙',
+  // '읽은 문장' 입력칸에 흐리게 보이는 예시
+  reflectionPlaceholder: '짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요.',
+  sentencePlaceholder: 'ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. '
+    + '흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. '
+    + '그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 '
+    + '되어 응원해주는 것이다. - 185쪽',
+  // 안내·규칙 카드에서 이 시즌에만 붙는 줄(공통 규칙 뒤에 이어진다)
+  extraRules: [],
+  // 규칙 아래 한 줄로 붙는 바깥 링크(OT 영상 등). null이면 아무것도 안 나온다.
+  otLink: null,
+  startDate: '2026-08-24',        // 챌린지 시작일 (포함)
+  endDate: '2026-09-20',          // 챌린지 종료일 (포함)
+
+  // 시즌1의 데이터는 접두사 없이 기존 컬렉션(participants/submissions/…)에 그대로 있다.
+  // 여기를 비워 두는 것이 곧 "기존 데이터를 건드리지 않는다"는 뜻이다.
+  dataPrefix: '',
+  storagePrefix: 'comingsoon.reading.v1',
+
+  // 시즌1은 전환 후 운영진만 볼 수 있게 잠근다(데이터는 그대로 남는다)
+  lockAt: '2026-09-21T03:00',
+
+  kickoutEnabled: true,           // 킥아웃 판정·통보를 쓰는 시즌인지
+  kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 킥아웃 대상
+  riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"
+  autoWarnThreshold: 5,           // 누적 미인증이 정확히 이 횟수가 된 날 자동 경고 메일
 
   // 날짜(startDate 기준 N일차)별 "오늘 읽을 부분" 안내. 배열 인덱스 0 = 1일차.
   // 실제 달력 날짜가 아니라 챌린지 시작일로부터 며칠째인지로 찾으므로, startDate를
@@ -90,6 +133,165 @@ CS.CONFIG = {
     [{ ch: '', s: ['재독 주간입니다. 새로 읽지 않고, 1~3주차에 <strong>밑줄 친 부분만</strong> 다시 읽습니다.'] }],
     [{ ch: '', s: ['재독 주간입니다. 새로 읽지 않고, 1~3주차에 <strong>밑줄 친 부분만</strong> 다시 읽습니다.'] }]
   ]
+}, {
+  id: 's2',
+  label: '시즌 1',
+  startsAt: '2026-09-21T02:00',   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
+  title: '퍼스널메이커스 독서 멤버십',
+  subtitle: '꿈과 돈 인증 시스템',
+  periodLabel: '멤버십 기간',
+  book: {
+    name: '꿈과 돈',
+    tagline: '모든 꿈이 실현되는 미래',
+    byline: '니시노 아키히로 지음 · 민경욱 옮김 · 소미미디어',
+    cover: '꿈과돈.webp',
+    desc: '콘텐츠는 넘치고 상품의 기능은 다 비슷해진 시대. 그런데 어떤 사람에게는 팬이 생기고 돈이 따라옵니다. '
+      + '팬과 돈이 생기는 브랜딩을 하기 위해 지금 무엇을 해야 하는지를 한 달간 함께 배웁니다.'
+  },
+  live: {
+    label: '매주 일요일 22:00 - 22:30 (9/27 · 10/4 · 10/11 · 10/18)',
+    note: '* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요. OT는 영상으로 제공됩니다(결제 후 전달된 노션 페이지 참고).'
+  },
+  rulesHeading: '안내 · 멤버십 규칙',
+  // 일정표 안내: "오늘 범위에서 와닿은 한 문장 + 내 브랜드/일에 적용할 점"
+  reflectionPlaceholder: '짧아도 좋습니다. 오늘 읽은 내용을 내 브랜드·일에 어떻게 적용할지 적어주세요.',
+  sentencePlaceholder: 'ex) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
+    + '끝에 쪽수를 붙여 주세요. (예: … - 47쪽)',
+  otLink: {
+    label: '퍼스널메이커스 독서 멤버십 OT 보기',
+    url: 'https://www.youtube.com/watch?v=ny6lJ-8PMXI'
+  },
+  extraRules: [
+    '인증을 놓쳐도 <strong>킥아웃되지 않습니다</strong>. 다만 28일 동안 <strong>누락이 6회 미만</strong>이면 '
+      + '커밍쏜이 직접 정리한 『꿈과 돈』 <strong>인사이트 정리본</strong>을 드립니다.',
+    '책은 <strong>소미미디어 판(2025년 10월 출간)</strong>으로 준비해 주세요. 다산북스 2024년 판은 '
+      + '번역과 목차가 달라 이 커리큘럼과 맞지 않습니다.'
+  ],
+  startDate: '2026-09-21',
+  endDate: '2026-10-18',
+
+  // 시즌2의 데이터는 s2_ 접두사가 붙은 별도 컬렉션에 쌓인다.
+  // 시즌1 컬렉션은 이름이 달라서 아예 닿지 않는다 = 기존 기록이 섞이거나 지워질 일이 없다.
+  dataPrefix: 's2',
+  storagePrefix: 'comingsoon.reading.s2',
+
+  lockAt: null,                   // 진행 중인 시즌이므로 잠그지 않는다
+
+  // 이 시즌엔 킥아웃이 없다. 누락 횟수는 그대로 세지만(운영진이 확인·검색할 수 있게)
+  // 위험/아웃 판정도, 경고·통보 메일도 하지 않는다.
+  kickoutEnabled: false,
+  kickoutThreshold: Infinity,
+  riskThreshold: Infinity,
+  autoWarnThreshold: Infinity,
+
+  // 운영진 공식 일정표(노션 "꿈과 돈 28일 챌린지 — 독서 일정표")를 그대로 옮긴 것.
+  // 소제목 표기는 소미미디어판 기준이다.
+  readingPlan: [
+    /* ── 1주차 — 부유층의 생태계: 누가 꿈에 돈을 내는가 (머리말 + 1장) ── */
+    [{ ch: '', s: [
+      '🎯 <strong>책 준비 + 목차 전체 훑어보기</strong>',
+      '① 목차에서 <strong>가장 기대되는 꼭지 한 가지</strong>와, 왜 그런지',
+      '② 이번 책에서 <strong>내가 얻고 싶은 것 1가지</strong>를 선언하세요'
+    ] }],
+    [
+      { ch: '', s: ['<strong>머리말</strong>'] },
+      { ch: '1장', s: ['지식 부족으로 목숨을 잃지 마라', '‘고가 상품’에 불평하는 바보'] }
+    ],
+    [{ ch: '1장', s: ['부유층을 알고, ‘프리미엄’과 ‘럭셔리’의 차이를 알라', '‘꿈’의 계산식'] }],
+    [{ ch: '1장', s: ['기능을 파니까 ‘싸다’라고 느끼는 거다', '당신의 도전에 큰돈을 내는 사람의 생활을 상상하라'] }],
+    [{ ch: '1장', s: ['《번외편》 ‘탈노동집약형’과 ‘탈완판사고’ — 🌕 추석 당일, 가장 가벼운 분량입니다'] }],
+    [{ ch: '2장', s: ['‘기능’이 돈이 안 된다는 사실을 받아들여라', '역사적 대패에서 배우는 ‘하이 스펙’과 ‘오버 스펙’'] }],
+    [{ ch: '', s: ['🔴 <strong>라이브 1회차</strong> (새 분량 없음 · 연휴 마지막 날, 밀린 분량 따라잡기)'] }],
+    /* ── 2주차 — 커뮤니티: 기능이 아니라 사람을 팔아라 (2장 + 3장 도입) ── */
+    [{ ch: '2장', s: ['‘기능 검색’에서 ‘사람 검색’으로', '‘올바른 서비스’보다 ‘마음을 훔치는 서비스’로'] }],
+    [{ ch: '2장', s: ['시장 가격을 무시할 수 있는 ‘사람 검색’의 실제 예시', '핵심은 ‘고객의 팬덤화’'] }],
+    [{ ch: '2장', s: ['‘응원할 여지’의 계산식', '‘팬 만들기’의 실제 예시'] }],
+    [{ ch: '2장', s: ['커뮤니케이션은 어디에서 생기는 걸까?', '불편이 가져다주는 것'] }],
+    [
+      { ch: '2장', s: ['《번외편》 돈의 기초 ~빚은 나쁘다?'] },
+      { ch: '3장', s: ['바다에 잠겨 있는 돈 이야기'] }
+    ],
+    [{ ch: '3장', s: ['새로운 문 앞에는 언제나 긴 설명이 있다', 'NFT를 엄청 간단하게 설명하겠다', '그림책 작가의 새로운 수입원'] }],
+    [{ ch: '', s: ['🔴 <strong>라이브 2회차</strong> (새 분량 없음 · 따라잡기)'] }],
+    /* ── 3주차 — NFT와 시대: 꿈을 지키는 돈의 구조 (3장 + 맺음말) ── */
+    [{ ch: '3장', s: ['NFT라는 럭셔리 상품', '돈 같은 ‘공동 환상’'] }],
+    [{ ch: '3장', s: ['‘디지털 폭탄 돌리기’가 된 NFT', 'AI × NFT로 활동 자금을 만든다'] }],
+    [{ ch: '3장', s: ['사람을 돕는 돈을 모으는 도구'] }],
+    [{ ch: '3장', s: ['시대를 바르게 파악하라'] }],
+    [{ ch: '맺음말', s: ['~꿈과 돈~ — 📗 <strong>1회독 완독일!</strong>'] }],
+    [{ ch: '', s: ['밀린 분량 따라잡기 + <strong>내 밑줄 목록 만들기</strong> (2회독 준비)'] }],
+    [{ ch: '', s: ['🔴 <strong>라이브 3회차</strong> — 완독 기념'] }],
+    /* ── 4주차 — 2회독: 내 것으로 ──
+     * 처음부터 새로 읽지 않는다. 1회독 때 친 밑줄을 중심으로 장 단위로 빠르게 다시 읽는다. */
+    [{ ch: '2회독', s: ['<strong>1장 부유층의 생태계</strong> 전체'] }],
+    [{ ch: '2회독', s: ['<strong>2장 전반</strong> (‘기능’이 돈이 안 된다 ~ ‘응원할 여지’의 계산식)'] }],
+    [{ ch: '2회독', s: ['<strong>2장 후반</strong> (‘팬 만들기’의 실제 예시 ~ 《번외편》 돈의 기초)'] }],
+    [{ ch: '2회독', s: ['<strong>3장 전반</strong> (바다에 잠겨 있는 돈 ~ 돈 같은 ‘공동 환상’)'] }],
+    [{ ch: '2회독', s: ['<strong>3장 후반 + 맺음말</strong> (‘디지털 폭탄 돌리기’ ~ 끝)'] }],
+    [{ ch: '', s: ['밑줄 총정리 · 🏆 <strong>28일 중 나의 최고 문장 1개 선정</strong>'] }],
+    [{ ch: '', s: ['🔴 <strong>라이브 4회차</strong> — 최종'] }]
+  ]
+}];
+
+/* ── 활성 시즌 고르기 ──────────────────────────────────────────
+ * startsAt이 이미 지난 시즌 중 가장 나중 것. startsAt이 null이면 언제나 후보다.
+ * 비교는 KST 벽시계 문자열끼리 한다 — startsAt을 KST로 적었으니, 지금 시각도
+ * KST로 바꿔서 'YYYY-MM-DD HH:MM' 사전순으로 견주면 시간대 계산이 따로 필요 없다.
+ */
+CS.seasonNowKST = function (now) {
+  // 'sv-SE' 로캘이 'YYYY-MM-DD HH:MM:SS' 형태를 주므로 사전순 비교가 곧 시간순 비교다.
+  return new Date(now || Date.now())
+    .toLocaleString('sv-SE', { timeZone: CS.COMMON.timezone })
+    .replace(' ', 'T');
+};
+
+CS.pickSeason = function (nowKST, overrideId) {
+  if (overrideId) {
+    const forced = CS.SEASONS.find((s) => s.id === overrideId);
+    if (forced) return forced;
+  }
+  const t = nowKST || CS.seasonNowKST();
+  let picked = CS.SEASONS[0];
+  CS.SEASONS.forEach((s) => {
+    if (!s.startsAt || s.startsAt <= t) picked = s;
+  });
+  return picked;
+};
+
+/* 시연·테스트용 시즌 고정: 브라우저는 ?season=s1, Node는 CS_SEASON=s1 */
+CS.seasonOverride = (function () {
+  try {
+    if (typeof location !== 'undefined' && location.search) {
+      return new URLSearchParams(location.search).get('season') || '';
+    }
+    if (typeof process !== 'undefined' && process.env) return process.env.CS_SEASON || '';
+  } catch (e) { /* 접근 불가한 환경이면 그냥 자동 선택 */ }
+  return '';
+})();
+
+CS.SEASON = CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride);
+
+/* 앱 전체가 보는 설정 = 공통값 + 활성 시즌값.
+ * 화면·서버 코드는 예전처럼 CS.CONFIG만 읽으면 되고, 시즌이 바뀌어도 고칠 곳이 없다. */
+CS.CONFIG = Object.assign({}, CS.COMMON, CS.SEASON, { seasonId: CS.SEASON.id });
+
+/* 지난 시즌이 잠겼는지. lockAt(KST)이 지나면 운영진 화면에서만 열 수 있다.
+ * 다만 운영진이 "읽기 전용 공개"를 켜 두면(공유 flags.openSeasons) 누구나 볼 수 있되
+ * 인증·추천 같은 쓰기는 모두 막힌다. 데이터 자체는 어느 쪽이든 그대로 남는다. */
+CS.seasonLocked = function (season, nowKST) {
+  if (!season || !season.lockAt) return false;
+  return season.lockAt <= (nowKST || CS.seasonNowKST());
+};
+
+CS.seasonById = function (id) {
+  return CS.SEASONS.find((s) => s.id === id) || null;
+};
+
+/* Firestore 컬렉션 이름에 시즌 접두사를 붙인다.
+ * 시즌1은 dataPrefix가 비어 있어 예전 이름 그대로 — 기존 데이터를 옮길 필요가 없다. */
+CS.collectionName = function (name) {
+  const prefix = CS.CONFIG.dataPrefix;
+  return prefix ? prefix + '_' + name : name;
 };
 
 // Firebase 연결 시 채워 넣을 자리 (backend: 'firebase' 로 바꾼 뒤 사용)

@@ -65,9 +65,31 @@ CS.MailTemplates = (function () {
     ].join('\n');
   }
 
+  /* ── 당일 인증 리마인드 메일(Netlify 예약 함수가 매일 21시 KST에 발송) ── */
+  function defaultReminderSubject() {
+    return `[${CS.CONFIG.title}] 오늘 인증 아직이에요 🙌`;
+  }
+  function defaultReminderBody() {
+    return [
+      '안녕하세요, {{이름}}님. 퍼스널메이커스입니다.',
+      '',
+      '{{날짜}} 인증이 아직 등록되지 않아 살짝 알려드립니다.',
+      '마감은 오늘 밤 24시 정각이고, 지금은 {{남은시간}} 남았습니다.',
+      '',
+      '오늘 읽은 문장 한 줄과 느낀 점이면 충분합니다. 잠깐이면 끝나요!',
+      '',
+      '인증하러 가기 → {{앱주소}}',
+      '',
+      '이미 인증을 마치셨다면 이 메일은 지나쳐 주세요.',
+      '',
+      '퍼스널메이커스 드림.'
+    ].join('\n');
+  }
+
   return {
     fill,
     defaultKickoutSubject, defaultKickoutBody,
-    defaultMissed5Subject, defaultMissed5Body
+    defaultMissed5Subject, defaultMissed5Body,
+    defaultReminderSubject, defaultReminderBody
   };
 })();
