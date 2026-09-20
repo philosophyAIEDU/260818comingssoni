@@ -42,6 +42,41 @@
       note: `누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상` }
     : { label: '누적 누락 인원', note: '누적 미인증이 1회 이상인 참여자' };
 
+  /* 책 소개 카드 — 시즌 설정(js/config.js)에서 통째로 채운다.
+   * 책이 바뀔 때 HTML을 고치는 대신 설정만 갈아 끼우면 되도록 했다. */
+  function paintIntro() {
+    const b = CONFIG.book;
+    const cover = $('introCover');
+    cover.src = b.cover;
+    cover.alt = `${b.name} 책 표지`;
+    $('introTitle').textContent = b.name;
+    if (b.tagline) {
+      $('introTagline').textContent = b.tagline;
+      $('introTagline').hidden = false;
+    }
+    $('introByline').textContent = b.byline;
+
+    const weeks = Math.round(U.challengeDates().length / 7);
+    $('introMeta').innerHTML =
+      `📅 <strong>${esc(CONFIG.periodLabel)}</strong> ${esc(U.longLabel(CONFIG.startDate))} ~ `
+      + `${esc(U.longLabel(CONFIG.endDate))}, ${weeks}주간<br>`
+      + `📢 <strong>독서모임</strong> ${esc(CONFIG.live.label)}`;
+    $('introFineprint').textContent = CONFIG.live.note;
+    $('introDesc').textContent = b.desc;
+
+    // 이 시즌에만 붙는 규칙을 공통 규칙 뒤에 이어 붙인다.
+    const list = $('ruleList');
+    (CONFIG.extraRules || []).forEach((html) => {
+      const li = document.createElement('li');
+      li.innerHTML = html;
+      list.appendChild(li);
+    });
+
+    document.title = `${CONFIG.title} · 인증하기`;
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute('content', `${CONFIG.title} ${b.name} 인증 시스템`);
+  }
+
   /* ── 헤더 / 배너 ─────────────────────── */
   function paintHeader() {
     $('brandTitle').textContent = CONFIG.title;
@@ -1021,6 +1056,7 @@
   async function boot() {
     await Store.init();
     if (!(await applySeasonLock())) return;
+    paintIntro();
     paintHeader();
     renderTodayRange();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));

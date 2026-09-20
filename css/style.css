@@ -397,6 +397,7 @@ footer.foot {
   box-shadow: 0 4px 10px rgba(0, 0, 0, .18);
 }
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.intro-body .tagline { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
 .intro-body .meta { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
 /* 눈에 띄는 경고가 아니라 덧붙이는 작은 안내(독소조항처럼) */
