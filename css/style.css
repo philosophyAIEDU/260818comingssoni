@@ -397,9 +397,18 @@ footer.foot {
   box-shadow: 0 4px 10px rgba(0, 0, 0, .18);
 }
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-/* 안내 카드 맨 아래 한 줄짜리 바깥 링크(OT 영상 등).
+/* 접지 않고 늘 보여 주는 한 줄 — 마감 시각처럼 놓치면 곤란한 것만 여기에 둔다. */
+.rule-key {
+  margin: 0 0 14px; padding: 11px 14px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13.5px; line-height: 1.6; color: var(--text-dim);
+}
+.rule-key strong { color: var(--text); }
+
+/* 안내 카드 맨 위 한 줄짜리 바깥 링크(OT 영상 등).
    복사·따봉 버튼과 같은 결로 — 테두리 한 겹, 아이콘 하나, 굵지 않은 글자. */
-.ot-link { margin: 14px 0 0; }
+.ot-link { margin: 0 0 12px; }
 .ot-link a {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 7px 13px; border: 1px solid var(--border-strong); border-radius: 999px;

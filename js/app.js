@@ -64,6 +64,10 @@
     $('introFineprint').textContent = CONFIG.live.note;
     $('introDesc').textContent = b.desc;
 
+    // 킥아웃이 없는 시즌에는 킥아웃 규칙 줄을 아예 내린다(빈 값이나 Infinity가 보이지 않게).
+    if (CONFIG.kickoutEnabled) $('kickN').textContent = CONFIG.kickoutThreshold;
+    else $('ruleKick').hidden = true;
+
     // 이 시즌에만 붙는 규칙을 공통 규칙 뒤에 이어 붙인다.
     const list = $('ruleList');
     (CONFIG.extraRules || []).forEach((html) => {
@@ -71,6 +75,9 @@
       li.innerHTML = html;
       list.appendChild(li);
     });
+    // 접혀 있으면 안에 뭐가 몇 개 있는지 모른다 — 펼칠지 판단할 수 있게 개수를 적어 둔다.
+    const hidden = list.querySelectorAll('li:not([hidden])').length;
+    $('ruleFold').querySelector('summary').textContent = `나머지 규칙 ${hidden}가지 보기`;
 
     $('ruleHeading').textContent = CONFIG.rulesHeading;
     $('sentence').placeholder = CONFIG.sentencePlaceholder;
@@ -93,11 +100,7 @@
   /* ── 헤더 / 배너 ─────────────────────── */
   function paintHeader() {
     $('brandTitle').textContent = CONFIG.title;
-    // 킥아웃이 없는 시즌에는 킥아웃 규칙 줄을 아예 내린다(빈 값이나 Infinity가 보이지 않게).
-    if (CONFIG.kickoutEnabled) {
-      $('kickN').textContent = CONFIG.kickoutThreshold;
-    } else {
-      $('ruleKick').hidden = true;
+    if (!CONFIG.kickoutEnabled) {
       // 위험 경고가 아니라 단순 집계이므로 빨강(bad) 대신 주황(warn)으로 낮춘다.
       $('ovRiskLabel').textContent = RISK_TILE.label;
       $('ovRiskTile').classList.replace('bad', 'warn');
