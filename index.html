@@ -54,11 +54,11 @@
     <section class="card">
       <h2 id="ruleHeading">안내 · 챌린지 규칙</h2>
       <ul class="muted" id="ruleList">
-        <li>마감은 <strong>24시 정각</strong>입니다. 지각 시 누락으로 체크되니 유의해주세요.</li>
+        <li>마감은 매일 밤 <strong>23:59</strong>입니다. <strong>1분이라도 넘으면 누락</strong>으로 처리되니 미리 인증해주세요.</li>
         <li id="ruleKick">누적 미인증 <strong id="kickN">5</strong>회 시 킥아웃됩니다. 개인적인 사정으로 인증이 어렵다면 최소 3일 전 운영진께 요청해주세요.</li>
         <li>같은 날짜에 다시 제출하면 <strong>기존 인증이 수정</strong>됩니다. (중복으로 기록되지 않습니다.) <strong>인증할 날짜</strong>에서 예전 날짜를 골라도 마찬가지로, 이미 낸 인증글을 나중에 다시 고칠 수 있습니다.</li>
         <li>반드시 <strong>당일 일정을 드롭다운 박스에서 선택</strong>해서 인증해 주셔야 합니다. (예: 2일차 분량을 자정 넘겨 인증하는 경우, 3일차가 아닌 <strong>2일차</strong>로 선택)</li>
-        <li>다만 <strong>마감(24:00)을 넘긴 제출은 어떤 날짜를 선택하든 계속 미인증(X)으로 집계</strong>됩니다. 지각으로 판정된 글에는 "지각" 표시가 함께 붙습니다.</li>
+        <li>다만 <strong>마감(23:59)을 넘긴 제출은 어떤 날짜를 선택하든 계속 미인증(X)으로 집계</strong>됩니다. 지각으로 판정된 글에는 "지각" 표시가 함께 붙습니다.</li>
       </ul>
       <p class="ot-link" id="otLink" hidden></p>
     </section>
@@ -75,7 +75,7 @@
       </div>
       <div class="sep"></div>
       <div class="col">
-        <span class="lbl">마감(24:00)까지</span>
+        <span class="lbl">마감(23:59)까지</span>
         <span class="big" id="countdown">--:--:--</span>
       </div>
 
@@ -96,7 +96,7 @@
     <section class="card" id="certifyCard">
       <h2>오늘의 인증</h2>
       <p class="hint">
-        매일 밤 <strong>24시 정각</strong>까지 제출해 주세요. 미인증으로 처리되니 미리 인증해주세요.
+        매일 밤 <strong>23:59</strong>까지 제출해 주세요. 1분이라도 넘으면 누락으로 처리되니 미리 인증해주세요.
       </p>
 
       <div id="formMsg"></div>
@@ -106,7 +106,7 @@
           <label for="certifyDate">인증할 날짜 <span class="sub">보통은 오늘로 자동 선택됩니다 · 예전 날짜를 골라 이미 낸 인증도 고칠 수 있어요</span></label>
           <select id="certifyDate"></select>
           <p class="hint bad" id="certifyDateWarn" hidden>
-            이 날짜는 이미 마감(24:00)이 지났습니다. 기록은 남길 수 있지만 <strong>미인증(X)으로 계속 집계</strong>됩니다.
+            이 날짜는 이미 마감(23:59)이 지났습니다. 기록은 남길 수 있지만 <strong>미인증(X)으로 계속 집계</strong>됩니다.
           </p>
         </div>
 
@@ -132,7 +132,7 @@
         </div>
 
         <div class="field">
-          <label for="reflection">오늘 책을 읽고 느낀 점</label>
+          <label for="reflection">읽고 느낀 점 — 내 브랜드나 비즈니스에 어떻게 적용할지</label>
           <textarea id="reflection" required></textarea>
         </div>
 
@@ -207,7 +207,7 @@
     <section class="card">
       <h2>📊 전체 진행현황 <span class="tag" id="overallCount">0명</span></h2>
       <p class="hint">참여자 전체의 인증 현황을 한눈에 볼 수 있는 대시보드입니다.
-        전일 지표는 <strong id="ovPrevDateLabel">어제</strong> 24시 마감으로 확정된 기록입니다.</p>
+        전일 지표는 <strong id="ovPrevDateLabel">어제</strong> 마감(23:59)으로 확정된 기록입니다.</p>
 
       <div class="stats" id="overallStats">
         <div class="stat">
