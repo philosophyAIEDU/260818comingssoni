@@ -112,7 +112,7 @@ CS.SEASONS = [{
   ]
 }, {
   id: 's2',
-  startsAt: '2026-09-21T01:00',   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
+  startsAt: '2026-09-21T02:00',   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
   title: '퍼스널메이커스 독서 멤버십',
   subtitle: '꿈과 돈 인증 시스템',
   book: { name: '꿈과 돈', author: '', cover: '' },

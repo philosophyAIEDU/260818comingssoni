@@ -30,8 +30,8 @@ function t(name, cond, extra) {
   const s1 = CS.SEASONS.find((x) => x.id === 's1');
   const s2 = CS.SEASONS.find((x) => x.id === 's2');
   t('시즌이 두 개(프로세스 이코노미 / 꿈과 돈)', !!s1 && !!s2 && CS.SEASONS.length === 2);
-  t('전환 1분 전에는 아직 시즌1', CS.pickSeason('2026-09-21T00:59').id === 's1');
-  t('전환 시각부터 시즌2', CS.pickSeason('2026-09-21T01:00').id === 's2');
+  t('전환 1분 전에는 아직 시즌1', CS.pickSeason('2026-09-21T01:59').id === 's1');
+  t('전환 시각(새벽 2시)부터 시즌2', CS.pickSeason('2026-09-21T02:00').id === 's2');
   t('그 이후로도 계속 시즌2', CS.pickSeason('2026-11-30T12:00').id === 's2');
   t('?season= 으로 시즌 고정 가능', CS.pickSeason('2026-11-30T12:00', 's1').id === 's1');
   t('없는 시즌 id는 무시하고 자동 선택', CS.pickSeason('2026-11-30T12:00', 'nope').id === 's2');
