@@ -9,7 +9,11 @@ const localStorage = {
   removeItem: (k) => mem.delete(k)
 };
 
-const sandbox = { window: {}, localStorage, console, Intl, Date, Math, JSON, Promise, setTimeout };
+// 시즌을 시즌0(프로세스 이코노미)으로 고정한다. 활성 시즌은 시계가 고르므로, 고정하지
+// 않으면 실제 날짜가 시즌 경계를 넘는 순간 아래 날짜·기준값 기대가 통째로 어긋난다.
+// (config.js의 CS_SEASON 오버라이드를 그대로 쓴다 — 실제 동작 경로와 같다)
+const sandbox = { window: {}, localStorage, console, Intl, Date, Math, JSON, Promise, setTimeout,
+  process: { env: { CS_SEASON: 's1' } } };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 const root = require('path').join(__dirname, '..');

@@ -1486,11 +1486,20 @@
     const toggle = $('seasonOpenToggle');
     const hint = $('seasonBarHint');
 
+    // "기간이 끝났다"와 "운영진만 볼 수 있게 잠겼다"는 다른 얘기라 따로 표시한다.
+    const today = U.today();
     sel.innerHTML = CS.SEASONS.map((s) => {
-      const locked = CS.seasonLocked(s) ? ' · 종료' : '';
+      const mark = CS.seasonLocked(s) ? ' · 운영진 전용'
+        : (today > s.endDate ? ' · 기간 종료' : '');
       const here = s.id === CS.SEASON.id ? ' selected' : '';
-      return `<option value="${s.id}"${here}>${esc(s.book.name)} (${U.shortLabel(s.startDate)}~${U.shortLabel(s.endDate)})${locked}</option>`;
+      return `<option value="${s.id}"${here}>${esc(s.label)} · ${esc(s.book.name)} `
+        + `(${U.shortLabel(s.startDate)}~${U.shortLabel(s.endDate)})${mark}</option>`;
     }).join('');
+
+    // 지금 어느 시즌을 보고 있는지는 배너에 항상 띄워 둔다 — 지난 시즌을 열어 둔 채
+    // 명단을 올리거나 고치는 일이 없도록.
+    $('seasonBadge').textContent = CS.SEASON.label;
+    $('seasonBadge').title = `${CS.SEASON.label} · ${CS.SEASON.book.name}`;
 
     sel.addEventListener('change', () => {
       // 시즌은 페이지 단위로 갈리므로(설정·저장소 모두) 새로고침이 가장 확실하다.
@@ -1504,10 +1513,24 @@
     toggle.checked = openSeasons.includes(CS.SEASON.id);
     toggle.disabled = !locked;
 
-    hint.textContent = locked
-      ? '종료된 시즌입니다. 기록은 그대로 보관되어 있고, 여기서는 읽기·검색·내려받기가 모두 됩니다. '
-        + '체크하면 참여자도 인증 화면에서 이 시즌을 읽기 전용으로 볼 수 있습니다.'
-      : '진행 중인 시즌입니다. 종료(잠금) 시각이 지나면 이 시즌도 운영진만 볼 수 있게 되고, 그때 공개 여부를 고를 수 있습니다.';
+    // 시계가 고르는 시즌과 다른 시즌을 보고 있으면 눈에 띄게 알려 준다.
+    const auto = CS.pickSeason(CS.seasonNowKST());
+    const viewingOther = auto.id !== CS.SEASON.id
+      ? `지금 진행 중인 시즌은 <strong>${esc(auto.label)} · ${esc(auto.book.name)}</strong>입니다. `
+        + '여기서 명단을 고치면 <strong>지금 보고 있는 시즌</strong>에만 반영됩니다. '
+      : '';
+    let state;
+    if (locked) {
+      state = '운영진만 볼 수 있는 시즌입니다. 기록은 그대로 보관되어 있고, 여기서는 읽기·검색·내려받기가 '
+        + '모두 됩니다. 체크하면 참여자도 인증 화면에서 이 시즌을 읽기 전용으로 볼 수 있습니다.';
+    } else if (today > CS.SEASON.endDate) {
+      state = `기간이 끝난 시즌입니다. ${CS.SEASON.lockAt ? CS.SEASON.lockAt.replace('T', ' ') + ' 이후' : '잠금 시각이 지나면'}`
+        + ' 참여자 화면에서 닫히고 운영진만 볼 수 있게 됩니다. 그때부터 공개 여부를 고를 수 있습니다.';
+    } else {
+      state = '진행 중인 시즌입니다. 종료(잠금) 시각이 지나면 이 시즌도 운영진만 볼 수 있게 되고, '
+        + '그때 공개 여부를 고를 수 있습니다.';
+    }
+    hint.innerHTML = viewingOther + state;
 
     toggle.addEventListener('change', async () => {
       const next = toggle.checked
