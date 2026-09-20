@@ -72,6 +72,16 @@
       list.appendChild(li);
     });
 
+    $('ruleHeading').textContent = CONFIG.rulesHeading;
+
+    // 규칙 아래 한 줄짜리 바깥 링크(OT 영상 등)
+    if (CONFIG.otLink) {
+      const { label, url } = CONFIG.otLink;
+      $('otLink').innerHTML =
+        `▶ <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`;
+      $('otLink').hidden = false;
+    }
+
     document.title = `${CONFIG.title} · 인증하기`;
     const desc = document.querySelector('meta[name="description"]');
     if (desc) desc.setAttribute('content', `${CONFIG.title} ${b.name} 인증 시스템`);

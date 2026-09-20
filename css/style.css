@@ -397,6 +397,11 @@ footer.foot {
   box-shadow: 0 4px 10px rgba(0, 0, 0, .18);
 }
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+/* 안내 카드 맨 아래 한 줄짜리 바깥 링크(OT 영상 등) */
+.ot-link { margin: 12px 0 0; font-size: 13px; }
+.ot-link a { font-weight: 600; color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+.ot-link a:hover { opacity: .8; }
+
 .intro-body .tagline { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
 .intro-body .meta { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
