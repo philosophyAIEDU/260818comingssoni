@@ -1,23 +1,22 @@
-/* 퍼스널메이커스 독서 챌린지 - 전역 설정
- * 이 파일의 값만 바꾸면 챌린지 기간/기준을 재사용할 수 있습니다.
+/* 퍼스널메이커스 독서 멤버십 - 전역 설정
+ *
+ * ── 시즌 구조 ────────────────────────────────────────────────
+ * 멤버십이 매달 새 책으로 이어지므로, 책마다 "시즌"을 하나씩 둔다.
+ * 시즌마다 저장소가 갈라져서(아래 dataPrefix) 이전 시즌 기록은 그대로 남고
+ * 새 시즌은 빈 상태에서 다시 쌓인다.
+ *
+ * 활성 시즌은 배포가 아니라 "시계"가 고른다 — startsAt이 지난 시즌 중 가장 나중 것.
+ * 그래서 미리 배포해 두면 전환 시각에 사람이 아무것도 하지 않아도 저절로 바뀐다.
+ * (시연·테스트 중에 시즌을 고정하고 싶으면 URL에 ?season=s1 을 붙인다)
  */
 window.CS = window.CS || {};
 
-CS.CONFIG = {
-  // 챌린지 기본 정보
-  title: '퍼스널메이커스 독서 챌린지',
-  subtitle: '프로세스 이코노미 인증 시스템',
+/* 시즌과 무관하게 항상 같은 값 */
+CS.COMMON = {
   logo: 'logo-header.jpg',               // 좌측 상단 로고 이미지 경로
   appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
-  startDate: '2026-08-24',        // 챌린지 시작일 (포함)
-  endDate: '2026-09-20',          // 챌린지 종료일 (포함)
-
-  // 운영 기준
   timezone: 'Asia/Seoul',         // 마감/날짜 판정 기준 시간대
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
-  kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 실제 킥아웃 대상
-  riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"으로 분류(아직 킥아웃 대상은 아님)
-  autoWarnThreshold: 5,           // 누적 미인증이 정확히 이 횟수가 된 날, 자동으로 경고 메일 발송(Netlify 예약 함수)
 
   // 챌린지 기간(startDate~endDate) 밖에서도 인증 제출을 허용할지
   //  true  : 시작 전·종료 후에도 제출 가능 (시연/테스트용, 집계에는 반영되지 않음)
@@ -25,12 +24,9 @@ CS.CONFIG = {
   allowSubmitOutsidePeriod: true,
 
   // 저장소 백엔드: 'local' | 'firebase'
-  //  - local    : 브라우저 localStorage (현재 기본값)
+  //  - local    : 브라우저 localStorage
   //  - firebase : js/store-firebase.js 의 Firestore 어댑터 사용
   backend: 'firebase',
-
-  // 로컬 저장소 키 접두사 (버전 올리면 기존 데이터와 분리됨)
-  storagePrefix: 'comingsoon.reading.v1',
 
   // 관리자 구글 계정 화이트리스트
   adminEmails: ['warmcomfortforyou@gmail.com', 'comingssoni@gmail.com'],
@@ -39,7 +35,31 @@ CS.CONFIG = {
   links: {
     applyForm: 'https://docs.google.com/forms/d/1W1ElxSd80uDmjByiS_pOwdFhq8HiOqb5Y0EzVU9PuHI/edit',
     verifyForm: 'https://docs.google.com/forms/d/1F0SRIGR82TWdSM9ADmM9LCGzk6jSg6EblzY01IWy7qs/edit'
-  },
+  }
+};
+
+/* 시즌 목록 — startsAt이 이른 것부터 적는다 */
+CS.SEASONS = [{
+  id: 's1',
+  startsAt: null,                 // 첫 시즌: 기준 시각 없이 항상 후보
+  title: '퍼스널메이커스 독서 챌린지',
+  subtitle: '프로세스 이코노미 인증 시스템',
+  book: { name: '프로세스 이코노미', author: '오바라 가즈히로', cover: '프로세스이코노미.png' },
+  startDate: '2026-08-24',        // 챌린지 시작일 (포함)
+  endDate: '2026-09-20',          // 챌린지 종료일 (포함)
+
+  // 시즌1의 데이터는 접두사 없이 기존 컬렉션(participants/submissions/…)에 그대로 있다.
+  // 여기를 비워 두는 것이 곧 "기존 데이터를 건드리지 않는다"는 뜻이다.
+  dataPrefix: '',
+  storagePrefix: 'comingsoon.reading.v1',
+
+  // 시즌1은 전환 후 운영진만 볼 수 있게 잠근다(데이터는 그대로 남는다)
+  lockAt: '2026-09-21T03:00',
+
+  kickoutEnabled: true,           // 킥아웃 판정·통보를 쓰는 시즌인지
+  kickoutThreshold: 6,            // 누적 미인증 N회 이상 → 킥아웃 대상
+  riskThreshold: 4,               // 누적 미인증 N회 이상 → "킥아웃 위험 인원"
+  autoWarnThreshold: 5,           // 누적 미인증이 정확히 이 횟수가 된 날 자동 경고 메일
 
   // 날짜(startDate 기준 N일차)별 "오늘 읽을 부분" 안내. 배열 인덱스 0 = 1일차.
   // 실제 달력 날짜가 아니라 챌린지 시작일로부터 며칠째인지로 찾으므로, startDate를
@@ -90,6 +110,80 @@ CS.CONFIG = {
     [{ ch: '', s: ['재독 주간입니다. 새로 읽지 않고, 1~3주차에 <strong>밑줄 친 부분만</strong> 다시 읽습니다.'] }],
     [{ ch: '', s: ['재독 주간입니다. 새로 읽지 않고, 1~3주차에 <strong>밑줄 친 부분만</strong> 다시 읽습니다.'] }]
   ]
+}, {
+  id: 's2',
+  startsAt: '2026-09-21T01:00',   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
+  title: '퍼스널메이커스 독서 멤버십',
+  subtitle: '꿈과 돈 인증 시스템',
+  book: { name: '꿈과 돈', author: '', cover: '' },
+  startDate: '2026-09-21',
+  endDate: '2026-10-18',
+
+  // 시즌2의 데이터는 s2_ 접두사가 붙은 별도 컬렉션에 쌓인다.
+  // 시즌1 컬렉션은 이름이 달라서 아예 닿지 않는다 = 기존 기록이 섞이거나 지워질 일이 없다.
+  dataPrefix: 's2',
+  storagePrefix: 'comingsoon.reading.s2',
+
+  lockAt: null,                   // 진행 중인 시즌이므로 잠그지 않는다
+
+  // 이 시즌엔 킥아웃이 없다. 누락 횟수는 그대로 세지만(운영진이 확인·검색할 수 있게)
+  // 위험/아웃 판정도, 경고·통보 메일도 하지 않는다.
+  kickoutEnabled: false,
+  kickoutThreshold: Infinity,
+  riskThreshold: Infinity,
+  autoWarnThreshold: Infinity,
+
+  // TODO: 『꿈과 돈』 28일 목차가 오면 시즌1과 같은 형식으로 채운다.
+  readingPlan: []
+}];
+
+/* ── 활성 시즌 고르기 ──────────────────────────────────────────
+ * startsAt이 이미 지난 시즌 중 가장 나중 것. startsAt이 null이면 언제나 후보다.
+ * 비교는 KST 벽시계 문자열끼리 한다 — startsAt을 KST로 적었으니, 지금 시각도
+ * KST로 바꿔서 'YYYY-MM-DD HH:MM' 사전순으로 견주면 시간대 계산이 따로 필요 없다.
+ */
+CS.seasonNowKST = function (now) {
+  // 'sv-SE' 로캘이 'YYYY-MM-DD HH:MM:SS' 형태를 주므로 사전순 비교가 곧 시간순 비교다.
+  return new Date(now || Date.now())
+    .toLocaleString('sv-SE', { timeZone: CS.COMMON.timezone })
+    .replace(' ', 'T');
+};
+
+CS.pickSeason = function (nowKST, overrideId) {
+  if (overrideId) {
+    const forced = CS.SEASONS.find((s) => s.id === overrideId);
+    if (forced) return forced;
+  }
+  const t = nowKST || CS.seasonNowKST();
+  let picked = CS.SEASONS[0];
+  CS.SEASONS.forEach((s) => {
+    if (!s.startsAt || s.startsAt <= t) picked = s;
+  });
+  return picked;
+};
+
+/* 시연·테스트용 시즌 고정: 브라우저는 ?season=s1, Node는 CS_SEASON=s1 */
+CS.seasonOverride = (function () {
+  try {
+    if (typeof location !== 'undefined' && location.search) {
+      return new URLSearchParams(location.search).get('season') || '';
+    }
+    if (typeof process !== 'undefined' && process.env) return process.env.CS_SEASON || '';
+  } catch (e) { /* 접근 불가한 환경이면 그냥 자동 선택 */ }
+  return '';
+})();
+
+CS.SEASON = CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride);
+
+/* 앱 전체가 보는 설정 = 공통값 + 활성 시즌값.
+ * 화면·서버 코드는 예전처럼 CS.CONFIG만 읽으면 되고, 시즌이 바뀌어도 고칠 곳이 없다. */
+CS.CONFIG = Object.assign({}, CS.COMMON, CS.SEASON, { seasonId: CS.SEASON.id });
+
+/* Firestore 컬렉션 이름에 시즌 접두사를 붙인다.
+ * 시즌1은 dataPrefix가 비어 있어 예전 이름 그대로 — 기존 데이터를 옮길 필요가 없다. */
+CS.collectionName = function (name) {
+  const prefix = CS.CONFIG.dataPrefix;
+  return prefix ? prefix + '_' + name : name;
 };
 
 // Firebase 연결 시 채워 넣을 자리 (backend: 'firebase' 로 바꾼 뒤 사용)

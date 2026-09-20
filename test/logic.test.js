@@ -26,6 +26,24 @@ function t(name, cond, extra) {
 }
 
 (async () => {
+  console.log('— 시즌 —');
+  const s1 = CS.SEASONS.find((x) => x.id === 's1');
+  const s2 = CS.SEASONS.find((x) => x.id === 's2');
+  t('시즌이 두 개(프로세스 이코노미 / 꿈과 돈)', !!s1 && !!s2 && CS.SEASONS.length === 2);
+  t('전환 1분 전에는 아직 시즌1', CS.pickSeason('2026-09-21T00:59').id === 's1');
+  t('전환 시각부터 시즌2', CS.pickSeason('2026-09-21T01:00').id === 's2');
+  t('그 이후로도 계속 시즌2', CS.pickSeason('2026-11-30T12:00').id === 's2');
+  t('?season= 으로 시즌 고정 가능', CS.pickSeason('2026-11-30T12:00', 's1').id === 's1');
+  t('없는 시즌 id는 무시하고 자동 선택', CS.pickSeason('2026-11-30T12:00', 'nope').id === 's2');
+
+  // 시즌1은 접두사가 없어야 한다 — 기존 데이터를 옮기지 않고 그대로 쓰기 위한 조건.
+  t('시즌1 컬렉션 이름은 예전 그대로', s1.dataPrefix === '');
+  t('시즌2 컬렉션은 s2_ 접두사', s2.dataPrefix === 's2');
+  t('두 시즌의 저장소 접두사가 서로 다름', s1.storagePrefix !== s2.storagePrefix);
+  t('시즌2에는 킥아웃이 없음', s2.kickoutEnabled === false && s1.kickoutEnabled === true);
+  t('CONFIG은 공통값 + 활성 시즌값', CONFIG.seasonId === CS.SEASON.id
+    && CONFIG.timezone === CS.COMMON.timezone && CONFIG.book.name === CS.SEASON.book.name);
+
   console.log('— 날짜 유틸 —');
   t('챌린지 기간 28일', U.challengeDates().length === 28, U.challengeDates().length);
   t('시작일 요일 = 월', U.weekday('2026-08-24') === '월', U.weekday('2026-08-24'));

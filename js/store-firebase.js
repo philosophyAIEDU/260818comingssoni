@@ -75,7 +75,10 @@ CS.FirebaseStore = (function () {
     return currentUser;
   }
 
-  const col = (name) => fs.collection(db, name);
+  /* 컬렉션 이름에 시즌 접두사를 붙여서 연다(js/config.js의 CS.collectionName).
+   * 시즌마다 데이터가 다른 컬렉션에 쌓이므로 이전 시즌 기록은 그대로 남는다. */
+  const col = (name) => fs.collection(db, CS.collectionName(name));
+  const docRef = (name, id) => fs.doc(db, CS.collectionName(name), id);
   const withId = (snap) => Object.assign({ id: snap.id }, snap.data());
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -130,22 +133,22 @@ CS.FirebaseStore = (function () {
       if (email && !EMAIL_RE.test(email)) throw new Error('올바른 메일 주소를 입력해 주세요.');
       body.email = email;
     }
-    await fs.updateDoc(fs.doc(db, 'participants', id), body);
+    await fs.updateDoc(docRef('participants', id), body);
 
     if (body.nickname) {
       const subs = await fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', id)));
       await Promise.all(subs.docs.map((d) =>
-        fs.updateDoc(fs.doc(db, 'submissions', d.id), { nickname: body.nickname })));
+        fs.updateDoc(docRef('submissions', d.id), { nickname: body.nickname })));
     }
-    const snap = await fs.getDoc(fs.doc(db, 'participants', id));
+    const snap = await fs.getDoc(docRef('participants', id));
     return withId(snap);
   }
 
   async function removeParticipant(id) {
     await init();
     const subs = await fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', id)));
-    await Promise.all(subs.docs.map((d) => fs.deleteDoc(fs.doc(db, 'submissions', d.id))));
-    await fs.deleteDoc(fs.doc(db, 'participants', id));
+    await Promise.all(subs.docs.map((d) => fs.deleteDoc(docRef('submissions', d.id))));
+    await fs.deleteDoc(docRef('participants', id));
   }
 
   async function listSubmissions(filter) {
@@ -173,7 +176,7 @@ CS.FirebaseStore = (function () {
     const found = await getSubmission(data.participantId, data.date);
     if (found) {
       const body = Object.assign({}, data, { updatedAt: now });
-      await fs.updateDoc(fs.doc(db, 'submissions', found.id), body);
+      await fs.updateDoc(docRef('submissions', found.id), body);
       return Object.assign({}, found, body);
     }
     const body = Object.assign({
@@ -188,13 +191,13 @@ CS.FirebaseStore = (function () {
 
   async function removeSubmission(id) {
     await init();
-    await fs.deleteDoc(fs.doc(db, 'submissions', id));
+    await fs.deleteDoc(docRef('submissions', id));
   }
 
   async function upvoteSubmission(id, clientId) {
     await init();
-    const docRef = fs.doc(db, 'submissions', id);
-    const snap = await fs.getDoc(docRef);
+    const ref = docRef('submissions', id);
+    const snap = await fs.getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data();
     const upvotedBy = data.upvotedBy || [];
@@ -202,7 +205,7 @@ CS.FirebaseStore = (function () {
       throw new Error('이미 이 글을 추천했습니다.');
     }
     // 여러 명이 동시에 눌러도 표가 유실되지 않도록 서버 측 원자 연산 사용
-    await fs.updateDoc(docRef, {
+    await fs.updateDoc(ref, {
       upvotes: fs.increment(1),
       upvotedBy: fs.arrayUnion(clientId)
     });
@@ -215,15 +218,15 @@ CS.FirebaseStore = (function () {
   /** 추천 취소 (본인이 눌렀던 엄지척을 되돌린다) */
   async function unvoteSubmission(id, clientId) {
     await init();
-    const docRef = fs.doc(db, 'submissions', id);
-    const snap = await fs.getDoc(docRef);
+    const ref = docRef('submissions', id);
+    const snap = await fs.getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data();
     const upvotedBy = data.upvotedBy || [];
     if (!upvotedBy.includes(clientId)) {
       throw new Error('추천한 적이 없는 글입니다.');
     }
-    await fs.updateDoc(docRef, {
+    await fs.updateDoc(ref, {
       upvotes: fs.increment(-1),
       upvotedBy: fs.arrayRemove(clientId)
     });
@@ -271,13 +274,13 @@ CS.FirebaseStore = (function () {
 
   async function removeNotifyEmail(id) {
     await init();
-    await fs.deleteDoc(fs.doc(db, 'notifyEmails', id));
+    await fs.deleteDoc(docRef('notifyEmails', id));
   }
 
   /* ── 공지문 (날짜별로 미리 써 두는 초안) ─── */
   async function getNotice(date) {
     await init();
-    const snap = await fs.getDoc(fs.doc(db, 'notices', date));
+    const snap = await fs.getDoc(docRef('notices', date));
     return snap.exists() ? snap.data() : null;
   }
 
@@ -286,10 +289,10 @@ CS.FirebaseStore = (function () {
     await init();
     const clean = String(text || '').trim();
     if (!clean) {
-      await fs.deleteDoc(fs.doc(db, 'notices', date));
+      await fs.deleteDoc(docRef('notices', date));
       return;
     }
-    await fs.setDoc(fs.doc(db, 'notices', date), { text: clean, updatedAt: CS.U.nowStamp() });
+    await fs.setDoc(docRef('notices', date), { text: clean, updatedAt: CS.U.nowStamp() });
   }
 
   async function listNotices() {
@@ -301,13 +304,13 @@ CS.FirebaseStore = (function () {
 
   async function getMeta() {
     await init();
-    const snap = await fs.getDoc(fs.doc(db, 'meta', 'app'));
+    const snap = await fs.getDoc(docRef('meta', 'app'));
     return snap.exists() ? snap.data() : {};
   }
 
   async function setMeta(patch) {
     await init();
-    await fs.setDoc(fs.doc(db, 'meta', 'app'), patch, { merge: true });
+    await fs.setDoc(docRef('meta', 'app'), patch, { merge: true });
     return getMeta();
   }
 
@@ -328,11 +331,11 @@ CS.FirebaseStore = (function () {
     }
     for (const p of obj.participants) {
       const { id } = p; const body = Object.assign({}, p); delete body.id;
-      await fs.setDoc(fs.doc(db, 'participants', id), body);
+      await fs.setDoc(docRef('participants', id), body);
     }
     for (const s of obj.submissions) {
       const { id } = s; const body = Object.assign({}, s); delete body.id;
-      await fs.setDoc(fs.doc(db, 'submissions', id), body);
+      await fs.setDoc(docRef('submissions', id), body);
     }
     if (obj.meta) await setMeta(obj.meta);
   }
@@ -341,7 +344,7 @@ CS.FirebaseStore = (function () {
     await init();
     for (const name of ['participants', 'submissions']) {
       const snap = await fs.getDocs(col(name));
-      await Promise.all(snap.docs.map((d) => fs.deleteDoc(fs.doc(db, name, d.id))));
+      await Promise.all(snap.docs.map((d) => fs.deleteDoc(docRef(name, d.id))));
     }
   }
 
