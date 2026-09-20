@@ -80,7 +80,8 @@
     if (CONFIG.otLink) {
       const { label, url } = CONFIG.otLink;
       $('otLink').innerHTML =
-        `▶ <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`;
+        `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">`
+        + `${U.icon('play')}<span>${esc(label)}</span></a>`;
       $('otLink').hidden = false;
     }
 

@@ -151,7 +151,7 @@ a { color: var(--accent); }
 .banner .today-range-day { font-size: 13.5px; font-weight: 700; color: #081d58; min-width: 9em; text-align: center; }
 .banner .today-range { margin: 0; font-size: 13.5px; line-height: 1.6; color: #081d58; }
 /* 오늘의 범위 — '1장 - 소제목'을 한 줄에 하나씩 세로로 */
-.range-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.range-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .range-list > li { display: flex; align-items: baseline; gap: 6px; }
 .range-list > li.range-plain { display: block; }
 .range-ch {
@@ -397,10 +397,18 @@ footer.foot {
   box-shadow: 0 4px 10px rgba(0, 0, 0, .18);
 }
 .intro-body h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-/* 안내 카드 맨 아래 한 줄짜리 바깥 링크(OT 영상 등) */
-.ot-link { margin: 12px 0 0; font-size: 13px; }
-.ot-link a { font-weight: 600; color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
-.ot-link a:hover { opacity: .8; }
+/* 안내 카드 맨 아래 한 줄짜리 바깥 링크(OT 영상 등).
+   복사·따봉 버튼과 같은 결로 — 테두리 한 겹, 아이콘 하나, 굵지 않은 글자. */
+.ot-link { margin: 14px 0 0; }
+.ot-link a {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px; border: 1px solid var(--border-strong); border-radius: 999px;
+  font-size: 13px; font-weight: 600; line-height: 1;
+  color: var(--text); text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.ot-link a:hover { border-color: var(--accent); color: var(--accent); }
+.ot-link .ico { width: 15px; height: 15px; flex: none; }
 
 .intro-body .tagline { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
@@ -464,8 +472,8 @@ footer.foot {
 .card > .fold { margin-top: 16px; }
 
 /* 안내 목록 */
-.card > ul.muted { padding-left: 18px; margin: 0; }
-.card > ul.muted li + li { margin-top: 4px; }
+.card > ul.muted { padding-left: 18px; margin: 0; line-height: 1.65; }
+.card > ul.muted li + li { margin-top: 9px; }
 
 /* ── 나의 진행 스트립 (달력형) ────────── */
 .strip {
