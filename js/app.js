@@ -74,6 +74,7 @@
 
     $('ruleHeading').textContent = CONFIG.rulesHeading;
     $('sentence').placeholder = CONFIG.sentencePlaceholder;
+    $('reflection').placeholder = CONFIG.reflectionPlaceholder;
 
     // 규칙 아래 한 줄짜리 바깥 링크(OT 영상 등)
     if (CONFIG.otLink) {
