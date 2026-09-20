@@ -62,7 +62,10 @@
     $('kToday').textContent = todayDone;
     $('kTodayRate').textContent = active.length ? `${Math.round((todayDone / active.length) * 100)}%` : '0%';
     $('kYesterday').textContent = (yest >= CONFIG.startDate) ? yestMissed : 0;
-    $('kRisk').textContent = active.filter((s) => s.atRisk).length;
+    // 킥아웃이 없는 시즌에는 "위험"이라는 단계가 없으므로 누락이 있는 사람 수만 센다.
+    $('kRisk').textContent = CONFIG.kickoutEnabled
+      ? active.filter((s) => s.atRisk).length
+      : active.filter((s) => s.missed > 0).length;
 
     $('todayLabel').textContent = U.shortLabel(today);
     const idx = U.dayIndex(today);
@@ -211,12 +214,14 @@
       if (p.status === 'out') return 'out';
       if (st.kickoutEligible) return 'kickout';
       if (st.atRisk) return 'risk';
+      // 킥아웃이 없는 시즌에서는 위험/대상 대신 "누락이 있는지"로만 가른다.
+      if (!CONFIG.kickoutEnabled && st.missed > 0) return 'missed';
       return 'active';
     };
     const statusFilter = $('rosterStatusFilter').value;
     if (statusFilter) visible = visible.filter((p) => statusKey(p) === statusFilter);
     // 손봐야 할 사람이 위로 오도록 항상 심한 순 → 미인증 많은 순 → 이름순
-    const rank = { out: 0, kickout: 1, risk: 2, active: 3 };
+    const rank = { out: 0, kickout: 1, risk: 2, missed: 2, active: 3 };
     visible = visible.slice().sort((a, b) =>
       rank[statusKey(a)] - rank[statusKey(b)]
       || statOf(b).missed - statOf(a).missed
@@ -1416,6 +1421,16 @@
     tick();
     setInterval(tick, 1000);
     initTabs();
+
+    // 킥아웃이 없는 시즌에서는 킥아웃/위험이라는 단계가 없다 — 그 선택지를 감추고,
+    // 대신 "누락 있는 사람만 보기"를 꺼내 운영진이 누락 인원을 바로 추릴 수 있게 한다.
+    if (!CONFIG.kickoutEnabled) {
+      $('kRiskLabel').textContent = '누락 인원';
+      document.querySelectorAll('#rosterStatusFilter [data-kickout-only]')
+        .forEach((el) => { el.hidden = true; });
+      document.querySelectorAll('#rosterStatusFilter [data-no-kickout]')
+        .forEach((el) => { el.hidden = false; });
+    }
 
     $('fDate').min = CONFIG.startDate;
     $('fDate').max = CONFIG.endDate;

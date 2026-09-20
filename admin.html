@@ -56,7 +56,7 @@
       <div class="stat ok"><div class="n" id="kToday">0</div><div class="k">오늘 인증</div></div>
       <div class="stat warn"><div class="n" id="kTodayRate">0%</div><div class="k">오늘 인증률</div></div>
       <div class="stat bad"><div class="n" id="kYesterday">0</div><div class="k">어제 미인증</div></div>
-      <div class="stat bad"><div class="n" id="kRisk">0</div><div class="k">킥아웃 위험 인원</div></div>
+      <div class="stat bad"><div class="n" id="kRisk">0</div><div class="k" id="kRiskLabel">킥아웃 위험 인원</div></div>
     </div>
 
     <div class="tabs" id="tabs">
@@ -127,8 +127,9 @@
         <select id="rosterStatusFilter">
           <option value="">전체 보기 (심한 순)</option>
           <option value="out">아웃만 보기</option>
-          <option value="kickout">킥아웃 대상만 보기</option>
-          <option value="risk">위험만 보기</option>
+          <option value="kickout" data-kickout-only>킥아웃 대상만 보기</option>
+          <option value="risk" data-kickout-only>위험만 보기</option>
+          <option value="missed" data-no-kickout hidden>누락 있는 사람만 보기</option>
           <option value="active">참여중만 보기</option>
         </select>
       </div>

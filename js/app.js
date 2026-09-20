@@ -32,10 +32,24 @@
     ));
   }
 
+  /* 세 번째 타일의 이름표. 킥아웃이 있는 시즌은 "위험 인원", 없는 시즌은 누락 집계만 한다. */
+  const RISK_TILE = CONFIG.kickoutEnabled
+    ? { label: '킥아웃 위험 인원',
+      note: `누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상` }
+    : { label: '누적 누락 인원', note: '누적 미인증이 1회 이상인 참여자' };
+
   /* ── 헤더 / 배너 ─────────────────────── */
   function paintHeader() {
     $('brandTitle').textContent = CONFIG.title;
-    $('kickN').textContent = CONFIG.kickoutThreshold;
+    // 킥아웃이 없는 시즌에는 킥아웃 규칙 줄을 아예 내린다(빈 값이나 Infinity가 보이지 않게).
+    if (CONFIG.kickoutEnabled) {
+      $('kickN').textContent = CONFIG.kickoutThreshold;
+    } else {
+      $('ruleKick').hidden = true;
+      // 위험 경고가 아니라 단순 집계이므로 빨강(bad) 대신 주황(warn)으로 낮춘다.
+      $('ovRiskLabel').textContent = RISK_TILE.label;
+      $('ovRiskTile').classList.replace('bad', 'warn');
+    }
     $('footRange').textContent =
       `${U.longLabel(CONFIG.startDate)} ~ ${U.longLabel(CONFIG.endDate)}`;
 
@@ -468,11 +482,15 @@
     tag.textContent = rt.label;
 
     const left = CONFIG.kickoutThreshold - stat.missed;
+    // 킥아웃이 있는 시즌에서만 "몇 회 남았는지"를 덧붙인다.
+    const missLine = CONFIG.kickoutEnabled
+      ? `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`
+      : `누적 미인증 <strong>${stat.missed}회</strong>입니다. 남은 날에 다시 채워 가세요.`;
     $('myHint').innerHTML = p.status === 'out'
       ? '참여가 종료된 상태입니다. 문의는 운영진에게 남겨 주세요.'
       : (stat.missed === 0
         ? '아직 미인증이 없습니다. 이 페이스를 지켜 주세요! 💪'
-        : `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`);
+        : missLine);
 
     // 날짜 스트립 (화면 폭에 맞춰 자동 줄바꿈)
     const strip = $('myStrip');
@@ -770,7 +788,7 @@
   let ovOpenKey = null; // 'miss' | 'risk' | null(닫힘)
   let ovLists = { miss: [], risk: [] };
   let ovMissDetail = { missed: [], late: [] }; // 전일 미제출 / 지각 명단 (나눠서 보여준다)
-  let ovRiskDetail = [];  // 킥아웃 위험 인원 [{nickname, missed, kickout}] — 누락 많은 순
+  let ovRiskDetail = [];  // 세 번째 타일의 명단 [{nickname, missed, kickout}] — 누락 많은 순
 
   const byKo = (a, b) => a.localeCompare(b, 'ko');
 
@@ -792,9 +810,9 @@
         <div class="ov-detail-row"><span class="ov-detail-key">지각 ${late.length}명</span> ${nameLine(late)}</div>`;
       return;
     }
-    // 이름만으로는 얼마나 위험한지 알 수 없으므로 누적 미인증 횟수를 함께 보여준다.
-    box.innerHTML = `<strong>킥아웃 위험 인원 (${ovRiskDetail.length}명)</strong>
-      <span class="muted">누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상</span>
+    // 이름만으로는 얼마나 밀렸는지 알 수 없으므로 누적 미인증 횟수를 함께 보여준다.
+    box.innerHTML = `<strong>${esc(RISK_TILE.label)} (${ovRiskDetail.length}명)</strong>
+      <span class="muted">${esc(RISK_TILE.note)}</span>
       <div class="ov-chips">${ovRiskDetail.length
         ? ovRiskDetail.map((r) => `<span class="ov-chip${r.kickout ? ' out' : ''}">${esc(r.nickname)}<b>${r.missed}회</b></span>`).join('')
         : '<span class="muted">해당하는 사람이 없습니다.</span>'}</div>`;
@@ -865,9 +883,12 @@
     const prevMissed = prevGraded.filter((s) => prevCell(s).status === 'X');
     const prevSubIds = new Set(allSubs.filter((s) => s.date === prevDate).map((s) => s.participantId));
 
-    // 킥아웃 위험 인원: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
+    // 킥아웃이 있는 시즌: 누적 미인증이 riskThreshold회 이상인 사람 전부(이미 킥아웃 대상인
     // 사람도 포함) — 아래 표의 '위험'·'킥아웃 대상' 태그로 그중 실제 심각도를 구분해서 보여준다.
-    const riskZone = active.filter((s) => s.atRisk);
+    // 킥아웃이 없는 시즌: 위험이라는 개념 자체가 없으므로, 누락이 한 번이라도 있는 사람을 모은다.
+    const riskZone = CONFIG.kickoutEnabled
+      ? active.filter((s) => s.atRisk)
+      : active.filter((s) => s.missed > 0);
 
     ovLists = { miss: prevMissed.map((s) => s.participant.nickname).sort(byKo),
       risk: riskZone.map((s) => s.participant.nickname).sort(byKo) };
