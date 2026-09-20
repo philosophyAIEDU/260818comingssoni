@@ -51,6 +51,25 @@
       <div class="col"><span class="lbl">마감까지</span><span class="big" id="countdown">--:--:--</span></div>
     </section>
 
+    <!-- 시즌 전환 · 지난 시즌 열람 (운영진 전용) -->
+    <section class="card" id="seasonBar" style="margin-bottom:18px">
+      <div class="row" style="align-items:flex-end">
+        <div>
+          <label class="muted" for="seasonSelect">보고 있는 시즌</label>
+          <select id="seasonSelect"></select>
+        </div>
+        <div>
+          <label class="muted" for="seasonOpenToggle">지난 시즌 공개</label>
+          <div style="display:flex;align-items:center;gap:8px;min-height:34px">
+            <input type="checkbox" id="seasonOpenToggle">
+            <label for="seasonOpenToggle" class="muted" style="margin:0">참여자도 읽기 전용으로 볼 수 있게</label>
+          </div>
+        </div>
+      </div>
+      <p class="hint" id="seasonBarHint"></p>
+      <div id="seasonBarMsg"></div>
+    </section>
+
     <div class="stats" style="margin-bottom:18px">
       <div class="stat"><div class="n" id="kTotal">0</div><div class="k">참여중</div></div>
       <div class="stat ok"><div class="n" id="kToday">0</div><div class="k">오늘 인증</div></div>

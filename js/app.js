@@ -32,6 +32,10 @@
     ));
   }
 
+  /* 지난 시즌을 "보기만" 하는 중인지. boot()에서 시즌 잠금 상태를 확인한 뒤 켜진다.
+   * 켜지면 인증 폼과 추천 버튼이 모두 잠겨서 예전 기록이 손대지 않은 채로 남는다. */
+  let READONLY = false;
+
   /* 세 번째 타일의 이름표. 킥아웃이 있는 시즌은 "위험 인원", 없는 시즌은 누락 집계만 한다. */
   const RISK_TILE = CONFIG.kickoutEnabled
     ? { label: '킥아웃 위험 인원',
@@ -572,6 +576,7 @@
   }
 
   function bindUpvoteButtons(container) {
+    if (READONLY) return; // 지난 시즌을 들여다보는 중 — 기록을 바꾸지 않는다
     container.querySelectorAll('.upvote-btn').forEach((btn) => {
       if (btn.classList.contains('self')) return; // 본인 글: 클릭 자체를 막는다
       btn.addEventListener('click', async () => {
@@ -596,7 +601,9 @@
     const own = isOwnSubmission(s);
     const late = U.isLate(s.date, s.createdAt);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : '', own ? 'self' : ''].filter(Boolean).join(' ');
-    const btnAttr = own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '';
+    const btnAttr = READONLY
+      ? 'disabled title="지난 시즌 기록이라 추천할 수 없습니다"'
+      : (own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '');
     // 왼쪽에는 글(이름·시간·본문)만, 오른쪽에는 버튼만 모아 둔다 — 본문이 버튼 사이로 파고들지 않게.
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-main">
@@ -978,8 +985,42 @@
   }
 
   /* ── 초기화 ──────────────────────────── */
+  /* 지난 시즌을 볼 수 있는지 판단한다.
+   *  - 잠기지 않았으면 평소대로.
+   *  - 잠겼고 운영진이 "읽기 전용 공개"를 켜 뒀으면 보기만 가능.
+   *  - 잠겼는데 공개도 아니면 화면을 열지 않고 안내만 남긴다(운영진 화면에서 볼 수 있다).
+   * 반환값 false = 이 화면을 더 그리지 않는다.
+   */
+  async function applySeasonLock() {
+    if (!CS.seasonLocked(CS.SEASON)) return true;
+
+    let flags = {};
+    try { flags = await Store.getSeasonFlags(); } catch (e) { /* 못 읽으면 잠긴 것으로 본다 */ }
+    const opened = Array.isArray(flags.openSeasons) && flags.openSeasons.includes(CS.SEASON.id);
+
+    const banner = $('seasonBanner');
+    banner.hidden = false;
+    if (!opened) {
+      // 기록은 그대로 있고, 다만 이 화면에서 열지 않는다.
+      document.querySelector('main.wrap').innerHTML = '';
+      document.querySelector('main.wrap').appendChild(banner);
+      msg(banner, `<strong>${esc(CONFIG.title)} · ${esc(CONFIG.book.name)}</strong> 시즌은 종료되었습니다.<br>`
+        + '기록은 그대로 보관되어 있습니다. 예전 인증 내용이 필요하시면 운영진에게 말씀해 주세요.<br>'
+        + '<a href="index.html">현재 진행 중인 시즌 보기</a>', 'warn');
+      return false;
+    }
+
+    READONLY = true;
+    msg(banner, `<strong>지난 시즌(${esc(CONFIG.book.name)}) 기록을 보는 중입니다.</strong><br>`
+      + '읽기 전용이라 인증 제출과 추천은 할 수 없습니다. '
+      + '<a href="index.html">현재 진행 중인 시즌 보기</a>', 'warn');
+    $('certifyCard').hidden = true;
+    return true;
+  }
+
   async function boot() {
     await Store.init();
+    if (!(await applySeasonLock())) return;
     paintHeader();
     renderTodayRange();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));

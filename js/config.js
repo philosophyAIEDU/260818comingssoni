@@ -179,6 +179,18 @@ CS.SEASON = CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride);
  * 화면·서버 코드는 예전처럼 CS.CONFIG만 읽으면 되고, 시즌이 바뀌어도 고칠 곳이 없다. */
 CS.CONFIG = Object.assign({}, CS.COMMON, CS.SEASON, { seasonId: CS.SEASON.id });
 
+/* 지난 시즌이 잠겼는지. lockAt(KST)이 지나면 운영진 화면에서만 열 수 있다.
+ * 다만 운영진이 "읽기 전용 공개"를 켜 두면(공유 flags.openSeasons) 누구나 볼 수 있되
+ * 인증·추천 같은 쓰기는 모두 막힌다. 데이터 자체는 어느 쪽이든 그대로 남는다. */
+CS.seasonLocked = function (season, nowKST) {
+  if (!season || !season.lockAt) return false;
+  return season.lockAt <= (nowKST || CS.seasonNowKST());
+};
+
+CS.seasonById = function (id) {
+  return CS.SEASONS.find((s) => s.id === id) || null;
+};
+
 /* Firestore 컬렉션 이름에 시즌 접두사를 붙인다.
  * 시즌1은 dataPrefix가 비어 있어 예전 이름 그대로 — 기존 데이터를 옮길 필요가 없다. */
 CS.collectionName = function (name) {

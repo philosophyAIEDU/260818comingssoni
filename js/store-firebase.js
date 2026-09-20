@@ -314,6 +314,20 @@ CS.FirebaseStore = (function () {
     return getMeta();
   }
 
+  /* 시즌 공용 설정. collectionName()을 거치지 않고 항상 같은 문서를 본다 —
+   * "지난 시즌을 열어 둘지"는 지금 보고 있는 시즌과 무관하게 같은 답이어야 한다. */
+  async function getSeasonFlags() {
+    await init();
+    const snap = await fs.getDoc(fs.doc(db, 'meta', 'seasonFlags'));
+    return snap.exists() ? snap.data() : {};
+  }
+
+  async function setSeasonFlags(patch) {
+    await init();
+    await fs.setDoc(fs.doc(db, 'meta', 'seasonFlags'), patch, { merge: true });
+    return getSeasonFlags();
+  }
+
   async function exportAll() {
     return {
       exportedAt: CS.U.nowStamp(),
@@ -352,7 +366,8 @@ CS.FirebaseStore = (function () {
     name: 'firebase',
     init, listParticipants, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta, exportAll, importAll, clearAll,
+    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
+    getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
     getNotice, setNotice, listNotices

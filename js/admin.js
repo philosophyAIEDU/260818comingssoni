@@ -1416,11 +1416,65 @@
   }
 
   /* ── 초기화 ──────────────────────────── */
+
+  /* ── 시즌 전환 · 지난 시즌 열람 ────────────────────────────
+   * 운영진 화면은 로그인 뒤에만 열리므로, 지난 시즌을 여는 통로도 여기에 둔다.
+   * 시즌을 고르면 ?season=<id>로 다시 열리고, 그때부터 모든 탭이 그 시즌의
+   * 데이터만 읽고 쓴다(컬렉션 이름이 통째로 갈라져 있다).
+   */
+  async function initSeasonBar() {
+    const sel = $('seasonSelect');
+    const toggle = $('seasonOpenToggle');
+    const hint = $('seasonBarHint');
+
+    sel.innerHTML = CS.SEASONS.map((s) => {
+      const locked = CS.seasonLocked(s) ? ' · 종료' : '';
+      const here = s.id === CS.SEASON.id ? ' selected' : '';
+      return `<option value="${s.id}"${here}>${esc(s.book.name)} (${U.shortLabel(s.startDate)}~${U.shortLabel(s.endDate)})${locked}</option>`;
+    }).join('');
+
+    sel.addEventListener('change', () => {
+      // 시즌은 페이지 단위로 갈리므로(설정·저장소 모두) 새로고침이 가장 확실하다.
+      location.search = `?season=${encodeURIComponent(sel.value)}`;
+    });
+
+    const locked = CS.seasonLocked(CS.SEASON);
+    let flags = {};
+    try { flags = await Store.getSeasonFlags(); } catch (e) { /* 못 읽으면 닫힌 것으로 본다 */ }
+    const openSeasons = Array.isArray(flags.openSeasons) ? flags.openSeasons : [];
+    toggle.checked = openSeasons.includes(CS.SEASON.id);
+    toggle.disabled = !locked;
+
+    hint.textContent = locked
+      ? '종료된 시즌입니다. 기록은 그대로 보관되어 있고, 여기서는 읽기·검색·내려받기가 모두 됩니다. '
+        + '체크하면 참여자도 인증 화면에서 이 시즌을 읽기 전용으로 볼 수 있습니다.'
+      : '진행 중인 시즌입니다. 종료(잠금) 시각이 지나면 이 시즌도 운영진만 볼 수 있게 되고, 그때 공개 여부를 고를 수 있습니다.';
+
+    toggle.addEventListener('change', async () => {
+      const next = toggle.checked
+        ? openSeasons.concat(CS.SEASON.id).filter((v, i, a) => a.indexOf(v) === i)
+        : openSeasons.filter((id) => id !== CS.SEASON.id);
+      try {
+        await Store.setSeasonFlags({ openSeasons: next });
+        openSeasons.length = 0;
+        next.forEach((id) => openSeasons.push(id));
+        msg($('seasonBarMsg'), toggle.checked
+          ? '이제 참여자도 이 시즌 기록을 읽기 전용으로 볼 수 있습니다.'
+          : '이 시즌은 다시 운영진만 볼 수 있습니다.', 'ok');
+      } catch (err) {
+        toggle.checked = !toggle.checked;
+        msg($('seasonBarMsg'), '저장하지 못했습니다: ' + err.message, 'bad');
+      }
+    });
+  }
+
   async function boot() {
     await Store.init();
     tick();
     setInterval(tick, 1000);
     initTabs();
+
+    await initSeasonBar();
 
     // 킥아웃이 없는 시즌에서는 킥아웃/위험이라는 단계가 없다 — 그 선택지를 감추고,
     // 대신 "누락 있는 사람만 보기"를 꺼내 운영진이 누락 인원을 바로 추릴 수 있게 한다.
