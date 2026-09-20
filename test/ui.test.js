@@ -14,10 +14,15 @@ let pass = 0, fail = 0;
 /* 활성 시즌은 배포가 아니라 시계가 고른다(js/config.js). 테스트는 시즌0(프로세스 이코노미)의
  * 날짜·기준값을 갈아끼워 쓰므로, 실제 날짜가 시즌 경계를 넘는 순간 그 값들이 엉뚱한 시즌에
  * 얹혀서 통째로 깨진다. 아래 컨텍스트들이 config를 어떻게 고쳐 쓰든 시즌은 항상 시즌0으로
- * 못박는다 — 시즌 선택 자체는 logic 테스트에서 따로 검증한다. */
-const pinSeason = (body) => body.replace(
-  'CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)',
-  "CS.pickSeason(CS.seasonNowKST(), 's1')");
+ * 못박는다 — 시즌 선택 자체는 logic 테스트에서 따로 검증한다.
+ *
+ * lockAt도 함께 지운다. 시즌0의 잠금 시각이 지나고 나면 인증 화면이 아예 열리지 않아
+ * (그게 맞는 동작이다) 아래 테스트가 전부 빈 화면을 보게 된다. 잠금 동작 자체는
+ * logic 테스트와 별도 확인에서 본다. */
+const pinSeason = (body) => body
+  .replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)',
+    "CS.pickSeason(CS.seasonNowKST(), 's1')")
+  .replace(/lockAt: '[^']*'/g, 'lockAt: null');
 const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console.log('  FAIL', n, x === undefined ? '' : JSON.stringify(x)));
 
 (async () => {
@@ -683,8 +688,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const rulesText = await rulesCard.textContent();
   t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
   t('킥아웃 요청 기한 3일로 변경', rulesText.includes('3일 전'));
+  // 규칙은 접어 두고, 마감 시각과 OT 링크만 밖에 둔다(카드가 너무 길어졌다).
+  t('마감 시각은 접지 않고 늘 보임',
+    (await rulesCard.locator('.rule-key').textContent()).includes('23:59'));
+  t('나머지 규칙은 기본으로 접혀 있음', !(await page.locator('#ruleFold').evaluate((el) => el.open)));
   const rulesLis = await rulesCard.locator('ul.muted li').count();
-  t('규칙 목록 5개(날짜 선택·지각 안내 포함)', rulesLis === 5, rulesLis);
+  t('접힌 규칙 4개(날짜 선택·지각 안내 포함)', rulesLis === 4, rulesLis);
+  t('접힘 요약에 항목 수 표시',
+    /나머지 규칙 4가지 보기/.test(await page.locator('#ruleFold summary').textContent()),
+    await page.locator('#ruleFold summary').textContent());
+  await page.click('#ruleFold summary');
+  await page.waitForTimeout(150);
+  t('클릭하면 펼쳐짐', await page.locator('#ruleFold').evaluate((el) => el.open));
   t('예전 날짜의 인증글도 고칠 수 있다는 안내 문구 노출', rulesText.includes('이미 낸 인증글을 나중에 다시 고칠 수 있습니다'));
   t('인증할 날짜 필드에도 과거 인증 수정 안내가 붙음',
     (await page.locator('label[for="certifyDate"] .sub').textContent()).includes('이미 낸 인증도 고칠 수 있어요'));
