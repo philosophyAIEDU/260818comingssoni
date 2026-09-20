@@ -883,6 +883,7 @@
     paintKickoutNotice();
     await refreshKickoutTemplate();
     await refreshMissed5Template();
+    await refreshReminderTemplate();
   }
 
   /* ── 특정 대상에게 안내 메일 작성(자동 발송 없이, 복사해서 직접 보냄) ─── */
@@ -1034,12 +1035,16 @@
   }
 
   function missedWarnBody(stat) {
+    // 킥아웃이 없는 시즌에는 "몇 회가 되면 킥아웃" 같은 경고가 성립하지 않는다.
+    const nudge = CONFIG.kickoutEnabled
+      ? `누적 미인증이 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 처리될 수 있으니, `
+        + '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다.'
+      : '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다. 남은 날이 아직 많습니다!';
     return [
       `안녕하세요, ${stat.participant.nickname}님,`,
       '',
       `현재까지 총 ${stat.missed}회 미인증되었습니다.`,
-      `누적 미인증이 ${CONFIG.kickoutThreshold}회가 되면 킥아웃 처리될 수 있으니, ` +
-        '오늘부터 다시 꾸준히 인증해 주시면 좋겠습니다.',
+      nudge,
       '',
       `인증하러 가기 → ${CONFIG.appUrl}`,
       '',
@@ -1048,7 +1053,7 @@
   }
 
   function paintMissedWarn() {
-    $('warnKickN').textContent = CONFIG.kickoutThreshold;
+    if (CONFIG.kickoutEnabled) $('warnKickN').textContent = CONFIG.kickoutThreshold;
     const rows = missedWarnCandidates();
     const cols = [
       { key: 'name', label: '이름', get: (r) => r.stat.participant.nickname },
@@ -1212,6 +1217,60 @@
     missed5TemplateDirty = false;
     msg($('missed5TemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
     await refreshMissed5Template();
+  }
+
+  /* ── 당일 인증 리마인드 메일 ─────────────────
+   *  실제 발송은 Netlify 예약 함수(netlify/functions/send-daily-reminder.js, 매일 21시 KST)가
+   *  한다 — 여기서는 문구를 편집·저장하고 최근 실행 결과를 확인만 한다. 문구는 킥아웃·경고
+   *  메일과 마찬가지로 meta 문서에 저장되고 예약 함수도 같은 문서를 읽으므로,
+   *  화면에 보이는 문구와 실제 발송 문구가 언제나 같다. */
+  let reminderMailTemplate = null;
+  let reminderTemplateDirty = false;
+
+  async function refreshReminderTemplate() {
+    const meta = await Store.getMeta();
+    reminderMailTemplate = meta.reminderMailTemplate || null;
+    loadReminderTemplateInputs();
+    paintReminderLastRun(meta.reminderLastRun || null);
+  }
+
+  function loadReminderTemplateInputs() {
+    if (reminderTemplateDirty) return;
+    $('reminderTemplateSubject').value =
+      (reminderMailTemplate && reminderMailTemplate.subject) || MailTemplates.defaultReminderSubject();
+    $('reminderTemplateBody').value =
+      (reminderMailTemplate && reminderMailTemplate.body) || MailTemplates.defaultReminderBody();
+    $('reminderTemplateStatus').textContent = reminderMailTemplate
+      ? `저장된 문구 사용 중 · 최근 수정 ${U.stampLabel(reminderMailTemplate.updatedAt)}`
+      : '기본 문구를 그대로 쓰는 중입니다(아직 저장한 적 없음).';
+  }
+
+  function paintReminderLastRun(lastRun) {
+    $('reminderLastRun').textContent = lastRun
+      ? `최근 자동 발송: ${U.stampLabel(lastRun.at)} · 대상 ${lastRun.candidates}명 중 ${lastRun.sent}건 발송`
+        + (lastRun.failed ? ` · 실패 ${lastRun.failed}건` : '')
+        + (lastRun.skippedNoEmail ? ` · 이메일 없어 건너뜀 ${lastRun.skippedNoEmail}건` : '')
+      : '아직 자동 발송이 실행된 적 없습니다(Netlify 배포·설정이 끝나면 매일 21시에 자동으로 실행됩니다).';
+  }
+
+  async function saveReminderTemplate() {
+    const subject = $('reminderTemplateSubject').value.trim();
+    const body = $('reminderTemplateBody').value.trim();
+    if (!subject || !body) {
+      msg($('reminderTemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
+      return;
+    }
+    await Store.setMeta({ reminderMailTemplate: { subject, body, updatedAt: U.nowStamp() } });
+    reminderTemplateDirty = false;
+    msg($('reminderTemplateMsg'), '리마인드 메일 문구를 저장했습니다. 다음 자동 발송부터 이 문구로 나갑니다.', 'ok');
+    await refreshReminderTemplate();
+  }
+
+  async function resetReminderTemplate() {
+    await Store.setMeta({ reminderMailTemplate: null });
+    reminderTemplateDirty = false;
+    msg($('reminderTemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
+    await refreshReminderTemplate();
   }
 
   /** Netlify 예약 함수가 그대로 채택할 대상과 완전히 같은 조건(정확히 5회, 아웃 아님, 아직 미경고)
@@ -1480,6 +1539,10 @@
     // 대신 "누락 있는 사람만 보기"를 꺼내 운영진이 누락 인원을 바로 추릴 수 있게 한다.
     if (!CONFIG.kickoutEnabled) {
       $('kRiskLabel').textContent = '누락 인원';
+      // 킥아웃 통보·미인증 경고 메일은 이 시즌에 존재하지 않는다(예약 함수도 건너뛴다).
+      $('kickoutMailSection').hidden = true;
+      $('missedWarnHint').hidden = true;
+      $('missedWarnHintNoKick').hidden = false;
       document.querySelectorAll('#rosterStatusFilter [data-kickout-only]')
         .forEach((el) => { el.hidden = true; });
       document.querySelectorAll('#rosterStatusFilter [data-no-kickout]')
@@ -1534,6 +1597,11 @@
     $('missed5TemplateBody').addEventListener('input', () => { missed5TemplateDirty = true; });
     $('missed5TemplateSave').addEventListener('click', saveMissed5Template);
     $('missed5TemplateReset').addEventListener('click', resetMissed5Template);
+
+    $('reminderTemplateSubject').addEventListener('input', () => { reminderTemplateDirty = true; });
+    $('reminderTemplateBody').addEventListener('input', () => { reminderTemplateDirty = true; });
+    $('reminderTemplateSave').addEventListener('click', saveReminderTemplate);
+    $('reminderTemplateReset').addEventListener('click', resetReminderTemplate);
 
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);

@@ -281,18 +281,26 @@
       </div>
     </div>
 
-    <h2 style="margin-top:26px">미인증 경고 메일</h2>
-    <p class="hint">
+    <h2 style="margin-top:26px">미인증 안내 메일</h2>
+    <p class="hint" id="missedWarnHint">
       현재 미인증 횟수가 있는 참여자 목록입니다(이미 아웃 처리된 분은 빠집니다). <strong>[메일 작성]</strong>을
       누르면 지금까지 몇 회 미인증됐는지와 누적 <strong id="warnKickN"></strong>회가 되면 킥아웃될 수 있다는
       내용을 자동으로 채운 제목·본문이 위 작성창에 채워집니다 — 확인 후 [Gmail로 작성하기]나
       [복사하기]로 보내주세요.
+    </p>
+    <p class="hint" id="missedWarnHintNoKick" hidden>
+      현재 누락이 있는 참여자 목록입니다(이미 아웃 처리된 분은 빠집니다). <strong>[메일 작성]</strong>을
+      누르면 지금까지 몇 회 누락했는지를 담은 제목·본문이 위 작성창에 채워집니다 — 확인 후
+      [Gmail로 작성하기]나 [복사하기]로 보내주세요. 이 시즌에는 킥아웃이 없어 경고가 아닌
+      안내 문구로 채워집니다.
     </p>
     <div id="missedWarnMsg"></div>
     <div class="scroll">
       <table id="missedWarnTable"></table>
     </div>
 
+    <!-- 킥아웃이 있는 시즌에서만 보이는 영역(admin.js가 감춘다) -->
+    <div id="kickoutMailSection">
     <h2 style="margin-top:26px">킥아웃 통보 메일</h2>
     <p class="hint">
       [명단 관리]에서 <strong>킥아웃 처리</strong>된 참여자 목록입니다. <strong>[메일 작성]</strong>을 누르면
@@ -371,6 +379,33 @@
       <button id="missed5TemplateReset">기본값으로 되돌리기</button>
     </div>
     <div id="missed5TemplateMsg"></div>
+    </div><!-- /#kickoutMailSection -->
+
+    <h2 style="margin-top:26px" id="reminderHead">당일 인증 리마인드 메일</h2>
+    <p class="hint">
+      그날 <strong>아직 인증하지 않은 참여자</strong>에게 <strong>매일 밤 21시(KST) 자동으로</strong>
+      안내 메일이 나갑니다. 마감(24:00)까지 세 시간 남은 시각이라 지금 알려주면 아직 늦지 않습니다.
+      아웃된 사람과 그날이 면제일인 사람은 빠지고, 같은 사람에게 하루 두 번 가지 않습니다.
+      매일 나가는 안내라 <strong>이메일로만</strong> 보냅니다(문자는 건당 비용이 계속 쌓입니다).
+      <strong>{{이름}}</strong>·<strong>{{날짜}}</strong>·<strong>{{남은시간}}</strong>·
+      <strong>{{앱주소}}</strong>는 참여자별로 실제 값으로 자동 치환됩니다.
+    </p>
+    <p class="muted" id="reminderLastRun"></p>
+
+    <div class="field" style="margin-top:18px">
+      <label for="reminderTemplateSubject">제목</label>
+      <input type="text" id="reminderTemplateSubject">
+    </div>
+    <div class="field">
+      <label for="reminderTemplateBody">본문</label>
+      <textarea id="reminderTemplateBody" rows="10"></textarea>
+    </div>
+    <p class="muted" id="reminderTemplateStatus"></p>
+    <div class="actions">
+      <button class="primary" id="reminderTemplateSave">저장</button>
+      <button id="reminderTemplateReset">기본값으로 되돌리기</button>
+    </div>
+    <div id="reminderTemplateMsg"></div>
   </section>
 
   <!-- ── 데이터 ───────────────────────── -->

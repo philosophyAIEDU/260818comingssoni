@@ -7,3 +7,8 @@
 # (24:00 KST 마감 직후라 그날의 미인증 확정 여부가 이미 반영된 상태입니다.)
 [functions."send-missed5-warning"]
   schedule = "10 15 * * *"
+
+# 매일 21:00(KST) = 12:00(UTC) 에, 그날 아직 인증하지 않은 참여자에게 리마인드 메일을
+# 보냅니다. 마감(24:00 KST)까지 세 시간 남은 시각이라 지금 알려주면 아직 늦지 않습니다.
+[functions."send-daily-reminder"]
+  schedule = "0 12 * * *"

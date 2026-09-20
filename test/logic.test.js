@@ -280,6 +280,34 @@ function t(name, cond, extra) {
   t('미인증 5회 경고 메일 치환 결과에 실제 이름·기준 횟수 반영',
     filledMissed5.includes('김철수') && filledMissed5.includes('5회') && filledMissed5.includes('6회'), filledMissed5);
 
+  console.log('— 당일 인증 리마인드 메일 (매일 21시 KST) —');
+  // 예약 함수(netlify/functions/_lib/dailyReminder.js)가 대상을 고르는 규칙과 같은 조건이다.
+  const rToday = U.today();
+  const rParticipants = [
+    { id: 'r1', nickname: '이미냄', status: '', exemptDates: [] },
+    { id: 'r2', nickname: '아직안냄', status: '', exemptDates: [] },
+    { id: 'r3', nickname: '오늘면제', status: '', exemptDates: [rToday] },
+    { id: 'r4', nickname: '아웃', status: 'out', exemptDates: [] },
+    { id: 'r5', nickname: '오늘이미받음', status: '', exemptDates: [], remindedAt: rToday }
+  ];
+  const rSubs = [{ participantId: 'r1', date: rToday, sentence: 'x', reflection: 'y', createdAt: U.nowStamp() }];
+  const rPicked = U.buildStats(rParticipants, rSubs, rToday).filter((st) => {
+    const p = st.participant;
+    if (p.status === 'out') return false;
+    if (st.submittedToday) return false;
+    if ((p.exemptDates || []).includes(rToday)) return false;
+    return p.remindedAt !== rToday;
+  }).map((st) => st.participant.nickname);
+  t('오늘 아직 안 낸 사람만 대상(이미 냄·면제·아웃·오늘 이미 받음은 제외)',
+    rPicked.length === 1 && rPicked[0] === '아직안냄', rPicked);
+
+  const filledReminder = MailTemplates.fill(MailTemplates.defaultReminderBody(),
+    { 이름: '소니', 날짜: U.longLabel(rToday), 남은시간: '약 3시간', 앱주소: CONFIG.appUrl });
+  t('리마인드 메일 치환 결과에 자리표시자가 남지 않음', !/\{\{/.test(filledReminder), filledReminder);
+  t('리마인드 메일에 이름·남은 시간·앱 주소 반영',
+    filledReminder.includes('소니') && filledReminder.includes('약 3시간')
+    && filledReminder.includes(CONFIG.appUrl), filledReminder);
+
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);
   await Store.setNotice('2026-08-24', '  8/24 공지 초안입니다  ');
