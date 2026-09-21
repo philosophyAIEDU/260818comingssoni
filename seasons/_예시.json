@@ -1,0 +1,33 @@
+{
+  "_설명": "다음 시즌을 만들 때 이 파일을 복사해서 채운 뒤 `node tools/new-season.mjs seasons/s3.json --write` 로 돌린다.",
+
+  "id": "s3",
+  "label": "시즌 2",
+  "switchAt": "2026-10-21T02:00",
+
+  "startDate": "2026-10-21",
+  "endDate": "2026-11-17",
+
+  "book": {
+    "name": "책 제목",
+    "tagline": "부제 (표지에 적힌 것)",
+    "byline": "지은이 · 옮긴이 · 출판사",
+    "cover": "책제목.webp",
+    "desc": "이 책을 왜 지금 읽는지 두세 문장. 상세페이지에도 그대로 들어간다."
+  },
+
+  "otUrl": "https://youtu.be/…",
+  "guideUrl": "https://…notion.site/…",
+  "appUrl": "https://personalmakersbook.netlify.app/",
+
+  "liveTime": "22:00 - 22:30",
+  "monthLabel": "10월",
+  "recruitLabel": "10/16(목) ~ 10/18(토) 23:59",
+  "giftMissLimit": 6,
+  "bookEditionRule": "",
+  "bookBuyNote": "",
+
+  "readingPlan": [
+    [{ "ch": "", "s": ["🎯 <strong>책 준비 + 목차 전체 훑어보기</strong>", "① 목차에서 <strong>가장 기대되는 꼭지 한 가지</strong>와, 왜 그런지", "② 이번 책에서 <strong>내가 얻고 싶은 것 1가지</strong>를 선언하세요"] }]
+  ]
+}

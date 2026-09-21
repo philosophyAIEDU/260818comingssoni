@@ -3,3 +3,6 @@ node_modules/
 *.log
 /admin.png
 /mobile.png
+
+# 자동 생성물 (노션에 붙여 넣는 초안)
+out/
