@@ -156,13 +156,11 @@ a { color: var(--accent); }
 /* 오늘의 범위 — '1장 - 소제목'을 한 줄에 하나씩 세로로, 가운데에 모아서.
    왼쪽에 붙여 두면 장 이름이 고정폭이라 오른쪽이 길게 비어 보인다. */
 .range-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-.range-list > li {
-  display: flex; align-items: baseline; justify-content: center;
-  gap: 6px; flex-wrap: wrap;
-}
-.range-list > li.range-plain { display: block; }
-.range-ch { flex: 0 0 auto; font-weight: 800; font-variant-numeric: tabular-nums; }
-.range-sep { flex: 0 0 auto; opacity: .55; }
+/* 플렉스로 두면 '1장' · '-' · 제목이 각각 아이템이라, 폭이 좁아지면 줄마다 쪼개진다.
+   보통 글처럼 흘려서 "1장 - 제목"이 한 덩어리로 읽히게 한다. */
+.range-list > li { display: block; }
+.range-ch { font-weight: 800; font-variant-numeric: tabular-nums; margin-right: 5px; }
+.range-sep { opacity: .55; margin-right: 5px; }
 
 
 /* ── 폼 ───────────────────────────────── */
