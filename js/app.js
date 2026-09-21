@@ -83,13 +83,13 @@
     $('sentence').placeholder = CONFIG.sentencePlaceholder;
     $('reflection').placeholder = CONFIG.reflectionPlaceholder;
 
-    // 규칙 아래 한 줄짜리 바깥 링크(OT 영상 등)
-    if (CONFIG.otLink) {
-      const { label, url } = CONFIG.otLink;
-      $('otLink').innerHTML =
-        `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">`
-        + `${U.icon('play')}<span>${esc(label)}</span></a>`;
-      $('otLink').hidden = false;
+    // 규칙 위에 나란히 놓이는 바깥 링크 버튼들(OT 영상·설명서 등)
+    const links = CONFIG.headLinks || [];
+    if (links.length) {
+      $('headLinks').innerHTML = links.map((l) =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">`
+        + `${U.icon(l.icon || 'play')}<span>${esc(l.label)}</span></a>`).join('');
+      $('headLinks').hidden = false;
     }
 
     document.title = `${CONFIG.title} · 인증하기`;

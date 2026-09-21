@@ -14,7 +14,7 @@ window.CS = window.CS || {};
 /* 시즌과 무관하게 항상 같은 값 */
 CS.COMMON = {
   logo: 'logo-header.jpg',               // 좌측 상단 로고 이미지 경로
-  appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
+  appUrl: 'https://personalmakersbook.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
   timezone: 'Asia/Seoul',         // 마감/날짜 판정 기준 시간대
   deadlineHour: 24,               // 매일 24:00 정각 마감 (유예 없음)
 
@@ -58,6 +58,8 @@ CS.SEASONS = [{
     note: '* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요'
   },
   rulesHeading: '안내 · 챌린지 규칙',
+  // 규칙 위에 나란히 놓이는 바깥 링크 버튼들. 비워 두면 아무것도 안 나온다.
+  headLinks: [],
   // '읽은 문장' 입력칸에 흐리게 보이는 예시
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요.',
   sentencePlaceholder: 'ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. '
@@ -66,8 +68,6 @@ CS.SEASONS = [{
     + '되어 응원해주는 것이다. - 185쪽',
   // 안내·규칙 카드에서 이 시즌에만 붙는 줄(공통 규칙 뒤에 이어진다)
   extraRules: [],
-  // 규칙 아래 한 줄로 붙는 바깥 링크(OT 영상 등). null이면 아무것도 안 나온다.
-  otLink: null,
   startDate: '2026-08-24',        // 챌린지 시작일 (포함)
   endDate: '2026-09-20',          // 챌린지 종료일 (포함)
 
@@ -150,17 +150,19 @@ CS.SEASONS = [{
   },
   live: {
     label: '매주 일요일 22:00 - 22:30 (9/27 · 10/4 · 10/11 · 10/18)',
-    note: '* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요. OT는 영상으로 제공됩니다(결제 후 전달된 노션 페이지 참고).'
+    note: '* 다시보기는 제공되지 않으니 꼭 시간내어 참여해주세요.'
   },
   rulesHeading: '안내 · 멤버십 규칙',
   // 일정표 안내: "오늘 범위에서 와닿은 한 문장 + 내 브랜드/일에 적용할 점"
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 읽은 내용을 내 브랜드·일에 어떻게 적용할지 적어주세요.',
   sentencePlaceholder: 'ex) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
     + '끝에 쪽수를 붙여 주세요. (예: … - 47쪽)',
-  otLink: {
-    label: '퍼스널메이커스 독서 멤버십 OT 보기',
-    url: 'https://www.youtube.com/watch?v=ny6lJ-8PMXI'
-  },
+  headLinks: [
+    { label: '독서 멤버십 OT 보기', icon: 'play',
+      url: 'https://youtu.be/ny6lJ-8PMXI' },
+    { label: '9월 퍼메스 독서 멤버십 설명서', icon: 'book',
+      url: 'https://capable-hook-3dd.notion.site/9-3dff15a6c51c8170aeaaf9cbe0974f92' }
+  ],
   extraRules: [
     '<strong>일요일은 새로 읽을 분량이 없습니다.</strong> 그날 오전 단톡방에 올라오는 <strong>발제문</strong>을 '
       + '보고 생각을 정리해 <strong>[읽고 느낀 점]</strong>에 남기면 그날 인증이 완료됩니다. '
