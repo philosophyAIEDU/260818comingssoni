@@ -313,6 +313,20 @@ href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variabl
       <table id="missedWarnTable"></table>
     </div>
 
+    <!-- 🎁 인사이트 정리본 선물 대상자 — giftMissLimit이 있는 시즌에서만 보인다(admin.js가 연다) -->
+    <div id="giftSection" hidden>
+    <h2 style="margin-top:26px">🎁 선물 대상자 <span class="tag" id="giftCount"></span></h2>
+    <p class="hint" id="giftHint"></p>
+    <div class="actions" style="margin-bottom:10px">
+      <button class="secondary" id="giftCopy" type="button">이름·이메일 복사</button>
+      <button class="secondary" id="giftCsv" type="button">CSV 내려받기</button>
+      <span class="muted" id="giftMsg"></span>
+    </div>
+    <div class="scroll">
+      <table id="giftTable"></table>
+    </div>
+    </div><!-- /#giftSection -->
+
     <!-- 킥아웃이 있는 시즌에서만 보이는 영역(admin.js가 감춘다) -->
     <div id="kickoutMailSection">
     <h2 style="margin-top:26px">킥아웃 통보 메일</h2>

@@ -141,7 +141,7 @@ node tools/roster-diff.mjs <신청자.xlsx> <카톡이름.txt>  # 명단 대조
 `seasons/_예시.json`을 복사해 채우면 된다. `--write`는 두 가지를 한다.
 
 1. `js/config.js`의 `CS.SEASONS`에 시즌을 더한다
-2. `out/상세페이지.md` · `out/설명서.md` · `out/카톡공지.txt` 초안을 만든다
+2. `out/상세페이지.md` · `out/설명서.md` · `out/일정표.md` · `out/카톡공지.txt` 초안과, 노션에 올릴 목록 `out/노션게시.json`을 만든다
    (틀은 `tools/templates/`에 있고, 매달 바뀌는 건 책 제목과 "왜 이 책인가"뿐이다)
 
 **전환은 따로 시킬 필요가 없다.** 활성 시즌은 배포가 아니라 시계가 고르므로(`startsAt`),
@@ -163,6 +163,9 @@ node tools/roster-diff.mjs <신청자.xlsx> <카톡이름.txt>  # 명단 대조
 
 동명이인은 카톡 이름에 붙은 숫자(`이유진1362`)를 전화번호와 맞춰 가른다. 양쪽 합이 맞는지
 검산까지 한다. **신청자 파일은 개인정보라 저장소에 커밋하지 않는다.**
+
+시즌이 끝나면 운영진 화면 [알림 메일 › 🎁 선물 대상자]에서 누락이 `giftMissLimit` 미만인 명단과 이메일을
+복사·내려받을 수 있다. 라이브 대본 4개로 인사이트 정리본을 만드는 절차는 `.claude/skills/live-insights/`에 있다.
 
 Claude Code로 작업한다면 `.claude/skills/new-season/`에 절차가 들어 있다 — "다음 시즌 준비"라고
 하면 노션 일정표를 읽어 여기까지 한 번에 한다.

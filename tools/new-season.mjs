@@ -6,8 +6,9 @@
  *
  * 만들어 주는 것
  *   1) js/config.js 의 CS.SEASONS 에 시즌 객체 추가
- *   2) out/상세페이지.md · out/설명서.md · out/카톡공지.txt  (모집·안내 문구 초안)
- *   3) 사람이 확인해야 하는 것 목록
+ *   2) out/상세페이지.md · out/설명서.md · out/일정표.md · out/카톡공지.txt  (모집·안내 문구 초안)
+ *   3) out/노션게시.json — 위 문서를 노션 어디에 어떤 제목으로 올릴지 (스킬이 읽는다)
+ *   4) 사람이 확인해야 하는 것 목록
  *
  * 시즌이 config에 들어가 있으면 전환은 저절로 된다 — 활성 시즌은 배포가 아니라
  * startsAt(KST) 시각이 고르기 때문이다. 미리 머지해 두면 그날 새벽에 알아서 바뀐다.
@@ -106,6 +107,8 @@ const seasonSrc = `, {
   kickoutThreshold: Infinity,
   riskThreshold: Infinity,
   autoWarnThreshold: Infinity,
+  // 🎁 정리본 선물 기준 — 누락이 이 횟수 미만이면 대상. 운영진 [알림 메일 › 선물 대상자]가 쓴다.
+  giftMissLimit: ${spec.giftMissLimit || 6},
   readingPlan: [
 ${planSrc}
   ]
@@ -130,6 +133,16 @@ const vars = {
   '설명서링크': spec.guideUrl,
   '앱주소': spec.appUrl || 'https://personalmakersbook.netlify.app/',
   '책구매안내': spec.bookBuyNote || '(구매 안내를 적어 주세요)',
+  // 월 5만 원을 하루로 나눈 값(백 원 단위 반올림). 상세페이지의 가격 앵커.
+  '하루비용': (Math.round(50000 / days / 100) * 100).toLocaleString('ko-KR'),
+  '일정표': plan.map((day, i) => {
+    const date = addDays(startDate, i);
+    const text = day.map((g) => {
+      const items = (g.s || []).map((x) => x.replace(/<[^>]+>/g, ''));
+      return g.ch ? `${g.ch} — ${items.join(' / ')}` : items.join(' / ');
+    }).join('<br>');
+    return `| ${i + 1}일차 | ${shortD(date)} | ${text} |`;
+  }).join('\n'),
   '인증누락안내': spec.missNote
     || `놓쳐도 킥아웃되는 건 아닙니다. 다만 인증은 이 멤버십의 핵심이에요. ${days}일 동안 인증 누락이 ${spec.giftMissLimit || 6}회 미만이면 커밍쏜의 『${spec.book.name}』 인사이트 정리본을 드립니다.`
 };
@@ -170,12 +183,29 @@ writeFileSync(cfgPath, cfg.slice(0, at) + '\n}' + seasonSrc + cfg.slice(at + mar
 
 const outDir = join(root, 'out');
 if (!existsSync(outDir)) mkdirSync(outDir);
-for (const [tpl, out] of [['상세페이지.md', '상세페이지.md'], ['설명서.md', '설명서.md'], ['카톡공지.txt', '카톡공지.txt']]) {
-  writeFileSync(join(outDir, out), fill(readFileSync(join(root, 'tools/templates', tpl), 'utf8')));
+for (const tpl of ['상세페이지.md', '설명서.md', '일정표.md', '카톡공지.txt']) {
+  writeFileSync(join(outDir, tpl), fill(readFileSync(join(root, 'tools/templates', tpl), 'utf8')));
 }
 
+/* 노션에 올릴 때 쓰는 목록 — 어느 파일을 어떤 제목으로 어디에 만들지.
+ * 파일 자체는 마크다운이라 notion-create-pages 에 그대로 넣으면 된다(HTML 주석은 빼고). */
+const NOTION_PARENT = '3c2f15a6c51c80108cb1c88b5212be7d'; // 「퍼메스 독서챌린지」
+const monthLabel = vars['월'];
+writeFileSync(join(outDir, '노션게시.json'), JSON.stringify({
+  parentPageId: NOTION_PARENT,
+  pages: [
+    { file: 'out/설명서.md', title: `${monthLabel} 퍼메스 독서 멤버십 설명서 『${spec.book.name}』`, icon: '📖',
+      note: '구매자에게 나가는 문서. 만든 뒤 노션에서 "웹에 게시"를 켜야 링크가 열린다 → 그 링크가 guideUrl.' },
+    { file: 'out/일정표.md', title: `${spec.book.name} ${days}일 독서 일정표`, icon: '🗓️',
+      note: '설명서와 앱의 일정이 같은 원본(readingPlan)에서 나왔는지 여기서 한 번 더 본다.' },
+    { file: 'out/상세페이지.md', title: `퍼스널메이커스 독서 멤버십 ${monthLabel} 『${spec.book.name}』`, icon: '📘',
+      note: '모집용. 이미지(후기·저자 사진·표지)와 신청 북마크는 지난달 페이지에서 가져와 넣는다.' }
+  ]
+}, null, 2));
+
 console.log('\n✓ js/config.js 에 시즌을 추가했습니다.');
-console.log('✓ out/상세페이지.md · out/설명서.md · out/카톡공지.txt 를 만들었습니다.');
+console.log('✓ out/상세페이지.md · out/설명서.md · out/일정표.md · out/카톡공지.txt 를 만들었습니다.');
+console.log('✓ out/노션게시.json — 노션에 올릴 제목·위치 목록 (new-season 스킬이 이걸 보고 페이지를 만든다)');
 if (leftovers.size) {
   console.log(`\n⚠ 채우지 못한 자리표시자: ${[...leftovers].join(', ')} — 시즌 설명서에 값을 넣어 주세요.`);
 }
@@ -191,4 +221,4 @@ const todo = [
   '앞 시즌의 lockAt — 새 시즌이 켜진 뒤 언제 잠글지 (js/config.js)'
 ].filter(Boolean);
 todo.forEach((t, i) => console.log(`   ${i + 1}. ${t}`));
-console.log('\n다음: npm run check:season  → 통과하면 PR');
+console.log('\n다음: npm run check:season  → 통과하면 out/노션게시.json 대로 노션에 올리고 → PR');
