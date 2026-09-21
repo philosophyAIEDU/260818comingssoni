@@ -284,6 +284,27 @@ function t(name, cond, extra) {
   t('미인증 5회 경고 메일 치환 결과에 실제 이름·기준 횟수 반영',
     filledMissed5.includes('김철수') && filledMissed5.includes('5회') && filledMissed5.includes('6회'), filledMissed5);
 
+  console.log('— 집계 시작일(gradeFrom) —');
+  // 시즌1은 1일차(단톡방 입장 당일)를 누락으로 세지 않는다. 시즌0은 첫날부터 센다.
+  t('시즌0은 gradeFrom 없음(첫날부터 집계)', CS.seasonById('s1').gradeFrom === null);
+  t('시즌1은 2일차부터 집계', CS.seasonById('s2').gradeFrom === '2026-09-22');
+
+  // statusFor는 CS.CONFIG을 보므로, 잠깐 시즌1 기준으로 바꿔 놓고 확인한다.
+  const savedCfg = CS.CONFIG;
+  CS.CONFIG = Object.assign({}, CS.COMMON, CS.seasonById('s2'), { seasonId: 's2' });
+  const gp = [{ id: 'g1', nickname: '안냄', status: '', exemptDates: [] },
+              { id: 'g2', nickname: '냈음', status: '', exemptDates: [] }];
+  const gs = [{ participantId: 'g2', date: '2026-09-21', sentence: 'x', reflection: 'y',
+                createdAt: '2026-09-21T10:00:00.000Z' }];
+  const [gA, gB] = U.buildStats(gp, gs, '2026-09-25');
+  const cellOn = (st, d) => st.cells.find((c) => c.date === d).status;
+  t('1일차에 안 내면 미인증이 아니라 집계 제외(·)', cellOn(gA, '2026-09-21') === '·', cellOn(gA, '2026-09-21'));
+  t('1일차에 냈으면 그대로 인증(O)', cellOn(gB, '2026-09-21') === 'O', cellOn(gB, '2026-09-21'));
+  t('2일차부터는 안 내면 미인증(X)', cellOn(gA, '2026-09-22') === 'X', cellOn(gA, '2026-09-22'));
+  t('1일차 결석은 누락 횟수에 안 들어감', gA.missed === 3, gA.missed);
+  t('1일차 인증은 인증 횟수에 들어감', gB.verified === 1, gB.verified);
+  CS.CONFIG = savedCfg;
+
   console.log('— 당일 인증 리마인드 메일 (매일 21시 KST) —');
   // 예약 함수(netlify/functions/_lib/dailyReminder.js)가 대상을 고르는 규칙과 같은 조건이다.
   const rToday = U.today();

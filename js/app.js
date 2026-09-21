@@ -565,7 +565,7 @@
   }
 
   function labelOf(st) {
-    return { O: '인증', X: '미인증', P: '면제', '-': '예정', '·': '해당 없음' }[st] || st;
+    return { O: '인증', X: '미인증', P: '면제', '-': '예정', '·': '집계 대상 아님' }[st] || st;
   }
 
   function renderEntry(s) {
