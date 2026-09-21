@@ -23,8 +23,10 @@
   --info-soft: #e5f0ff;
   --radius: 14px;
   --shadow: 0 4px 14px rgba(0, 28, 120, 0.12);
-  --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
-          'Segoe UI', Roboto, 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  /* Pretendard Variable — index.html에서 실제로 불러온다(전에는 이름만 적혀 있어
+     기기마다 제각각 시스템 폰트로 떨어졌다). 못 받아오면 아래 순서로 물러난다. */
+  --font: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont,
+          'Apple SD Gothic Neo', 'Segoe UI', Roboto, 'Noto Sans KR', 'Malgun Gothic', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -58,6 +60,12 @@
 body {
   margin: 0;
   font-family: var(--font);
+  /* 한글은 자간이 조금 좁아야 단단해 보인다. 숫자는 폭을 고정해 날짜·카운트다운이
+     1초마다 흔들리지 않게 한다. */
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
@@ -185,6 +193,8 @@ input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent);
 }
 select { appearance: none; background-image: none; }
+/* 드롭다운 목록은 브라우저가 제 폰트로 그리는 일이 있어 따로 일러 준다 */
+option, optgroup { font-family: var(--font); }
 
 /* 인증하기 버튼 바로 위 — 오늘의 인증이 무엇으로 쌓이는지 알려 주는 문구.
    경고가 아니라 응원에 가까우므로 강한 색 대신 왼쪽 강조선만 두고 조용하게 놓는다. */
