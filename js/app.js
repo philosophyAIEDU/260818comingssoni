@@ -409,6 +409,49 @@
       return `<option value="${d}">${label}${d === today ? ' · 오늘' : ''}</option>`;
     }).join('');
     sel.value = dates.includes(keep) ? keep : today;
+    paintCertifyDatePicker();
+  }
+
+  /* 화면에 보이는 드롭다운. 값은 숨겨 둔 <select>가 그대로 쥐고, 여기서는 그 내용을 비춰
+   * 주기만 한다 — macOS가 <select> 글자를 OS 글꼴로 직접 그려서 앱 글꼴과 어긋나 보이기
+   * 때문이다. 고르면 select.value를 바꾸고 change를 쏘아 기존 흐름을 그대로 탄다. */
+  function paintCertifyDatePicker() {
+    const sel = $('certifyDate');
+    const cur = [...sel.options].find((o) => o.value === sel.value) || sel.options[0];
+    $('certifyDateBtn').textContent = cur ? cur.textContent : '';
+    $('certifyDateList').innerHTML = [...sel.options].map((o) =>
+      `<li class="picker-option" role="option" data-value="${esc(o.value)}"`
+      + ` aria-selected="${o.value === sel.value}">${esc(o.textContent)}</li>`).join('');
+  }
+
+  function openCertifyDatePicker(open) {
+    $('certifyDateList').hidden = !open;
+    $('certifyDatePicker').setAttribute('aria-expanded', String(open));
+    $('certifyDateBtn').setAttribute('aria-expanded', String(open));
+  }
+
+  function bindCertifyDatePicker() {
+    const list = $('certifyDateList');
+    $('certifyDateBtn').addEventListener('click', () => openCertifyDatePicker(list.hidden));
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('.picker-option');
+      if (!li) return;
+      const sel = $('certifyDate');
+      if (sel.value !== li.dataset.value) {
+        sel.value = li.dataset.value;
+        sel.dispatchEvent(new Event('change'));
+      }
+      paintCertifyDatePicker();
+      openCertifyDatePicker(false);
+      $('certifyDateBtn').focus();
+    });
+    // 바깥을 누르거나 Esc를 누르면 닫는다
+    document.addEventListener('click', (e) => {
+      if (!$('certifyDatePicker').contains(e.target)) openCertifyDatePicker(false);
+    });
+    $('certifyDatePicker').addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { openCertifyDatePicker(false); $('certifyDateBtn').focus(); }
+    });
   }
 
   /** 선택된 날짜가 이미 마감을 넘겼는지 안내 (오늘이 아니면 항상 마감 지남) */
@@ -1103,6 +1146,7 @@
     $('participant').addEventListener('change', onSelect);
     bindParticipantCombo();
     $('certifyDate').addEventListener('change', onCertifyDateChange);
+    bindCertifyDatePicker();
     $('verifyForm').addEventListener('submit', onSubmit);
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', saveDraft));

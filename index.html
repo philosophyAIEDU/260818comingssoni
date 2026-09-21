@@ -115,7 +115,14 @@
       <form id="verifyForm" autocomplete="off">
         <div class="field">
           <label for="certifyDate">인증할 날짜 <span class="sub">보통은 오늘로 자동 선택됩니다 · 예전 날짜를 골라 이미 낸 인증도 고칠 수 있어요</span></label>
-          <select id="certifyDate"></select>
+          <div class="picker" id="certifyDatePicker">
+            <button type="button" class="picker-btn" id="certifyDateBtn"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+            <ul class="picker-list" id="certifyDateList" role="listbox" hidden></ul>
+          </div>
+          <!-- 값은 계속 이 select가 쥔다. macOS가 <select> 글자를 OS 글꼴로 직접 그려서
+               앱 글꼴과 어긋나 보이기 때문에, 화면에 보이는 것만 위 버튼으로 바꿨다. -->
+          <select id="certifyDate" class="sr-only" tabindex="-1" aria-hidden="true"></select>
           <p class="hint bad" id="certifyDateWarn" hidden>
             이 날짜는 이미 마감(23:59)이 지났습니다. 기록은 남길 수 있지만 <strong>미인증(X)으로 계속 집계</strong>됩니다.
           </p>
