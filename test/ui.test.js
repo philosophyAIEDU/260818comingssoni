@@ -48,7 +48,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   });
 
   const page = await ctx.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  /* 바깥에서 받아오는 것(웹폰트 CDN 등)이 막힌 환경에서도 테스트는 돌아야 한다.
+   * 못 받아오면 폰트가 시스템 것으로 물러날 뿐, 우리 코드의 오류가 아니다. */
+  const ourError = (t) => !/ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED|net::ERR_/.test(t);
+  page.on('console', (m) => { if (m.type() === 'error' && ourError(m.text())) errs.push('console: ' + m.text()); });
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
   // 삭제 등 confirm() 대화상자는 기본적으로 수락(승인)해서 실제 동작을 검증한다.
   page.on('dialog', (d) => d.accept());
