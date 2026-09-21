@@ -1556,6 +1556,14 @@
     setInterval(tick, 1000);
     initTabs();
 
+    $('adminBrandSub').textContent = `${CONFIG.title} · ${CONFIG.book.name}`;
+    $('adminFootBrand').textContent = CONFIG.title;
+    // 파일을 고르면 이름을 옆에 적어 준다 (기본 입력은 감춰 두었다)
+    $('rosterCsvInput').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      $('rosterCsvName').textContent = f ? f.name : '선택한 파일 없음';
+    });
+
     await initSeasonBar();
 
     // 킥아웃이 없는 시즌에서는 킥아웃/위험이라는 단계가 없다 — 그 선택지를 감추고,
