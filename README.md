@@ -22,7 +22,7 @@ npx http-server -p 8080 -c-1
 # → http://127.0.0.1:8080
 ```
 
-Netlify(현재 배포 주소: https://comingssoni.netlify.app/)나 GitHub Pages에 올리면 그대로 배포됩니다.
+Netlify(현재 배포 주소: https://personalmakersbook.netlify.app/)나 GitHub Pages에 올리면 그대로 배포됩니다.
 
 ---
 
@@ -189,7 +189,7 @@ test/ui.test.js                   브라우저 시나리오 테스트
 ```js
 title: '퍼스널메이커스 독서 챌린지', // 좌측 상단 브랜드명
 logo: 'logo-header.jpg',         // 좌측 상단 로고 이미지 경로
-appUrl: 'https://comingssoni.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
+appUrl: 'https://personalmakersbook.netlify.app/', // 인증 알림 메일에 안내할 앱 주소
 startDate: '2026-08-24',   // 시작일
 endDate:   '2026-09-20',   // 종료일
 kickoutThreshold: 6,       // 누적 미인증 N회 이상 → 실제 킥아웃

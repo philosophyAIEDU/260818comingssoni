@@ -410,18 +410,18 @@ footer.foot {
 }
 .rule-key strong { color: var(--text); }
 
-/* 안내 카드 맨 위 한 줄짜리 바깥 링크(OT 영상 등).
+/* 안내 카드 맨 위에 나란히 놓이는 바깥 링크 버튼들(OT 영상·설명서 등).
    복사·따봉 버튼과 같은 결로 — 테두리 한 겹, 아이콘 하나, 굵지 않은 글자. */
-.ot-link { margin: 0 0 12px; }
-.ot-link a {
+.head-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.head-links a {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 13px; border: 1px solid var(--border-strong); border-radius: 999px;
-  font-size: 13px; font-weight: 600; line-height: 1;
+  padding: 8px 14px; border: 1px solid var(--border-strong); border-radius: 999px;
+  font-size: 13px; font-weight: 600; line-height: 1.2;
   color: var(--text); text-decoration: none;
   transition: border-color .15s, color .15s;
 }
-.ot-link a:hover { border-color: var(--accent); color: var(--accent); }
-.ot-link .ico { width: 15px; height: 15px; flex: none; }
+.head-links a:hover { border-color: var(--accent); color: var(--accent); }
+.head-links .ico { width: 15px; height: 15px; flex: none; }
 
 .intro-body .tagline { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
 .intro-body .author { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
