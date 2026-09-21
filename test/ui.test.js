@@ -1180,6 +1180,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await sp.waitForTimeout(400);
     const colOf = (sel, n) => sp.locator(`${sel} tbody tr td:nth-child(${n})`).allTextContents();
 
+    t('giftMissLimit이 없는 시즌에는 선물 대상자 섹션이 숨겨짐', !(await sp.isVisible('#giftSection')));
     t('등록된 메일 주소 목록은 접힌 채로 시작',
       !(await sp.locator('#notifyListFold').evaluate((el) => el.open)));
     await sp.click('#notifyListFold summary');
@@ -1935,6 +1936,74 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('처리 후에는 버튼도 다시 숨겨짐', !(await m5Page.isVisible('#missed5CurrentExcludeBtn')));
 
   await m5Ctx.close();
+
+  // ── 🎁 선물 대상자: giftMissLimit 미만으로 놓친 사람만, 아웃은 빼고 ──
+  // 시즌0에는 giftMissLimit이 없으니(위 sortCtx에서 섹션이 숨겨진 걸 봤다) 여기서 값을 심어 켠다.
+  const giftCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await giftCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace(/startDate: '[^']+'/, `startDate: '${shift(-5)}'`)
+               .replace(/endDate: '[^']+'/, `endDate: '${shift(22)}'`)
+               .replace('kickoutEnabled: true,', 'kickoutEnabled: true, giftMissLimit: 3,')
+               .replace(/kickoutThreshold: \d+/, 'kickoutThreshold: 60')
+               .replace(/riskThreshold: \d+/, 'riskThreshold: 40')
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    // 오늘 -5 ~ 오늘 -1 = 지난 5일. (오늘은 아직 안 지났으니 누락이 아니다)
+    const plan = [['다받음', 5, ''], ['둘놓침', 3, 'two@ex.com'], ['셋놓침', 2, 'three@ex.com'], ['아웃됨', 5, 'out@ex.com']];
+    const parts = plan.map(([n, , e], i) => ({
+      id: 'g' + i, nickname: n, email: e, kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z',
+      ...(n === '아웃됨' ? { status: 'out', outDate: shift(-1), kickReason: 'manual' } : {})
+    }));
+    const subs = [];
+    plan.forEach(([n, done], i) => {
+      for (let d = 0; d < done; d++) {
+        const date = shift(-5 + d);
+        subs.push({ id: `gs${i}_${d}`, participantId: 'g' + i, nickname: n, date, sentence: '문장',
+          reflection: '느낀 점', upvotes: 0, upvotedBy: [], createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z` });
+      }
+    });
+    const mails = [{ id: 'gm', name: '다받음', email: 'all@ex.com', createdAt: '2026-08-20T10:00:00.000Z' }];
+    await giftCtx.addInitScript(({ parts, subs, mails }) => {
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.notifyEmails', JSON.stringify(mails));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs, mails });
+    const gp = await giftCtx.newPage();
+    await gp.goto(BASE + '/admin.html');
+    await gp.waitForTimeout(700);
+    await gp.click('button[data-tab="notify"]');
+    await gp.waitForTimeout(400);
+    t('giftMissLimit이 있으면 선물 대상자 섹션이 보임', await gp.isVisible('#giftSection'));
+    const names = await gp.locator('#giftTable tbody tr td:nth-child(1)').allTextContents();
+    t('누락 3회 미만인 사람만 대상(0회·2회), 3회는 빠지고 아웃은 빠짐',
+      JSON.stringify(names) === JSON.stringify(['다받음', '둘놓침']), names);
+    t('대상자 수 표시', (await gp.textContent('#giftCount')).trim() === '2명', await gp.textContent('#giftCount'));
+    const emails = await gp.locator('#giftTable tbody tr td:nth-child(4)').allTextContents();
+    t('참여자 이메일이 비면 알림 메일 목록에서 같은 이름으로 찾음',
+      JSON.stringify(emails) === JSON.stringify(['all@ex.com', 'two@ex.com']), emails);
+    const hint = await gp.textContent('#giftHint');
+    t('기간 중에는 "오늘까지 기준"과 남은 날을 알려줌', /오늘\(.*까지 기준/.test(hint) && /22일/.test(hint), hint);
+    t('기준을 넘긴 사람 수도 알려줌', /1명/.test(hint), hint);
+    await gp.click('#giftTable th[data-sortkey="missed"]');
+    await gp.waitForTimeout(200);
+    const names2 = await gp.locator('#giftTable tbody tr td:nth-child(1)').allTextContents();
+    t('누락 머리글을 누르면 많은 순으로 뒤집힘', names2[0] === '둘놓침', names2);
+    await gp.evaluate(() => {
+      navigator.clipboard.writeText = (text) => { window.__copiedGiftText = text; return Promise.resolve(); };
+    });
+    await gp.click('#giftCopy');
+    await gp.waitForTimeout(200);
+    const copied = await gp.evaluate(() => window.__copiedGiftText);
+    t('이름·이메일 복사 — 한 줄에 "이름 <이메일>", 정렬 순서 그대로',
+      copied === '둘놓침 <two@ex.com>\n다받음 <all@ex.com>', copied);
+  }
+  await giftCtx.close();
 
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();

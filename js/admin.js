@@ -802,6 +802,7 @@
   const sortState = {
     notify: { key: 'name', dir: 'asc' },
     warn: { key: 'missed', dir: 'desc' },
+    gift: { key: 'missed', dir: 'asc' },
     kick: { key: 'outDate', dir: 'desc' }
   };
 
@@ -880,6 +881,7 @@
     // 미인증 경고 메일·킥아웃 통보 메일의 이메일(참여자 이메일이 비어 있을 때의 대체 조회)은
     // notifyEmails 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
     paintMissedWarn();
+    paintGift();
     paintKickoutNotice();
     await refreshKickoutTemplate();
     await refreshMissed5Template();
@@ -1085,6 +1087,83 @@
         $('customMailForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
+  }
+
+  /* ── 🎁 선물 대상자 ─────────────────────
+   *  누락이 CONFIG.giftMissLimit 회 "미만"(6 → 5회 이하)인 참여자에게 인사이트 정리본을 보낸다.
+   *  아웃 처리된 사람은 제외한다. 기간이 끝나기 전에는 "오늘까지 기준"의 명단이므로, 화면에
+   *  남은 날 수를 함께 적어 확정 명단과 헷갈리지 않게 한다. 이메일은 참여자 이메일이 비어 있으면
+   *  [알림 메일] 목록에서 같은 이름으로 찾는다(미인증 안내 메일과 같은 규칙). */
+  function giftCandidates() {
+    const limit = CONFIG.giftMissLimit;
+    if (!limit) return { eligible: [], lost: [] };
+    const alive = stats.filter((s) => s.participant.status !== 'out');
+    const row = (s) => ({ stat: s, email: resolveEmailFor(s.participant) });
+    return {
+      eligible: alive.filter((s) => s.missed < limit).map(row),
+      lost: alive.filter((s) => s.missed >= limit).map(row)
+    };
+  }
+
+  function giftLines(rows) {
+    return rows.map(({ stat: s, email }) => `${s.participant.nickname}${email ? ` <${email}>` : ''}`).join('\n');
+  }
+
+  function paintGift() {
+    const limit = CONFIG.giftMissLimit;
+    const box = $('giftSection');
+    if (!limit) { box.hidden = true; return; }
+    box.hidden = false;
+    const { eligible, lost } = giftCandidates();
+    const today = U.today();
+    const ended = today > CONFIG.endDate;
+    const left = ended ? 0 : U.challengeDates().filter((d) => d > today).length;
+    const noMail = eligible.filter((r) => !r.email).length;
+    $('giftCount').textContent = `${eligible.length}명`;
+    $('giftHint').innerHTML = (ended
+      ? `멤버십이 끝났습니다. 누락 <strong>${limit}회 미만(${limit - 1}회 이하)</strong>인 <strong>${eligible.length}명</strong>이 `
+        + `『${esc(CONFIG.book.name)}』 인사이트 정리본을 받습니다.`
+      : `<strong>오늘(${esc(U.shortLabel(today))})까지 기준</strong>입니다 — 아직 <strong>${left}일</strong> 남아 명단이 바뀔 수 있습니다. `
+        + `누락 <strong>${limit}회 미만(${limit - 1}회 이하)</strong>이면 정리본 대상이고, 지금 기준 <strong>${eligible.length}명</strong>입니다.`)
+      + (lost.length ? ` 이미 ${limit}회 이상 놓친 분은 ${lost.length}명입니다.` : '')
+      + (noMail ? ` <span class="muted">(이메일이 비어 있는 분 ${noMail}명 — [명단 관리]에서 채우면 여기에도 채워집니다)</span>` : '');
+
+    const cols = [
+      { key: 'name', label: '이름', get: (r) => r.stat.participant.nickname },
+      { key: 'missed', label: '누락', cls: 'num', get: (r) => r.stat.missed },
+      { key: 'verified', label: '인증', cls: 'num', get: (r) => r.stat.verified },
+      { key: 'email', label: '이메일', get: (r) => r.email || '' }
+    ];
+    const t = $('giftTable');
+    t.innerHTML = eligible.length
+      ? `${sortHead('gift', cols)}<tbody>${
+        sortRows('gift', cols, eligible).map(({ stat: s, email }) => `<tr>
+          <td>${esc(s.participant.nickname)}</td>
+          <td class="num">${s.missed}</td>
+          <td class="num">${s.verified}</td>
+          <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">지금 기준 대상자가 없습니다.</td></tr></tbody>';
+    bindSortHead(t, 'gift', paintGift);
+  }
+
+  function copyGiftList() {
+    const { eligible } = giftCandidates();
+    if (!eligible.length) { msg($('giftMsg'), '복사할 명단이 없습니다.', 'bad'); return; }
+    copyText(giftLines(sortRows('gift', [
+      { key: 'name', get: (r) => r.stat.participant.nickname },
+      { key: 'missed', get: (r) => r.stat.missed },
+      { key: 'verified', get: (r) => r.stat.verified },
+      { key: 'email', get: (r) => r.email || '' }
+    ], eligible)), $('giftCopy'));
+  }
+
+  function exportGiftCsv() {
+    const { eligible } = giftCandidates();
+    const head = ['이름', '누락', '인증', '이메일'];
+    const lines = [head.map(csvCell).join(',')].concat(eligible.map(({ stat: s, email }) =>
+      [s.participant.nickname, s.missed, s.verified, email].map(csvCell).join(',')));
+    download(`선물대상자_${CONFIG.book.name}_${U.today()}.csv`, lines.join('\n'), 'text/csv');
   }
 
   /* ── 킥아웃 통보 메일 ───────────────────
@@ -1637,6 +1716,8 @@
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
     $('exportCsvMatrix').addEventListener('click', exportMatrixCsv);
+    $('giftCopy').addEventListener('click', copyGiftList);
+    $('giftCsv').addEventListener('click', exportGiftCsv);
     $('importJson').addEventListener('click', importJson);
     $('wipe').addEventListener('click', async () => {
       if (!confirm('모든 참가자와 인증 기록을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?')) return;

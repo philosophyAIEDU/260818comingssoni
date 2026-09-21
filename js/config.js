@@ -194,6 +194,9 @@ CS.SEASONS = [{
   kickoutThreshold: Infinity,
   riskThreshold: Infinity,
   autoWarnThreshold: Infinity,
+  // 🎁 인사이트 정리본 선물 기준 — 누락이 이 횟수 "미만"이면 대상(6 → 5회 이하).
+  // 운영진 화면 [알림 메일 › 선물 대상자]가 이 값으로 명단을 뽑는다. null이면 그 섹션이 안 보인다.
+  giftMissLimit: 6,
 
   // 운영진 공식 일정표(노션 "꿈과 돈 28일 챌린지 — 독서 일정표")를 그대로 옮긴 것.
   // 소제목 표기는 소미미디어판 기준이다.

@@ -113,6 +113,10 @@ for (const s of CS.SEASONS) {
   } else {
     check(L, '킥아웃이 꺼진 시즌은 기준값이 Infinity',
       [s.kickoutThreshold, s.riskThreshold, s.autoWarnThreshold].every((v) => v === Infinity));
+    // 킥아웃 대신 "누락 N회 미만이면 정리본 선물"이 이 시즌의 동기다 — 기준이 없으면 운영진 화면에
+    // 선물 대상자 명단이 안 뜨고, 상세페이지 약속(6회 미만)과 앱이 어긋난다.
+    check(L, '선물 기준(giftMissLimit)이 2 이상의 정수', Number.isInteger(s.giftMissLimit) && s.giftMissLimit >= 2,
+      s.giftMissLimit);
   }
 
   // ── 바깥 링크 ──
