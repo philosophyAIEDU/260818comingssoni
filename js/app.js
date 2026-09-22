@@ -139,6 +139,16 @@
     return `<ul class="range-list">${lines.join('')}</ul>`;
   }
 
+  /** 라이브 날의 발제문. 그날이 되기 전에는 보여주지 않는다(미리 보면 라이브의 재미가 준다). */
+  function promptHtml(dayIdx, date) {
+    const entry = (CONFIG.weeklyPrompts || []).find((w) => w.day === dayIdx);
+    if (!entry || !entry.questions || !entry.questions.length) return '';
+    if (date > U.today()) return '';
+    return `<div class="prompt-box"><b>📝 오늘의 발제문</b><ol>${
+      entry.questions.map((q) => `<li>${esc(q)}</li>`).join('')
+    }</ol><span class="muted">한 가지만 골라 [읽고 느낀 점]에 답을 남기면 오늘 인증 완료입니다.</span></div>`;
+  }
+
   function renderTodayRange() {
     const fold = $('todayRangeFold');
     if (!fold) return;
@@ -159,7 +169,7 @@
     const date = U.addDays(CONFIG.startDate, rangeDayIdx - 1);
     $('rangeDayLabel').textContent = `${rangeDayIdx}일차 (${U.shortLabel(date)})`
       + (rangeDayIdx === todayIdx ? ' · 오늘' : '');
-    $('todayRangeText').innerHTML = rangeHtml(plan[rangeDayIdx - 1]);
+    $('todayRangeText').innerHTML = rangeHtml(plan[rangeDayIdx - 1]) + promptHtml(rangeDayIdx, date);
     $('rangePrevDay').disabled = rangeDayIdx <= 1;
     $('rangeNextDay').disabled = rangeDayIdx >= plan.length;
     fold.hidden = false;
@@ -186,6 +196,14 @@
     // 시작 전 D-day/OT 안내 배너는 더 이상 보여주지 않는다(요청에 따라 제거).
     // 제출 가능 여부에 따른 버튼 잠금 동작은 그대로 유지한다.
     msg(box, '');
+
+    // 회고 세션: 종료 다음 날 ~ retroUntil. 인증은 닫힌 채로 안내만 띄운다.
+    const today = U.today();
+    if (CONFIG.retroUntil && today > CONFIG.endDate && today <= CONFIG.retroUntil) {
+      box.innerHTML = `<div class="note retro">📚 <strong>회고 세션</strong> (${esc(U.shortLabel(U.addDays(CONFIG.endDate, 1)))} ~ ${esc(U.shortLabel(CONFIG.retroUntil))})<br>`
+        + `${U.challengeDates().length}일 동안 고생 많으셨습니다. 인증은 끝났고, 이 기간엔 세 가지만 합니다.<br>`
+        + '① 아래 [나의 현황]에서 내 기록을 내려받기 ② 28일 중 나의 최고 문장 하나를 단톡방에 나누기 ③ 정리본이 오면 한 꼭지 골라 적용해 보기</div>';
+    }
 
     if (!open) {
       $('submitBtn').disabled = true;

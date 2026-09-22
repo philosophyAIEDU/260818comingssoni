@@ -75,6 +75,12 @@ CS.FirebaseStore = (function () {
     return currentUser;
   }
 
+  /** 서버 함수(정리본 발송 등)에 "운영진이 맞다"를 증명할 Firebase ID 토큰. 로그인 전이면 null. */
+  async function getIdToken() {
+    await init();
+    return currentUser ? currentUser.getIdToken() : null;
+  }
+
   /* 컬렉션 이름에 시즌 접두사를 붙여서 연다(js/config.js의 CS.collectionName).
    * 시즌마다 데이터가 다른 컬렉션에 쌓이므로 이전 시즌 기록은 그대로 남는다. */
   const col = (name) => fs.collection(db, CS.collectionName(name));
@@ -368,7 +374,7 @@ CS.FirebaseStore = (function () {
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
-    onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser,
+    onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser, getIdToken,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
     getNotice, setNotice, listNotices
   };

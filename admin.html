@@ -204,6 +204,17 @@ href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variabl
       <span class="muted" id="noticeSavedCount" style="margin-left:auto"></span>
     </div>
     <div id="noticeMsg"></div>
+
+    <!-- 📝 주간 발제문 — weeklyPrompts가 있는 시즌에서만 보인다(admin.js가 연다) -->
+    <div id="promptSection" hidden>
+      <h2 style="margin-top:26px">발제문 (라이브 날 오전 단톡방용)</h2>
+      <p class="hint">
+        라이브 날 아침에 단톡방에 올릴 발제문입니다. 같은 내용이 그날 앱 [오늘의 범위]에도 자동으로
+        보이고, 멤버는 한 가지를 골라 [읽고 느낀 점]에 답을 남기면 인증이 됩니다. 문구를 고치려면
+        <code>js/config.js</code>의 <code>weeklyPrompts</code>를 고칩니다.
+      </p>
+      <div id="promptList"></div>
+    </div>
   </section>
 
   <!-- ── 제출 기록 ─────────────────────── -->
@@ -325,6 +336,32 @@ href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variabl
     <div class="scroll">
       <table id="giftTable"></table>
     </div>
+
+    <h3 style="margin-top:18px">정리본 메일 보내기</h3>
+    <p class="hint">
+      정리본 노션 링크를 넣고 누르면 <strong>위 명단 전원</strong>에게 서버가 메일을 보냅니다(운영진 로그인 필요).
+      한 번 받은 사람에게는 다시 가지 않습니다 — 링크를 고쳐 다시 보내려면 아래 체크를 켜세요.
+      <strong>{{이름}}</strong>·<strong>{{누락횟수}}</strong>·<strong>{{책이름}}</strong>·<strong>{{정리본링크}}</strong>·
+      <strong>{{일수}}</strong>·<strong>{{라이브횟수}}</strong>가 실제 값으로 치환됩니다.
+    </p>
+    <div class="field">
+      <label for="giftLink">정리본 링크 (노션 · 웹에 게시된 주소)</label>
+      <input type="url" id="giftLink" placeholder="https://…notion.site/…">
+    </div>
+    <div class="field">
+      <label for="giftMailSubject">제목</label>
+      <input type="text" id="giftMailSubject">
+    </div>
+    <div class="field">
+      <label for="giftMailBody">본문</label>
+      <textarea id="giftMailBody" rows="10"></textarea>
+    </div>
+    <p class="muted" id="giftLastRun"></p>
+    <div class="actions">
+      <button class="primary" id="giftSendBtn" type="button">정리본 메일 보내기</button>
+      <label class="muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="giftResend"> 이미 받은 사람에게도 다시 보내기</label>
+    </div>
+    <div id="giftSendMsg"></div>
     </div><!-- /#giftSection -->
 
     <!-- 킥아웃이 있는 시즌에서만 보이는 영역(admin.js가 감춘다) -->
@@ -364,8 +401,19 @@ href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variabl
     </div>
     <div id="kickoutTemplateMsg"></div>
 
-    <h2 style="margin-top:26px">미인증 5회 자동 경고 메일</h2>
-    <p class="hint">
+    </div><!-- /#kickoutMailSection -->
+
+    <!-- 누락 5회 자동 안내 — 킥아웃 시즌(경고)과 정리본 시즌(한 번 더 놓치면 정리본 없음) 둘 다 쓴다 -->
+    <div id="missed5Section">
+    <h2 style="margin-top:26px" id="missed5Head">미인증 5회 자동 경고 메일</h2>
+    <p class="hint" id="missed5HintGift" hidden>
+      누락이 정확히 <strong id="autoWarnNGift"></strong>회가 된 참여자에게 <strong>"한 번 더 놓치면 정리본을 못 받아요"</strong>
+      안내가 <strong>매일 자정 직후(KST) 자동으로</strong> 나갑니다(메일·문자). 같은 사람에게 한 번만 갑니다.
+      그리고 그 사람이 다음 날에도 인증을 안 하면, 21시 리마인드가 <strong>"오늘 놓치면 정리본을 못 받아요"</strong>
+      문구로 매일 나갑니다(인증할 때까지). 아래 제목·본문을 고쳐 저장할 수 있고
+      <strong>{{이름}}</strong>·<strong>{{누락횟수}}</strong>·<strong>{{선물기준}}</strong>·<strong>{{책이름}}</strong>·<strong>{{앱주소}}</strong>가 치환됩니다.
+    </p>
+    <p class="hint" id="missed5HintKick">
       누적 미인증이 정확히 <strong id="autoWarnN"></strong>회가 된 참여자에게, 1회만 더
       미인증되면 킥아웃 대상이 될 수 있다는 안내가 <strong>매일 자정 직후(KST) 자동으로</strong>
       나갑니다(Netlify 예약 함수 — 별도 배포·환경 변수 설정이 끝나야 실제로 동작합니다.
@@ -407,7 +455,7 @@ href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variabl
       <button id="missed5TemplateReset">기본값으로 되돌리기</button>
     </div>
     <div id="missed5TemplateMsg"></div>
-    </div><!-- /#kickoutMailSection -->
+    </div><!-- /#missed5Section -->
 
     <h2 style="margin-top:26px" id="reminderHead">당일 인증 리마인드 메일</h2>
     <p class="hint">

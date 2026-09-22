@@ -42,6 +42,19 @@ function reminderTemplate(meta) {
   };
 }
 
+/* 정리본 시즌에서 누락이 이미 (giftMissLimit-1)회인 사람 — 오늘 놓치면 정리본을 못 받는다.
+ * 그 사람에게는 일반 리마인드 대신 이 "경계" 문구가 나간다. 인증할 때까지 매일. */
+function urgentTemplate(meta) {
+  const saved = meta.reminderUrgentMailTemplate;
+  return {
+    subject: (saved && saved.subject) || MailTemplates.defaultReminderUrgentSubject(),
+    body: (saved && saved.body) || MailTemplates.defaultReminderUrgentBody()
+  };
+}
+function isAtGiftEdge(stat) {
+  return !!CONFIG.giftMissLimit && !CONFIG.kickoutEnabled && stat.missed === CONFIG.giftMissLimit - 1;
+}
+
 /** 3시간 12분 남았으면 '약 3시간' — 분 단위까지 적으면 메일을 읽는 시점엔 이미 틀려 있다. */
 function remainingLabel() {
   const sec = U.secondsToMidnight();
@@ -64,6 +77,7 @@ async function runDailyReminder() {
 
   const stats = U.buildStats(participants, submissions, todayISO);
   const template = reminderTemplate(meta);
+  const urgent = urgentTemplate(meta);
 
   // 오늘 아직 안 낸 사람. 아웃된 사람, 오늘이 면제일인 사람, 이미 오늘 받은 사람은 뺀다.
   const candidates = stats.filter((s) => {
@@ -75,6 +89,7 @@ async function runDailyReminder() {
   });
 
   let sent = 0;
+  let sentUrgent = 0;
   let skippedNoEmail = 0;
   const failures = [];
   const remaining = remainingLabel();
@@ -89,16 +104,22 @@ async function runDailyReminder() {
       이름: p.nickname,
       날짜: U.longLabel(todayISO),
       남은시간: remaining,
+      누락횟수: s.missed,
+      선물기준: CONFIG.giftMissLimit || '',
+      책이름: CONFIG.book.name,
       앱주소: CONFIG.appUrl
     };
+    const edge = isAtGiftEdge(s);
+    const tpl = edge ? urgent : template;
     try {
       await sendMail({
         fromName: CONFIG.title,
         to: email,
-        subject: MailTemplates.fill(template.subject, vars),
-        text: MailTemplates.fill(template.body, vars)
+        subject: MailTemplates.fill(tpl.subject, vars),
+        text: MailTemplates.fill(tpl.body, vars)
       });
       sent++;
+      if (edge) sentUrgent++;
       await col('participants').doc(p.id).update({ remindedAt: todayISO });
     } catch (err) {
       failures.push({ id: p.id, nickname: p.nickname, error: err.message });
@@ -111,6 +132,7 @@ async function runDailyReminder() {
     season: CONFIG.seasonId,
     candidates: candidates.length,
     sent,
+    sentUrgent,
     skippedNoEmail,
     failed: failures.length,
     failures
@@ -120,7 +142,7 @@ async function runDailyReminder() {
   await metaDoc().set({
     reminderLastRun: {
       at: U.nowStamp(), today: todayISO, candidates: candidates.length,
-      sent, skippedNoEmail, failed: failures.length
+      sent, sentUrgent, skippedNoEmail, failed: failures.length
     }
   }, { merge: true });
 

@@ -328,6 +328,18 @@ function t(name, cond, extra) {
 
   const filledReminder = MailTemplates.fill(MailTemplates.defaultReminderBody(),
     { 이름: '소니', 날짜: U.longLabel(rToday), 남은시간: '약 3시간', 앱주소: CONFIG.appUrl });
+  // 정리본 시즌용 문구들 — 자리표시자가 전부 치환되는지
+  const giftVars = { 이름: '김철수', 누락횟수: 5, 선물기준: 6, 책이름: '꿈과 돈', 앱주소: 'https://x/', 날짜: '2026년 10월 1일(목)', 남은시간: '약 3시간', 정리본링크: 'https://n/', 일수: 28, 라이브횟수: 4 };
+  for (const [name, fn] of [['누락 5회 정리본 안내', 'defaultGiftWarnBody'], ['경계 리마인드', 'defaultReminderUrgentBody'], ['정리본 발송', 'defaultGiftBody']]) {
+    const out = MailTemplates.fill(MailTemplates[fn](), giftVars);
+    t(`${name} 메일 치환 결과에 자리표시자가 남지 않음`, !out.includes('{{'), out);
+    t(`${name} 메일에 책 이름과 이름이 들어감`, out.includes('꿈과 돈') && out.includes('김철수'));
+  }
+  t('정리본 발송 메일에 링크가 들어감', MailTemplates.fill(MailTemplates.defaultGiftBody(), giftVars).includes('https://n/'));
+  t('시즌2 발제문은 라이브 날(7·14·21·28)에만', JSON.stringify((s2.weeklyPrompts || []).map((w) => w.day)) === JSON.stringify([7, 14, 21, 28]));
+  t('시즌2 발제문마다 질문 3개', (s2.weeklyPrompts || []).every((w) => w.questions.length === 3));
+  t('시즌2 회고 종료일이 종료일 뒤', s2.retroUntil > s2.endDate, s2.retroUntil);
+
   t('리마인드 메일 치환 결과에 자리표시자가 남지 않음', !/\{\{/.test(filledReminder), filledReminder);
   t('리마인드 메일에 이름·남은 시간·앱 주소 반영',
     filledReminder.includes('소니') && filledReminder.includes('약 3시간')

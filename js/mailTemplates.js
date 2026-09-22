@@ -65,6 +65,31 @@ CS.MailTemplates = (function () {
     ].join('\n');
   }
 
+  /* ── 누락 5회 자동 안내(킥아웃이 없는 시즌 — "한 번 더 놓치면 정리본을 못 받아요") ──
+   *  같은 예약 함수(send-missed5-warning)가 giftMissLimit이 있는 시즌에서는 이 문구를 쓴다.
+   *  누락이 정확히 (giftMissLimit - 1)회가 된 사람에게 한 번 나간다. */
+  function defaultGiftWarnSubject() {
+    return `[${CS.CONFIG.title}] 인증 누락 {{누락횟수}}회 — 한 번 더 놓치면 정리본을 못 받아요`;
+  }
+  function defaultGiftWarnBody() {
+    return [
+      '안녕하세요, {{이름}}님. 퍼스널메이커스입니다.',
+      '',
+      '확인해 보니 {{이름}}님의 인증 누락이 {{누락횟수}}회가 되어 살짝 알려드립니다.',
+      '',
+      '이번 멤버십은 킥아웃이 없습니다. 다만 누락이 {{선물기준}}회 미만이어야 ' +
+        '커밍쏜이 직접 정리한 『{{책이름}}』 인사이트 정리본을 받으실 수 있어요. ' +
+        '지금 딱 경계에 계십니다 — 한 번만 더 놓치면 정리본 대상에서 빠집니다.',
+      '',
+      '남은 날은 하루도 놓치지 않으셨으면 합니다. 짧아도 괜찮아요. 오늘 읽은 문장 한 줄과 느낀 점이면 충분합니다.',
+      '혹시 개인 사정으로 어려운 날이 있다면 운영진에게 미리 말씀해 주세요 — 면제 처리를 도와드릴 수 있습니다.',
+      '',
+      '인증하러 가기 → {{앱주소}}',
+      '',
+      '퍼스널메이커스 드림.'
+    ].join('\n');
+  }
+
   /* ── 당일 인증 리마인드 메일(Netlify 예약 함수가 매일 21시 KST에 발송) ── */
   function defaultReminderSubject() {
     return `[${CS.CONFIG.title}] 오늘 인증 아직이에요 🙌`;
@@ -86,10 +111,59 @@ CS.MailTemplates = (function () {
     ].join('\n');
   }
 
+  /* ── 리마인드의 "경계" 판 — 누락이 이미 (giftMissLimit - 1)회라 오늘 놓치면 정리본을 못 받는 사람에게,
+   *  21시 리마인드가 일반 문구 대신 이 문구로 나간다. 매일, 인증할 때까지. */
+  function defaultReminderUrgentSubject() {
+    return `[${CS.CONFIG.title}] 오늘 놓치면 정리본을 못 받아요 — {{남은시간}} 남았습니다`;
+  }
+  function defaultReminderUrgentBody() {
+    return [
+      '안녕하세요, {{이름}}님. 퍼스널메이커스입니다.',
+      '',
+      '{{날짜}} 인증이 아직 등록되지 않았습니다. 마감은 오늘 밤 23:59, 지금 {{남은시간}} 남았습니다.',
+      '',
+      '{{이름}}님은 지금 누락 {{누락횟수}}회입니다. 오늘까지 놓치면 {{선물기준}}회가 되어 ' +
+        '『{{책이름}}』 인사이트 정리본 대상에서 빠집니다.',
+      '',
+      '문장 한 줄, 느낀 점 한 줄이면 됩니다. 지금 잠깐이면 끝나요.',
+      '',
+      '인증하러 가기 → {{앱주소}}',
+      '',
+      '이미 인증을 마치셨다면 이 메일은 지나쳐 주세요.',
+      '',
+      '퍼스널메이커스 드림.'
+    ].join('\n');
+  }
+
+  /* ── 🎁 정리본 발송 메일(운영진 화면 [선물 대상자 › 정리본 메일 보내기]) ── */
+  function defaultGiftSubject() {
+    return `[${CS.CONFIG.title}] 🎁 『{{책이름}}』 인사이트 정리본을 보내드립니다`;
+  }
+  function defaultGiftBody() {
+    return [
+      '안녕하세요, {{이름}}님. 커밍쏜입니다.',
+      '',
+      '{{일수}}일 동안 정말 고생 많으셨습니다. 누락 {{누락횟수}}회로 끝까지 함께해 주셔서, ' +
+        '약속드린 『{{책이름}}』 인사이트 정리본을 보내드립니다.',
+      '',
+      '정리본 보기 → {{정리본링크}}',
+      '',
+      '라이브 {{라이브횟수}}번에서 제가 말한 것 중 여러분 것으로 가져가셨으면 하는 것만 남겼습니다. ' +
+        '한 꼭지라도 내 브랜드에 적용해 보시면, 이 책은 값을 한 겁니다.',
+      '',
+      '다음 달에도 함께 읽어요.',
+      '',
+      '결국, 그렇게 내가 주인공이 되는 시간이 커밍쏜.'
+    ].join('\n');
+  }
+
   return {
     fill,
     defaultKickoutSubject, defaultKickoutBody,
     defaultMissed5Subject, defaultMissed5Body,
-    defaultReminderSubject, defaultReminderBody
+    defaultReminderSubject, defaultReminderBody,
+    defaultGiftWarnSubject, defaultGiftWarnBody,
+    defaultReminderUrgentSubject, defaultReminderUrgentBody,
+    defaultGiftSubject, defaultGiftBody
   };
 })();
