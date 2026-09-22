@@ -929,6 +929,24 @@
   let overallStats = [];       // paintOverall()이 채워 두는 원본 통계(정렬 전) — 정렬만 바꿀 때 재사용
   let overallSort = 'rate';    // 'rate' 인증률순 | 'name-asc' 이름순 | 'name-desc' 이름 역순
 
+  /* "전체 진행현황"은 모든 참여자의 전체 인증 기록(submissions 전체)이 있어야 계산할 수 있다.
+   * 이 화면을 열 때마다, 특히 "인증 제출하기"를 누를 때마다 매번 전체를 다시 읽으면 챌린지가
+   * 진행될수록(기록이 쌓일수록) Firestore 읽기 비용이 눈덩이처럼 불어난다 — 한 번 읽어서 탭에
+   * 캐시해 두고, 내가 방금 제출한 기록만 캐시에 직접 반영해서 다시 읽지 않고도 최신 상태를
+   * 보여준다. 다른 사람의 새 기록까지 보려면 [🔄 새로고침] 버튼으로 명시적으로 다시 읽는다. */
+  let allSubsCache = null;
+
+  async function loadAllSubs(force) {
+    if (force || !allSubsCache) allSubsCache = await Store.listSubmissions();
+    return allSubsCache;
+  }
+
+  function upsertAllSubsCache(sub) {
+    if (!allSubsCache) return;
+    const idx = allSubsCache.findIndex((s) => s.participantId === sub.participantId && s.date === sub.date);
+    if (idx >= 0) allSubsCache[idx] = sub; else allSubsCache.push(sub);
+  }
+
   function sortOverallStats(stats, sort) {
     const byNameAsc = (a, b) => a.participant.nickname.localeCompare(b.participant.nickname, 'ko');
     if (sort === 'name-asc') return stats.slice().sort(byNameAsc);
@@ -959,13 +977,13 @@
     $('overallTable').innerHTML = `${head}<tbody>${body}</tbody>`;
   }
 
-  async function paintOverall() {
+  async function paintOverall(opts) {
     if (!participants.length) {
       $('overallCount').textContent = '0명';
       $('overallTable').innerHTML = '<tbody><tr><td class="empty">등록된 참가자가 없습니다.</td></tr></tbody>';
       return;
     }
-    const allSubs = await Store.listSubmissions();
+    const allSubs = await loadAllSubs(opts && opts.force);
     overallStats = U.buildStats(participants, allSubs);
 
     const active = overallStats.filter((s) => s.participant.status !== 'out');
@@ -1065,6 +1083,7 @@
       paintCertifyDateWarn(date);
 
       await paintMine(pid);
+      upsertAllSubsCache(saved); // 방금 저장한 내 기록만 캐시에 반영 — 전체를 다시 읽지 않아도 된다
       await paintOverall();
       feedDate = date;
       feedVisibleCount = FEED_PAGE_SIZE;
@@ -1180,7 +1199,7 @@
       try {
         await refreshSocialFeed();
         await calculateRanksAndFame();
-        await paintOverall();
+        await paintOverall({ force: true }); // 수동 새로고침은 다른 사람의 새 기록까지 진짜로 다시 읽는다
       } finally { btn.disabled = false; }
     });
     const pollFeed = () => {
@@ -1201,7 +1220,7 @@
         if (keep) { $('participant').value = keep; await onSelect(); }
         await refreshSocialFeed();
         await calculateRanksAndFame();
-        await paintOverall();
+        await paintOverall({ force: true });
       }
     });
   }
