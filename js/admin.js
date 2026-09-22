@@ -33,6 +33,7 @@
     paintRoster();
     paintParticipantFilter();
     paintEntries();
+    paintPrompts();
     try {
       // 공지문(notices) 컬렉션은 새로 추가된 기능이라, Firestore 보안 규칙에서 아직 읽기·쓰기가
       // 막혀 있는 환경도 있을 수 있다. 여기서 실패해도 알림 메일 등 나머지 탭은 정상 동작해야
@@ -794,6 +795,40 @@
     });
   }
 
+  /* ── 📝 주간 발제문 (라이브 날 단톡방 공지용) ── */
+  function promptKakaoText(entry, idx) {
+    const date = U.addDays(CONFIG.startDate, entry.day - 1);
+    return [
+      `📝 ${idx + 1}주차 발제문 (${U.shortLabel(date)})`,
+      '오늘은 새로 읽을 분량이 없습니다. 아래 질문 중 하나를 골라 생각을 정리해 앱 [읽고 느낀 점]에 남기면 오늘 인증 완료입니다.',
+      '',
+      ...entry.questions.map((q, i) => `${i + 1}. ${q}`),
+      '',
+      `오늘 밤 22시 라이브에서 이 이야기를 나눕니다. ${CONFIG.appUrl}`
+    ].join('\n');
+  }
+
+  function paintPrompts() {
+    const box = $('promptSection');
+    const list = (CONFIG.weeklyPrompts || []).filter((w) => w.questions && w.questions.length);
+    if (!box) return;
+    if (!list.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const today = U.today();
+    $('promptList').innerHTML = list.map((entry, idx) => {
+      const date = U.addDays(CONFIG.startDate, entry.day - 1);
+      const state = date === today ? ' · 오늘' : (date < today ? ' · 지남' : '');
+      return `<div class="field" style="margin-top:14px">
+        <label>${idx + 1}주차 · ${entry.day}일차 (${esc(U.shortLabel(date))})${state}</label>
+        <textarea class="report" rows="9" readonly id="promptText${idx}">${esc(promptKakaoText(entry, idx))}</textarea>
+        <div class="actions" style="margin-top:6px"><button class="small" data-copyprompt="${idx}">복사</button></div>
+      </div>`;
+    }).join('');
+    $('promptList').querySelectorAll('[data-copyprompt]').forEach((el) => {
+      el.addEventListener('click', (e) => copyText($('promptText' + el.dataset.copyprompt).value, e.target));
+    });
+  }
+
   /* ── 알림 메일 ───────────────────────── */
 
   /* ── 표 정렬 ───────────────────────────
@@ -882,6 +917,7 @@
     // notifyEmails 목록에서 찾으므로, 그 목록이 새로고침될 때마다(메일 추가/삭제 포함) 함께 다시 그린다.
     paintMissedWarn();
     paintGift();
+    await refreshGiftLastRun();
     paintKickoutNotice();
     await refreshKickoutTemplate();
     await refreshMissed5Template();
@@ -1132,7 +1168,8 @@
       { key: 'name', label: '이름', get: (r) => r.stat.participant.nickname },
       { key: 'missed', label: '누락', cls: 'num', get: (r) => r.stat.missed },
       { key: 'verified', label: '인증', cls: 'num', get: (r) => r.stat.verified },
-      { key: 'email', label: '이메일', get: (r) => r.email || '' }
+      { key: 'email', label: '이메일', get: (r) => r.email || '' },
+      { key: 'sent', label: '정리본', get: (r) => r.stat.participant.giftSentAt || '' }
     ];
     const t = $('giftTable');
     t.innerHTML = eligible.length
@@ -1142,9 +1179,67 @@
           <td class="num">${s.missed}</td>
           <td class="num">${s.verified}</td>
           <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
+          <td>${s.participant.giftSentAt ? `보냄 ${esc(U.shortLabel(s.participant.giftSentAt))}` : '<span class="muted">-</span>'}</td>
         </tr>`).join('')}</tbody>`
       : '<tbody><tr><td class="empty">지금 기준 대상자가 없습니다.</td></tr></tbody>';
     bindSortHead(t, 'gift', paintGift);
+
+    // 발송 문구는 기본값으로 한 번만 채운다(운영진이 고친 내용을 새로고침이 덮지 않게).
+    if (!$('giftMailSubject').value) $('giftMailSubject').value = MailTemplates.defaultGiftSubject();
+    if (!$('giftMailBody').value) $('giftMailBody').value = MailTemplates.defaultGiftBody();
+  }
+
+  async function refreshGiftLastRun() {
+    if (!CONFIG.giftMissLimit) return;
+    const meta = await Store.getMeta();
+    const r = meta.giftLastRun;
+    $('giftLastRun').textContent = r
+      ? `최근 발송: ${U.stampLabel(r.at)} · 대상 ${r.eligible}명 중 ${r.sent}건 발송` +
+        (r.skippedAlready ? ` · 이미 받은 사람 ${r.skippedAlready}명 건너뜀` : '') +
+        (r.skippedNoEmail ? ` · 이메일 없음 ${r.skippedNoEmail}명` : '') +
+        (r.failed ? ` · 실패 ${r.failed}건` : '')
+      : '아직 정리본을 보낸 적 없습니다.';
+  }
+
+  /** 서버 함수(send-gift-mail)가 대상자를 다시 계산해서 보낸다 — 여기서는 링크·문구만 넘긴다. */
+  async function sendGiftMail() {
+    const link = $('giftLink').value.trim();
+    if (!/^https?:\/\//.test(link)) { msg($('giftSendMsg'), '정리본 링크(https://…)를 먼저 넣어 주세요.', 'bad'); return; }
+    if (!Store.getIdToken) { msg($('giftSendMsg'), '이 백엔드(로컬 저장)에서는 메일을 보낼 수 없습니다. Firebase 배포본에서 눌러 주세요.', 'bad'); return; }
+    const { eligible } = giftCandidates();
+    const resend = $('giftResend').checked;
+    const fresh = eligible.filter((r) => resend || !r.stat.participant.giftSentAt);
+    if (!fresh.length) { msg($('giftSendMsg'), '보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).', 'warn'); return; }
+    if (!confirm(`${fresh.length}명에게 정리본 메일을 보낼까요?\n${link}`)) return;
+    const btn = $('giftSendBtn');
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '보내는 중…';
+    try {
+      const token = await Store.getIdToken();
+      const res = await fetch('/.netlify/functions/send-gift-mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+        body: JSON.stringify({
+          link, resend,
+          subject: $('giftMailSubject').value.trim(),
+          body: $('giftMailBody').value.trim()
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      msg($('giftSendMsg'),
+        `${data.sent}명에게 보냈습니다.` +
+        (data.skippedAlready ? ` 이미 받은 ${data.skippedAlready}명은 건너뛰었습니다.` : '') +
+        (data.skippedNoEmail ? ` 이메일이 없는 ${data.skippedNoEmail}명은 못 보냈습니다.` : '') +
+        (data.failed ? ` 실패 ${data.failed}건.` : ''), data.failed ? 'warn' : 'ok');
+      await refresh();
+    } catch (e) {
+      msg($('giftSendMsg'), `발송 실패: ${esc(e.message)}`, 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
   }
 
   function copyGiftList() {
@@ -1244,17 +1339,32 @@
   let missed5MailTemplate = null;
   let missed5TemplateDirty = false;
 
+  /* 킥아웃 시즌은 autoWarnThreshold(5)에 "한 번 더면 킥아웃", 정리본 시즌은 giftMissLimit-1(5)에
+   * "한 번 더면 정리본 없음". 문구는 서로 다른 meta 키에 저장해 시즌 종류가 바뀌어도 섞이지 않는다. */
+  const missed5Mode = () => (CONFIG.kickoutEnabled ? 'kickout' : (CONFIG.giftMissLimit ? 'gift' : null));
+  const missed5Threshold = () => (CONFIG.kickoutEnabled ? CONFIG.autoWarnThreshold : (CONFIG.giftMissLimit || Infinity) - 1);
+  const missed5MetaKey = () => (missed5Mode() === 'gift' ? 'giftWarnMailTemplate' : 'missed5MailTemplate');
+
   function missed5MailSubjectTemplate() {
-    return (missed5MailTemplate && missed5MailTemplate.subject) || MailTemplates.defaultMissed5Subject();
+    if (missed5MailTemplate && missed5MailTemplate.subject) return missed5MailTemplate.subject;
+    return missed5Mode() === 'gift' ? MailTemplates.defaultGiftWarnSubject() : MailTemplates.defaultMissed5Subject();
   }
   function missed5MailBodyTemplate() {
-    return (missed5MailTemplate && missed5MailTemplate.body) || MailTemplates.defaultMissed5Body();
+    if (missed5MailTemplate && missed5MailTemplate.body) return missed5MailTemplate.body;
+    return missed5Mode() === 'gift' ? MailTemplates.defaultGiftWarnBody() : MailTemplates.defaultMissed5Body();
   }
 
   async function refreshMissed5Template() {
-    $('autoWarnN').textContent = CONFIG.autoWarnThreshold;
+    const mode = missed5Mode();
+    $('missed5Section').hidden = !mode;
+    if (!mode) return;
+    $('missed5HintKick').hidden = mode !== 'kickout';
+    $('missed5HintGift').hidden = mode !== 'gift';
+    $('missed5Head').textContent = mode === 'gift' ? '누락 5회 자동 안내 메일 (정리본)' : '미인증 5회 자동 경고 메일';
+    $('autoWarnN').textContent = missed5Threshold();
+    $('autoWarnNGift').textContent = missed5Threshold();
     const meta = await Store.getMeta();
-    missed5MailTemplate = meta.missed5MailTemplate || null;
+    missed5MailTemplate = meta[missed5MetaKey()] || null;
     loadMissed5TemplateInputs();
     paintMissed5LastRun(meta.missed5LastRun || null);
     paintMissed5Current();
@@ -1285,14 +1395,14 @@
       msg($('missed5TemplateMsg'), '제목과 본문을 모두 입력해 주세요.', 'bad');
       return;
     }
-    await Store.setMeta({ missed5MailTemplate: { subject, body, updatedAt: U.nowStamp() } });
+    await Store.setMeta({ [missed5MetaKey()]: { subject, body, updatedAt: U.nowStamp() } });
     missed5TemplateDirty = false;
-    msg($('missed5TemplateMsg'), '미인증 5회 자동 경고 메일 문구를 저장했습니다. 다음 자동 발송부터 이 문구로 나갑니다.', 'ok');
+    msg($('missed5TemplateMsg'), '자동 안내 메일 문구를 저장했습니다. 다음 자동 발송부터 이 문구로 나갑니다.', 'ok');
     await refreshMissed5Template();
   }
 
   async function resetMissed5Template() {
-    await Store.setMeta({ missed5MailTemplate: null });
+    await Store.setMeta({ [missed5MetaKey()]: null });
     missed5TemplateDirty = false;
     msg($('missed5TemplateMsg'), '기본 문구로 되돌렸습니다.', 'ok');
     await refreshMissed5Template();
@@ -1356,8 +1466,9 @@
    *  — 지금 이 순간 자동 발송 대상이 될 사람 목록. 이미 다른 방법으로 안내한 사람을 골라
    *  "자동 발송에서 제외"(= warned5At을 지금 날짜로 채워서 이미 보낸 것으로 표시)할 수 있게 해준다. */
   function missed5CurrentCandidates() {
+    const n = missed5Threshold();
     return stats.filter((s) =>
-      s.missed === CONFIG.autoWarnThreshold && s.participant.status !== 'out' && !s.participant.warned5At);
+      s.missed === n && s.participant.status !== 'out' && !s.participant.warned5At);
   }
 
   function paintMissed5Current() {
@@ -1367,7 +1478,8 @@
       ? `<thead><tr><th>이름</th><th class="num">미인증</th><th>연락 방법</th></tr></thead><tbody>${
         rows.map((s) => {
           const ways = [resolveEmailFor(s.participant) && '메일', s.participant.phone && '문자'].filter(Boolean);
-          return `<tr><td>${esc(s.participant.nickname)}</td><td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>` +
+          const outOf = CONFIG.kickoutEnabled ? `/${CONFIG.kickoutThreshold}` : '';
+          return `<tr><td>${esc(s.participant.nickname)}</td><td class="num">${s.missed}${outOf}</td>` +
             `<td>${ways.length ? esc(ways.join(' · ')) : '<span class="muted">이메일·전화번호 없음</span>'}</td></tr>`;
         }).join('')
       }</tbody>`
@@ -1718,6 +1830,7 @@
     $('exportCsvMatrix').addEventListener('click', exportMatrixCsv);
     $('giftCopy').addEventListener('click', copyGiftList);
     $('giftCsv').addEventListener('click', exportGiftCsv);
+    $('giftSendBtn').addEventListener('click', sendGiftMail);
     $('importJson').addEventListener('click', importJson);
     $('wipe').addEventListener('click', async () => {
       if (!confirm('모든 참가자와 인증 기록을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?')) return;

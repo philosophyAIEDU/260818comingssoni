@@ -47,7 +47,24 @@ function resolveEmailFor(participant, notifyEmails) {
   return byName ? byName.email : '';
 }
 
-function missed5Template(meta) {
+/* 이 함수는 두 가지 시즌에서 돈다.
+ *   킥아웃 시즌  — 누락이 autoWarnThreshold(5)회가 되면 "한 번 더 놓치면 킥아웃" (missed5MailTemplate)
+ *   정리본 시즌  — 누락이 giftMissLimit-1(5)회가 되면 "한 번 더 놓치면 정리본을 못 받아요" (giftWarnMailTemplate)
+ * 둘 다 아니면(킥아웃도 선물도 없는 시즌) 아무에게도 보내지 않는다. */
+function warnMode() {
+  if (CONFIG.kickoutEnabled) return { mode: 'kickout', threshold: CONFIG.autoWarnThreshold };
+  if (CONFIG.giftMissLimit) return { mode: 'gift', threshold: CONFIG.giftMissLimit - 1 };
+  return null;
+}
+
+function missed5Template(meta, mode) {
+  if (mode === 'gift') {
+    const saved = meta.giftWarnMailTemplate;
+    return {
+      subject: (saved && saved.subject) || MailTemplates.defaultGiftWarnSubject(),
+      body: (saved && saved.body) || MailTemplates.defaultGiftWarnBody()
+    };
+  }
   const saved = meta.missed5MailTemplate;
   return {
     subject: (saved && saved.subject) || MailTemplates.defaultMissed5Subject(),
@@ -56,9 +73,9 @@ function missed5Template(meta) {
 }
 
 async function runMissed5Warning() {
-  // 킥아웃이 없는 시즌에는 이 경고 자체가 존재하지 않는다 — 아무에게도 보내지 않는다.
-  if (!CONFIG.kickoutEnabled) {
-    return { skipped: 'kickout-disabled', season: CONFIG.seasonId, today: U.today() };
+  const wm = warnMode();
+  if (!wm) {
+    return { skipped: 'no-warning-in-this-season', season: CONFIG.seasonId, today: U.today() };
   }
 
   const [participants, submissions, notifyEmails, meta] = await Promise.all([
@@ -67,10 +84,10 @@ async function runMissed5Warning() {
 
   const todayISO = U.today();
   const stats = U.buildStats(participants, submissions, todayISO);
-  const template = missed5Template(meta);
+  const template = missed5Template(meta, wm.mode);
 
   const candidates = stats.filter((s) =>
-    s.missed === CONFIG.autoWarnThreshold
+    s.missed === wm.threshold
     && s.participant.status !== 'out'
     && !s.participant.warned5At);
 
@@ -87,8 +104,11 @@ async function runMissed5Warning() {
 
     const vars = {
       이름: p.nickname,
-      자동경고기준: CONFIG.autoWarnThreshold,
+      자동경고기준: wm.threshold,
       킥아웃기준: CONFIG.kickoutThreshold,
+      누락횟수: s.missed,
+      선물기준: CONFIG.giftMissLimit || '',
+      책이름: CONFIG.book.name,
       앱주소: CONFIG.appUrl
     };
     const subject = MailTemplates.fill(template.subject, vars);
@@ -122,6 +142,7 @@ async function runMissed5Warning() {
 
   const result = {
     today: todayISO,
+    mode: wm.mode,
     candidates: candidates.length,
     sentEmail,
     sentSms,

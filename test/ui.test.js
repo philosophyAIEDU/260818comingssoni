@@ -2005,6 +2005,87 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   }
   await giftCtx.close();
 
+  // ── 시즌 1(꿈과 돈) 실제 설정으로: 라이브 날 발제문 · 정리본 시즌의 운영진 화면 ──
+  // 오늘이 7일차(첫 라이브)가 되도록 시즌 1 날짜만 옮긴다. pinSeason 대신 's2'로 고정.
+  const s2Route = (start, end, grade) => async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)', "CS.pickSeason(CS.seasonNowKST(), 's2')")
+               .replace("startDate: '2026-09-21'", `startDate: '${start}'`)
+               .replace("endDate: '2026-10-18'", `endDate: '${end}'`)
+               .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${grade}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  };
+  const s2Ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await s2Ctx.route('**/js/config.js', s2Route(shift(-6), shift(21), shift(-5)));
+  {
+    const parts = [{ id: 'q0', nickname: '멤버하나', email: 'one@ex.com', kakaoJoined: '', createdAt: shift(-6) + 'T00:00:00.000Z' }];
+    await s2Ctx.addInitScript(({ parts }) => {
+      const K = 'comingsoon.reading.s2';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify([]));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts });
+    const ap = await s2Ctx.newPage();
+    ap.on('pageerror', (e) => errs.push('pageerror(s2): ' + e.message));
+    await ap.goto(BASE + '/index.html');
+    await ap.waitForTimeout(600);
+    await ap.click('#todayRangeFold summary');
+    await ap.waitForTimeout(200);
+    t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
+    t('발제문 첫 질문이 보임', (await ap.textContent('#todayRangeText .prompt-box')).includes('기능을 파니까'));
+    await ap.click('#rangeNextDay');
+    await ap.waitForTimeout(200);
+    t('다음 날(8일차)에는 발제문이 없음', !(await ap.isVisible('#todayRangeText .prompt-box')));
+    await ap.click('#rangePrevDay'); await ap.click('#rangePrevDay');
+    await ap.waitForTimeout(200);
+    t('지난 날(6일차)에도 발제문 없음', !(await ap.isVisible('#todayRangeText .prompt-box')));
+
+    const adp = await s2Ctx.newPage();
+    adp.on('pageerror', (e) => errs.push('pageerror(s2 admin): ' + e.message));
+    await adp.goto(BASE + '/admin.html');
+    await adp.waitForTimeout(700);
+    await adp.click('button[data-tab="report"]');
+    await adp.waitForTimeout(300);
+    t('운영진 공지문 탭에 발제문 4주치가 보임', (await adp.locator('#promptList textarea').count()) === 4);
+    t('발제문 문구에 앱 주소와 회차가 들어감',
+      /1주차 발제문/.test(await adp.inputValue('#promptText0')) && /personalmakersbook/.test(await adp.inputValue('#promptText0')));
+    await adp.click('button[data-tab="notify"]');
+    await adp.waitForTimeout(400);
+    t('정리본 시즌에는 누락 5회 안내 섹션이 정리본 문구로 보임',
+      await adp.isVisible('#missed5Section') && /정리본/.test(await adp.textContent('#missed5Head')));
+    t('킥아웃 통보 섹션은 숨겨짐', !(await adp.isVisible('#kickoutMailSection')));
+    t('누락 5회 안내 기본 문구가 정리본 문구', /정리본/.test(await adp.inputValue('#missed5TemplateBody')));
+    t('선물 대상자 섹션에 정리본 발송 버튼이 있음', await adp.isVisible('#giftSendBtn'));
+    t('정리본 발송 제목이 기본값으로 채워짐', /정리본/.test(await adp.inputValue('#giftMailSubject')));
+  }
+  await s2Ctx.close();
+
+  // ── 회고 세션: 종료 다음 날 ~ retroUntil 사이에는 앱이 회고 안내를 띄운다 ──
+  const retroCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  await retroCtx.route('**/js/config.js', async (route) => {
+    const res = await route.fetch();
+    let body = await res.text();
+    body = body.replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)', "CS.pickSeason(CS.seasonNowKST(), 's2')")
+               .replace("startDate: '2026-09-21'", `startDate: '${shift(-30)}'`)
+               .replace("endDate: '2026-10-18'", `endDate: '${shift(-3)}'`)
+               .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${shift(-29)}'`)
+               .replace("retroUntil: '2026-10-20'", `retroUntil: '${shift(2)}'`)
+               .replace(/backend: '[^']+'/, `backend: 'local'`);
+    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+  });
+  {
+    const rp = await retroCtx.newPage();
+    rp.on('pageerror', (e) => errs.push('pageerror(retro): ' + e.message));
+    await rp.goto(BASE + '/index.html');
+    await rp.waitForTimeout(600);
+    t('회고 세션 안내가 보임', await rp.isVisible('#phaseNote .note.retro'));
+    t('회고 안내에 기간과 할 일이 적힘', /회고 세션/.test(await rp.textContent('#phaseNote')) && /최고 문장/.test(await rp.textContent('#phaseNote')));
+    t('회고 기간에는 제출이 잠김', await rp.isDisabled('#submitBtn'));
+  }
+  await retroCtx.close();
+
   // 모바일 뷰포트에서 가로 스크롤 없는지 + 한글 텍스트가 이상하게(글자 하나씩) 줄바꿈되지 않는지
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 360, height: 780 }); // 실제 좁은 안드로이드 기기 폭 기준

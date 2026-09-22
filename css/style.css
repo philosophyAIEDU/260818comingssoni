@@ -850,3 +850,13 @@ button.ghost { background: transparent; }
   .upvote-btn { min-height: 38px; padding: 7px 13px; }
   .feed-item { column-gap: 10px; }
 }
+
+/* 라이브 날 [오늘의 범위] 안에 붙는 발제문 */
+.prompt-box { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); text-align: left; }
+.prompt-box > b { display: block; margin-bottom: 6px; }
+.prompt-box ol { margin: 0 0 8px; padding-left: 20px; }
+.prompt-box li { margin: 6px 0; line-height: 1.6; }
+.prompt-box .muted { font-size: 13px; }
+
+/* 회고 세션 안내(종료 후 ~ 다음 시즌 전) */
+.note.retro { text-align: left; line-height: 1.7; }

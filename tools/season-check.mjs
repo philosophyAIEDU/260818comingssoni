@@ -2,7 +2,7 @@
 /* 시즌 정의가 성립하는지 기계적으로 검사한다.
  *
  * 매달 새 책으로 시즌을 갈아 끼우는데, 그때 사람이 저지르는 실수는 늘 같은 종류다 —
- * 회차 수가 28일이 아니거나, 라이브가 일요일에 안 맞거나, 하루가 빈 채로 남거나,
+ * 회차 수가 28일이 아니거나, 라이브가 7·14·21·28일차에 안 맞거나, 하루가 빈 채로 남거나,
  * 새 시즌의 저장소 접두사가 앞 시즌과 겹치거나. 전부 배포 전에 잡을 수 있는 것들이라
  * 여기 모아 두고 `npm run check:season` 한 번으로 본다.
  *
@@ -96,9 +96,19 @@ for (const s of CS.SEASONS) {
     .map((d, i) => ({ i: i + 1, lines: d.flatMap((g) => g.s || []) }))
     .filter((x) => x.lines.some(isLiveLine));
   withSeason(s, (U) => {
-    const wrong = liveDays.filter((x) => U.weekday(U.addDays(s.startDate, x.i - 1)) !== '일');
-    check(L, `라이브 회차가 모두 일요일 (${liveDays.length}회)`, wrong.length === 0,
+    // 라이브는 각 주 7일째(7·14·21·28일차). 요일은 시작일에 따라 달라지므로 요일이 아니라 회차로 본다.
+    const wrong = liveDays.filter((x) => x.i % 7 !== 0);
+    check(L, `라이브 회차가 7·14·21·28일차 (${liveDays.length}회)`, wrong.length === 0,
       wrong.map((x) => `${x.i}일차=${U.weekday(U.addDays(s.startDate, x.i - 1))}`).join(', '));
+    // 발제문은 라이브 날에만 붙는다
+    const promptDays = (s.weeklyPrompts || []).map((w) => w.day);
+    const liveSet = new Set(liveDays.map((x) => x.i));
+    check(L, '발제문(weeklyPrompts)이 라이브 날에만 있다',
+      promptDays.every((d) => liveSet.has(d)), promptDays.filter((d) => !liveSet.has(d)).join(', '));
+    check(L, '발제문마다 질문이 1개 이상', (s.weeklyPrompts || []).every((w) => Array.isArray(w.questions) && w.questions.length));
+    if (s.retroUntil) {
+      check(L, '회고 종료일(retroUntil)이 종료일 뒤', ISO.test(s.retroUntil) && s.retroUntil > s.endDate, s.retroUntil);
+    }
     check(L, '마지막 회차 날짜 = endDate',
       U.addDays(s.startDate, plan.length - 1) === s.endDate,
       U.addDays(s.startDate, plan.length - 1));
