@@ -21,9 +21,7 @@
   }
 
   /* ── 데이터 로드 ─────────────────────── */
-  async function refresh() {
-    participants = await Store.listParticipants();
-    submissions = await Store.listSubmissions();
+  async function repaint() {
     stats = U.buildStats(participants, submissions)
       .sort((a, b) => (b.missed - a.missed)
         || (a.verified - b.verified)
@@ -46,6 +44,24 @@
         '읽기·쓰기를 허용해 두었는지 확인해 주세요. (README 참고)', 'bad');
     }
     await refreshNotify();
+  }
+
+  /** participants + submissions를 모두 다시 읽는다. 인증 기록(submissions) 자체가 바뀌었을 때만
+   *  쓴다 — 챌린지가 진행될수록 submissions는 계속 쌓여서, 필요 없을 때도 매번 전체를 다시 읽으면
+   *  Firestore 읽기 비용이 커진다(무료 요금제 한도를 넘길 수 있다). */
+  async function refresh() {
+    participants = await Store.listParticipants();
+    submissions = await Store.listSubmissions();
+    await repaint();
+  }
+
+  /** 명단(이름·이메일·전화번호·상태·면제일·카톡방 참여 여부 등)만 바뀐 동작에서 쓴다.
+   *  인증 기록은 건드리지 않았으니 이미 불러온 submissions를 그대로 재사용하고
+   *  participants만 다시 읽는다 — 명단 관련 조작은 refresh()보다 훨씬 잦은데, 참가자 수는
+   *  누적 인증 건수보다 훨씬 적어서 읽기 비용이 크게 줄어든다. */
+  async function refreshLite() {
+    participants = await Store.listParticipants();
+    await repaint();
   }
 
   /* ── 상단 지표 ───────────────────────── */
@@ -162,7 +178,7 @@
       btn.disabled = true;
       try {
         await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
-        await refresh();
+        await refreshLite();
         showCell(pid, date);
       } catch (err) {
         // 저장이 실패해도 아무 표시가 없으면 성공한 줄 알고 넘어가기 쉬워서(실제로 이 문제로
@@ -178,7 +194,9 @@
         del.disabled = true;
         try {
           await Store.removeSubmission(sub.id);
-          await refresh();
+          // 방금 지운 문서만 캐시에서 빼면 되므로, submissions 전체를 다시 읽지 않는다.
+          submissions = submissions.filter((s) => s.id !== sub.id);
+          await refreshLite();
           showCell(pid, date);
         } catch (err) {
           del.disabled = false;
@@ -278,10 +296,13 @@
     t.querySelectorAll('[data-rename]').forEach((el) => {
       el.addEventListener('change', async () => {
         try {
-          await Store.updateParticipant(el.dataset.rename, { nickname: el.value });
+          const updated = await Store.updateParticipant(el.dataset.rename, { nickname: el.value });
+          // 이름이 바뀌면 그 사람의 제출 기록(submissions)에도 이름이 함께 갱신된다(store 쪽에서 처리).
+          // submissions 전체를 다시 읽지 않고, 캐시에도 같은 변경을 그대로 반영해서 맞춰 둔다.
+          submissions.forEach((s) => { if (s.participantId === el.dataset.rename) s.nickname = updated.nickname; });
           msg($('rosterMsg'), '이름을 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
-        await refresh();
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-editemail]').forEach((el) => {
@@ -290,7 +311,7 @@
           await Store.updateParticipant(el.dataset.editemail, { email: el.value });
           msg($('rosterMsg'), '이메일을 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
-        await refresh();
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-editphone]').forEach((el) => {
@@ -299,7 +320,7 @@
           await Store.updateParticipant(el.dataset.editphone, { phone: el.value.trim() });
           msg($('rosterMsg'), '전화번호를 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
-        await refresh();
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-editkakao]').forEach((el) => {
@@ -308,7 +329,7 @@
           await Store.updateParticipant(el.dataset.editkakao, { kakaoJoined: el.value });
           msg($('rosterMsg'), '카톡방 참여 여부를 수정했습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
-        await refresh();
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-toggle]').forEach((el) => {
@@ -322,7 +343,7 @@
           // 복귀(다시 활동 상태로) 시에는 미인증 5회 자동 경고도 새로 다시 받을 수 있게 초기화한다.
           warned5At: out ? p.warned5At || null : null
         });
-        await refresh();
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-kickout]').forEach((el) => {
@@ -334,7 +355,7 @@
           outDate: U.today(),
           kickReason: 'kickout'
         });
-        await refresh();
+        await refreshLite();
         msg($('rosterMsg'),
           `${esc(p.nickname)} 님을 킥아웃 처리했습니다. [알림 메일] 탭의 "킥아웃 통보 메일"에서 안내 메일을 작성할 수 있습니다.`,
           'ok');
@@ -345,7 +366,9 @@
         const p = participants.find((x) => x.id === el.dataset.del);
         if (!confirm(`${p.nickname} 님을 명단에서 삭제할까요?\n제출한 인증 기록도 함께 삭제됩니다.`)) return;
         await Store.removeParticipant(p.id);
-        await refresh();
+        // 참가자를 지우면 store 쪽에서 그 사람의 submissions도 함께 지운다 — 캐시도 맞춰 둔다.
+        submissions = submissions.filter((s) => s.participantId !== p.id);
+        await refreshLite();
       });
     });
     t.querySelectorAll('[data-addexempt]').forEach((el) => {
@@ -361,7 +384,7 @@
         try {
           await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
           msg($('rosterMsg'), `${p.nickname} 님의 ${U.shortLabel(d)}을(를) 면제일로 등록했습니다.`, 'ok');
-          await refresh();
+          await refreshLite();
         } catch (e) {
           // 저장이 실패했는데도 아무 표시가 없으면 성공한 줄 알고 넘어가기 쉬워서(실제로 이 문제로
           // 면제 등록이 반영 안 된 사례가 있었음) 반드시 눈에 띄는 실패 메시지를 남긴다.
@@ -378,7 +401,7 @@
         el.disabled = true;
         try {
           await Store.updateParticipant(pid, { exemptDates: list });
-          await refresh();
+          await refreshLite();
         } catch (e) {
           el.disabled = false;
           msg($('rosterMsg'), `면제 해제 실패: ${esc(e.message)}`, 'bad');
@@ -396,7 +419,7 @@
     msg($('rosterMsg'),
       `${added.length}명 등록 완료${skipped.length ? ` · 중복 ${skipped.length}명 건너뜀 (${esc(skipped.join(', '))})` : ''}`,
       added.length ? 'ok' : 'warn');
-    await refresh();
+    await refreshLite();
   }
 
   /* ── 명단 시트 업로드 (CSV/엑셀: 이름, 이메일 [, 전화번호]) ─────── */
@@ -506,7 +529,7 @@
       msg($('syncEmailMsg'),
         filled ? `${filled}명의 이메일을 채웠습니다.` : '채울 대상이 없습니다(이미 이메일이 있거나, 이름이 일치하는 항목이 없습니다).',
         filled ? 'ok' : 'warn');
-      await refresh();
+      await refreshLite();
     } catch (e) {
       msg($('syncEmailMsg'), `실패: ${esc(e.message)}`, 'bad');
     } finally {
@@ -567,7 +590,7 @@
       if (phonesFilled) parts.push(`전화번호 ${phonesFilled}건 채움`);
       msg($('rosterCsvMsg'), parts.join(' · '), (pAdded.length || mAdded.length) ? 'ok' : 'warn');
       input.value = '';
-      await refresh();
+      await refreshLite();
       await refreshNotify();
     } catch (e) {
       msg($('rosterCsvMsg'), `업로드 실패: ${esc(e.message)}`, 'bad');
@@ -785,7 +808,9 @@
         el.disabled = true;
         try {
           await Store.removeSubmission(s.id);
-          await refresh();
+          // 방금 지운 문서만 캐시에서 빼면 되므로, submissions 전체를 다시 읽지 않는다.
+          submissions = submissions.filter((x) => x.id !== s.id);
+          await refreshLite();
         } catch (e) {
           el.disabled = false;
           alert(`삭제 실패: ${e.message}`);
@@ -1383,7 +1408,7 @@
 
     await Promise.all(rows.map((s) => Store.updateParticipant(s.participant.id, { warned5At: U.today() })));
     msg($('missed5CurrentMsg'), `${rows.length}명을 자동 발송 대상에서 제외했습니다. 새로 5회가 되는 사람에게만 이제부터 자동 발송됩니다.`, 'ok');
-    await refresh();
+    await refreshLite();
   }
 
   /** 통보 메일은 운영진이 Gmail·복사로 직접 보내므로 앱이 발송을 알 수 없다.
@@ -1443,7 +1468,7 @@
       msg($('kickoutNoticeMsg'), sentAt
         ? `${esc(p ? p.nickname : '')} 님을 <strong>${esc(U.shortLabel(sentAt))} 발송</strong>으로 기록했습니다.`
         : `${esc(p ? p.nickname : '')} 님의 발송 기록을 지웠습니다.`, 'ok');
-      await refresh();
+      await refreshLite();
     };
     t.querySelectorAll('[data-kicksent]').forEach((el) => {
       el.addEventListener('click', () => markSent(el.dataset.kicksent, U.today()));
