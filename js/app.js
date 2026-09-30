@@ -687,6 +687,12 @@
     return !!currentPid && s.participantId === currentPid;
   }
 
+  /* 피드는 2분마다(+화면 복귀 시) 자동으로 다시 그려지는데, 그때마다 전체 목록을 새 HTML로
+   * 통째로 갈아 끼우다 보니 "느낀 점 보기"로 펼쳐 둔 <details>도 매번 닫힌 상태로 되돌아갔다
+   * — 남의 글을 읽던 중 2분이 지나거나 다른 앱을 갔다 오면 저절로 접혀 버리는 문제였다.
+   * 펼쳐 둔 글의 id를 따로 기억해 뒀다가, 다시 그릴 때 그대로 열어 둔다. */
+  const feedOpenIds = new Set();
+
   function bindUpvoteButtons(container) {
     if (READONLY) return; // 지난 시즌을 들여다보는 중 — 기록을 바꾸지 않는다
     container.querySelectorAll('.upvote-btn').forEach((btn) => {
@@ -709,6 +715,16 @@
     });
   }
 
+  /** 펼침 상태(feedOpenIds)를 계속 따라가도록, 열고 닫을 때마다 기억해 둔다. */
+  function bindFeedDetails(container) {
+    container.querySelectorAll('.feed-more').forEach((el) => {
+      el.addEventListener('toggle', () => {
+        if (el.open) feedOpenIds.add(el.dataset.subid);
+        else feedOpenIds.delete(el.dataset.subid);
+      });
+    });
+  }
+
   function renderFeedItem(s, isWinner, hasUpvoted) {
     const own = isOwnSubmission(s);
     const late = U.isLate(s.date, s.createdAt);
@@ -725,7 +741,7 @@
           <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         </div>
         <p class="feed-quote">“${esc(s.sentence)}”</p>
-        <details class="feed-more">
+        <details class="feed-more" data-subid="${esc(s.id)}"${feedOpenIds.has(s.id) ? ' open' : ''}>
           <summary>느낀 점 보기</summary>
           <dl class="body">
             <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
@@ -794,6 +810,7 @@
     feedList.innerHTML = visible.map((s) =>
       renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
     bindUpvoteButtons(feedList);
+    bindFeedDetails(feedList);
     CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: U.shortLabel(date) });
 
     const remaining = shown.length - visible.length;

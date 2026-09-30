@@ -305,6 +305,14 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('느낀 점 보기를 누르면 느낀 점이 펼쳐짐',
     (await bomtolQuoteCard.locator('.feed-more dd').first().textContent()).includes('오늘은 30분만 읽었다'));
 
+  // 회귀 테스트: 2분마다(또는 다른 화면에 갔다 돌아올 때) 피드가 자동으로 다시 그려지는데,
+  // 그때 펼쳐 둔 "느낀 점"이 저절로 접혀 버리던 문제가 있었다 — [🔄 새로고침]도 같은 방식으로
+  // 목록을 다시 그리므로, 그 이후에도 열린 상태가 유지되는지로 검증한다.
+  await page.click('#feedRefresh');
+  await page.waitForTimeout(400);
+  t('피드가 다시 그려져도 펼쳐 둔 느낀 점은 계속 열려 있음',
+    await bomtolQuoteCard.locator('.feed-more').evaluate((el) => el.open));
+
   // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
   const bamtolCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
   t('본인 글 엄지척 비활성', await bamtolCard.locator('.upvote-btn').isDisabled());
