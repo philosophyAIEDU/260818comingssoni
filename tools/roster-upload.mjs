@@ -80,8 +80,9 @@ const db = admin.firestore();
 const col = (name) => db.collection(collectionName(name));
 
 // 앞 시즌 명단과 맞춰 "몇 시즌째 연속인지"를 같이 넣는다 — 앱에서 이름 옆 🔥N 배지가 된다.
-const prior = await loadPriorIndexes(db, global.CS.SEASONS, seasonId, (prefix, name) => (prefix ? `${prefix}_${name}` : name));
-const streakOf = (r) => seasonStreakFor({ nickname: r.name, email: r.email, phone: r.phone }, prior.map((x) => x.idx));
+const prior = await loadPriorIndexes(db, global.CS.SEASONS, seasonId,
+  (prefix, name) => (prefix ? `${prefix}_${name}` : name), global.CS.COMMON.streakFromSeason);
+const streakOf = (r) => seasonStreakFor({ nickname: r.name, email: r.email }, prior.map((x) => x.idx));
 
 const existingP = new Set((await col('participants').get()).docs.map((d) => d.data().nickname));
 const existingM = new Set((await col('notifyEmails').get()).docs.map((d) => String(d.data().email || '').toLowerCase()));

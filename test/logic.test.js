@@ -340,27 +340,46 @@ function t(name, cond, extra) {
   t('시즌2 발제문마다 질문 3개', (s2.weeklyPrompts || []).every((w) => w.questions.length === 3));
   t('시즌2 회고 종료일이 종료일 뒤', s2.retroUntil > s2.endDate, s2.retroUntil);
 
-  // 연속 참여 배지 계산 (tools/lib/streak.mjs)
+  // 연속 참여 배지 계산 (tools/lib/streak.mjs) — 이메일·이름으로 같은 사람을 찾는다
   {
-    const { indexRoster, seasonStreakFor } = await import(require('path').join(root, 'tools/lib/streak.mjs'));
-    const s0 = indexRoster([
-      { nickname: '김민지', email: 'a@x.com', phone: '010-1111-2222' },
-      { nickname: '수지', email: 'suji@x.com', phone: '010-3333-4444' },
-      { nickname: '박아웃', email: 'o@x.com', phone: '', status: 'out' }
+    const { indexRoster, seasonStreakFor, priorSeasons } = await import(require('path').join(root, 'tools/lib/streak.mjs'));
+    // 시즌 순서: 꿈과 돈(s2) → 다음(s3) → 그다음(s4). 지금이 s4라고 치고 앞 시즌을 가까운 것부터.
+    const s2Roster = indexRoster([
+      { nickname: '김민지', email: 'a@x.com' },
+      { nickname: '수지', email: 'suji@x.com' },
+      { nickname: '박아웃', email: 'o@x.com' },
+      { nickname: '쉬었던사람', email: 'rest@x.com' },
+      { nickname: '이유진(1362)', email: '' }
     ]);
-    const s1 = indexRoster([
-      { nickname: '김민지', email: 'a@x.com', phone: '01011112222' },
-      { nickname: '엄수지', email: 'suji@x.com', phone: '' },
-      { nickname: '박아웃', email: 'o@x.com', phone: '' },
-      { nickname: '이유진1362', email: '', phone: '010-9999-1362' }
+    const s3Roster = indexRoster([
+      { nickname: '김민지', email: 'a@x.com' },
+      { nickname: '엄수지', email: 'suji@x.com' },
+      { nickname: '박아웃', email: 'o@x.com', status: 'out' },
+      { nickname: '이유진1362', email: '' },
+      { nickname: '김지영(1111)', email: '' },
+      { nickname: '김지영(2222)', email: '' },
+      { nickname: '이메일바꾼', email: 'old@x.com' }
     ]);
-    const prior = [s1, s0]; // 가까운 시즌부터
-    t('두 시즌 다 있으면 3시즌째', seasonStreakFor({ nickname: '김민지', email: 'a@x.com', phone: '010-1111-2222' }, prior) === 3);
-    t('이름이 바뀌어도(수지→엄수지) 이메일로 이어짐', seasonStreakFor({ nickname: '엄수지', email: 'suji@x.com' }, prior) === 3);
-    t('앞 시즌에서 아웃이면 거기서 끊김', seasonStreakFor({ nickname: '박아웃', email: 'o@x.com' }, prior) === 2);
-    t('꼬리표(1362) 떼고 전화번호로 맞춤', seasonStreakFor({ nickname: '이유진(1362)', phone: '01099991362' }, prior) === 2);
-    t('처음 온 사람은 1', seasonStreakFor({ nickname: '신입', email: 'n@x.com' }, prior) === 1);
-    t('앞 시즌이 없으면 1', seasonStreakFor({ nickname: '김민지' }, []) === 1);
+    const prior = [s3Roster, s2Roster]; // 가까운 시즌부터
+    t('세 시즌 연속이면 🔥3', seasonStreakFor({ nickname: '김민지', email: 'a@x.com' }, prior) === 3);
+    t('이름을 바꿔도(수지→엄수지) 이메일이 같으면 이어짐', seasonStreakFor({ nickname: '엄수지', email: 'suji@x.com' }, prior) === 3);
+    t('이메일을 바꿔도 이름이 같으면 이어짐', seasonStreakFor({ nickname: '이메일바꾼', email: 'new@x.com' }, prior) === 2);
+    t('바로 앞 시즌에서 아웃이면 끊김 → 1(배지 없음)', seasonStreakFor({ nickname: '박아웃', email: 'o@x.com' }, prior) === 1);
+    t('한 시즌 쉬고 돌아오면 1(배지 없음)부터', seasonStreakFor({ nickname: '쉬었던사람', email: 'rest@x.com' }, prior) === 1);
+    t('꼬리표 표기만 달라도 같은 이름(이유진(1362) = 이유진1362)', seasonStreakFor({ nickname: '이유진1362' }, prior) === 3);
+    t('동명이인이 있던 이름은 이름만으로 잇지 않음', seasonStreakFor({ nickname: '김지영' }, prior) === 1);
+    t('동명이인도 꼬리표까지 같으면 이어짐', seasonStreakFor({ nickname: '김지영(2222)' }, prior) === 2);
+    t('처음 온 사람은 1(배지 없음)', seasonStreakFor({ nickname: '신입', email: 'n@x.com' }, prior) === 1);
+    t('이름도 이메일도 없으면 1', seasonStreakFor({}, prior) === 1);
+
+    // 세기 시작 시즌: 꿈과 돈(s2)부터. 시즌 0(s1, 챌린지)은 세지 않는다.
+    t('설정: 배지는 꿈과 돈(s2)부터 센다', CS.COMMON.streakFromSeason === 's2');
+    const fake = [{ id: 's1' }, { id: 's2' }, { id: 's3' }, { id: 's4' }];
+    t('꿈과 돈 시즌 자체에는 앞 시즌이 없음(이번 시즌 배지 없음)', priorSeasons(fake, 's2', 's2').length === 0);
+    t('다음 시즌(s3)은 꿈과 돈만 봄 — 시즌 0은 안 봄',
+      JSON.stringify(priorSeasons(fake, 's3', 's2').map((x) => x.id)) === JSON.stringify(['s2']));
+    t('그다음(s4)은 가까운 시즌부터 s3, s2',
+      JSON.stringify(priorSeasons(fake, 's4', 's2').map((x) => x.id)) === JSON.stringify(['s3', 's2']));
   }
 
   t('리마인드 메일 치환 결과에 자리표시자가 남지 않음', !/\{\{/.test(filledReminder), filledReminder);
