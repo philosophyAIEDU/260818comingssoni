@@ -340,6 +340,29 @@ function t(name, cond, extra) {
   t('시즌2 발제문마다 질문 3개', (s2.weeklyPrompts || []).every((w) => w.questions.length === 3));
   t('시즌2 회고 종료일이 종료일 뒤', s2.retroUntil > s2.endDate, s2.retroUntil);
 
+  // 연속 참여 배지 계산 (tools/lib/streak.mjs)
+  {
+    const { indexRoster, seasonStreakFor } = await import(require('path').join(root, 'tools/lib/streak.mjs'));
+    const s0 = indexRoster([
+      { nickname: '김민지', email: 'a@x.com', phone: '010-1111-2222' },
+      { nickname: '수지', email: 'suji@x.com', phone: '010-3333-4444' },
+      { nickname: '박아웃', email: 'o@x.com', phone: '', status: 'out' }
+    ]);
+    const s1 = indexRoster([
+      { nickname: '김민지', email: 'a@x.com', phone: '01011112222' },
+      { nickname: '엄수지', email: 'suji@x.com', phone: '' },
+      { nickname: '박아웃', email: 'o@x.com', phone: '' },
+      { nickname: '이유진1362', email: '', phone: '010-9999-1362' }
+    ]);
+    const prior = [s1, s0]; // 가까운 시즌부터
+    t('두 시즌 다 있으면 3시즌째', seasonStreakFor({ nickname: '김민지', email: 'a@x.com', phone: '010-1111-2222' }, prior) === 3);
+    t('이름이 바뀌어도(수지→엄수지) 이메일로 이어짐', seasonStreakFor({ nickname: '엄수지', email: 'suji@x.com' }, prior) === 3);
+    t('앞 시즌에서 아웃이면 거기서 끊김', seasonStreakFor({ nickname: '박아웃', email: 'o@x.com' }, prior) === 2);
+    t('꼬리표(1362) 떼고 전화번호로 맞춤', seasonStreakFor({ nickname: '이유진(1362)', phone: '01099991362' }, prior) === 2);
+    t('처음 온 사람은 1', seasonStreakFor({ nickname: '신입', email: 'n@x.com' }, prior) === 1);
+    t('앞 시즌이 없으면 1', seasonStreakFor({ nickname: '김민지' }, []) === 1);
+  }
+
   t('리마인드 메일 치환 결과에 자리표시자가 남지 않음', !/\{\{/.test(filledReminder), filledReminder);
   t('리마인드 메일에 이름·남은 시간·앱 주소 반영',
     filledReminder.includes('소니') && filledReminder.includes('약 3시간')

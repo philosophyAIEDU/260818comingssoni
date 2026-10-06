@@ -9,7 +9,8 @@
     "check:season": "node tools/season-check.mjs",
     "season:new": "node tools/new-season.mjs",
     "roster:diff": "node tools/roster-diff.mjs",
-    "roster:upload": "node tools/roster-upload.mjs"
+    "roster:upload": "node tools/roster-upload.mjs",
+    "streak:sync": "node tools/streak-sync.mjs"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",

@@ -860,3 +860,7 @@ button.ghost { background: transparent; }
 
 /* 회고 세션 안내(종료 후 ~ 다음 시즌 전) */
 .note.retro { text-align: left; line-height: 1.7; }
+
+/* 연속 참여 배지 — 2시즌째부터 이름 옆에 ②③… */
+.season-badge { display: inline-block; margin-left: 4px; color: var(--accent); font-weight: 700; font-size: .95em; vertical-align: 0; cursor: default; }
+.combo-option.active .season-badge, .picker-option.active .season-badge { color: #fff; }

@@ -196,6 +196,7 @@ const seasonSrc = `, {
     '인증을 놓쳐도 <strong>킥아웃되지 않습니다</strong>. 다만 ${days}일 동안 <strong>누락이 ${spec.giftMissLimit || 6}회 미만(${(spec.giftMissLimit || 6) - 1}회 이하)</strong>이면 '
       + '커밍쏜이 직접 정리한 『${esc(spec.book.name)}』 <strong>인사이트 정리본</strong>을 드립니다.',
     ${q(spec.bookEditionRule || '')} ,
+    '지난달에 이어 함께하시는 분은 이름 옆에 <strong>② ③ …</strong> 연속 시즌 표시가 붙습니다. 한 달 더 할 때마다 올라갑니다.',
     '${days}일간 기록한 내용은 <strong>한 번에 내려받을 수</strong> 있습니다. 화면 맨 아래 <strong>[나의 현황]</strong>에서 '
       + '지금까지 몇 번 인증했고 몇 번 놓쳤는지도 확인할 수 있습니다.'
   ].filter(Boolean),
