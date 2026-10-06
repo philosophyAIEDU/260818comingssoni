@@ -265,6 +265,7 @@
         <td><select data-editkakao="${p.id}">
           ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
         </select></td>
+        <td><input type="number" min="1" max="99" value="${p.seasonStreak || 1}" data-editstreak="${p.id}" title="이번 시즌 포함 연속 참여 시즌 수 (2부터 앱에 배지)" style="width:58px"></td>
         <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
         <td class="num">${st.missed}</td>
@@ -290,7 +291,7 @@
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>이름</th><th>이메일</th><th>전화번호</th><th>카톡방</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>이메일</th><th>전화번호</th><th>카톡방</th><th title="연속 참여 시즌 수">연속</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -320,6 +321,16 @@
         try {
           await Store.updateParticipant(el.dataset.editphone, { phone: el.value.trim() });
           msg($('rosterMsg'), '전화번호를 수정했습니다.', 'ok');
+        } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
+        await refreshLite();
+      });
+    });
+    t.querySelectorAll('[data-editstreak]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        const n = Math.max(1, Math.min(99, parseInt(el.value, 10) || 1));
+        try {
+          await Store.updateParticipant(el.dataset.editstreak, { seasonStreak: n });
+          msg($('rosterMsg'), n >= 2 ? `연속 ${n}시즌으로 표시합니다 — 앱 이름 옆에 배지가 붙습니다.` : '연속 표시를 없앴습니다.', 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refreshLite();
       });

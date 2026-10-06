@@ -2020,17 +2020,33 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   const s2Ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await s2Ctx.route('**/js/config.js', s2Route(shift(-6), shift(21), shift(-5)));
   {
-    const parts = [{ id: 'q0', nickname: '멤버하나', email: 'one@ex.com', kakaoJoined: '', createdAt: shift(-6) + 'T00:00:00.000Z' }];
-    await s2Ctx.addInitScript(({ parts }) => {
+    const parts = [
+      { id: 'q0', nickname: '멤버하나', email: 'one@ex.com', kakaoJoined: '', createdAt: shift(-6) + 'T00:00:00.000Z' },
+      { id: 'q1', nickname: '연속둘', email: 'two@ex.com', kakaoJoined: '', seasonStreak: 2, createdAt: shift(-6) + 'T00:00:00.000Z' }
+    ];
+    const subs2 = [{ id: 'q1s', participantId: 'q1', nickname: '연속둘', date: shift(0), sentence: '문장', reflection: '느낌', upvotes: 0, upvotedBy: [],
+      createdAt: `${shift(0)}T05:00:00.000Z`, updatedAt: `${shift(0)}T05:00:00.000Z` }];
+    await s2Ctx.addInitScript(({ parts, subs2 }) => {
       const K = 'comingsoon.reading.s2';
       localStorage.setItem(K + '.participants', JSON.stringify(parts));
-      localStorage.setItem(K + '.submissions', JSON.stringify([]));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs2));
       localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
-    }, { parts });
+    }, { parts, subs2 });
     const ap = await s2Ctx.newPage();
     ap.on('pageerror', (e) => errs.push('pageerror(s2): ' + e.message));
     await ap.goto(BASE + '/index.html');
     await ap.waitForTimeout(600);
+    // 연속 참여 배지: seasonStreak 2인 사람만 이름 옆에 ②
+    const feedNicks = await ap.locator('#socialFeedList .feed-nick').allInnerTexts();
+    t('피드 이름 옆에 연속 배지 ②', feedNicks.some((x) => x.includes('연속둘') && x.includes('②')), feedNicks);
+    await ap.click('#overallTableFold summary');
+    await ap.waitForTimeout(300);
+    const statusCells = await ap.locator('#overallTable tbody td:first-child').allInnerTexts();
+    t('전체 진행현황 표에도 배지가 붙고 1시즌째는 안 붙음',
+      statusCells.some((x) => x.includes('연속둘②')) && !statusCells.some((x) => x.includes('멤버하나②')), statusCells);
+    await ap.fill('#participantSearch', '연속');
+    await ap.waitForTimeout(200);
+    t('이름 고르기 목록에도 배지', /②/.test(await ap.textContent('#participantListbox')));
     await ap.click('#todayRangeFold summary');
     await ap.waitForTimeout(200);
     t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
@@ -2046,6 +2062,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     adp.on('pageerror', (e) => errs.push('pageerror(s2 admin): ' + e.message));
     await adp.goto(BASE + '/admin.html');
     await adp.waitForTimeout(700);
+    await adp.click('button[data-tab="roster"]');
+    await adp.waitForTimeout(300);
+    const streakVals = await adp.locator('#rosterTable input[data-editstreak]').evaluateAll((els) => els.map((e) => e.value));
+    t('운영진 명단에 "연속" 칸이 있고 값이 맞음', streakVals.includes('2') && streakVals.includes('1'), streakVals);
     await adp.click('button[data-tab="report"]');
     await adp.waitForTimeout(300);
     t('운영진 공지문 탭에 발제문 4주치가 보임', (await adp.locator('#promptList textarea').count()) === 4);

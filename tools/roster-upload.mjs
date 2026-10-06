@@ -16,6 +16,7 @@
  *   - 신청자 파일은 커밋하지 않는다(개인정보)
  */
 import { readTable } from './lib/xlsx-lite.mjs';
+import { loadPriorIndexes, seasonStreakFor } from './lib/streak.mjs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -78,6 +79,10 @@ admin.initializeApp({ credential: admin.credential.cert(JSON.parse(key)) });
 const db = admin.firestore();
 const col = (name) => db.collection(collectionName(name));
 
+// 앞 시즌 명단과 맞춰 "몇 시즌째 연속인지"를 같이 넣는다 — 앱에서 이름 옆 ②③ 배지가 된다.
+const prior = await loadPriorIndexes(db, global.CS.SEASONS, seasonId, (prefix, name) => (prefix ? `${prefix}_${name}` : name));
+const streakOf = (r) => seasonStreakFor({ nickname: r.name, email: r.email, phone: r.phone }, prior.map((x) => x.idx));
+
 const existingP = new Set((await col('participants').get()).docs.map((d) => d.data().nickname));
 const existingM = new Set((await col('notifyEmails').get()).docs.map((d) => String(d.data().email || '').toLowerCase()));
 
@@ -92,6 +97,8 @@ if (needHuman.length) console.log(`   ⚠ 동명이인인데 전화번호가 없
 if (invalidEmails.length) console.log(`   ⚠ 이메일 형식이 아닌 값: ${invalidEmails.join(', ')}`);
 const renamed = entries.filter((r, i) => r.name !== raw[i].name);
 if (renamed.length) console.log(`   동명이인 표기: ${renamed.map((r) => r.name).join(', ')}`);
+const cont = addP.filter((r) => streakOf(r) >= 2);
+console.log(`   연속 참여(앞 시즌 ${prior.length}개와 대조): ${cont.length}명` + (cont.length ? ` — ${cont.map((r) => `${r.name}(${streakOf(r)})`).join(', ')}` : ''));
 
 if (!WRITE) {
   console.log('\n(미리보기입니다. 실제로 넣으려면 --write 를 붙이세요)');
@@ -116,6 +123,7 @@ for (const r of addP) {
     outDate: null,
     exemptDates: [],
     note: '',
+    seasonStreak: streakOf(r),   // 이번 시즌 포함 연속 시즌 수. 2 이상이면 앱에 배지
     createdAt: U.nowStamp()
   });
   if (++n >= 400) await flush();

@@ -276,6 +276,18 @@
 
   function comboLabel(p) { return `${p.nickname}${outSuffix(p)}`; }
 
+  /* ── 연속 참여 배지 — 2시즌째부터 이름 옆에 ②③… ──
+   * participants/{id}.seasonStreak (roster-upload 도구가 앞 시즌 명단과 맞춰 넣는다). */
+  const CIRCLED = ['', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+  function streakBadge(p) {
+    const n = p && Number(p.seasonStreak);
+    if (!n || n < 2) return '';
+    const mark = CIRCLED[n] || `(${n})`;
+    return `<span class="season-badge" title="${n}시즌 연속 참여">${mark}</span>`;
+  }
+  const byId = (pid) => participants.find((x) => x.id === pid);
+  const byNick = (nick) => participants.find((x) => x.nickname === nick);
+
   /** 검색어로 후보를 좁힌다. 참여 중인 사람이 위, 아웃은 아래. */
   function comboCandidates(term) {
     const matches = (nick) => nicknameMatches(nick, term);
@@ -292,7 +304,7 @@
     box.innerHTML = comboItems.length
       ? comboItems.map((p, i) => `<li class="combo-option${i === comboActive ? ' active' : ''}"
           role="option" id="combo-opt-${i}" aria-selected="${$('participant').value === p.id}"
-          data-pid="${esc(p.id)}">${esc(comboLabel(p))}</li>`).join('')
+          data-pid="${esc(p.id)}">${esc(comboLabel(p))}${streakBadge(p)}</li>`).join('')
       : '<li class="combo-empty">검색 결과가 없습니다.</li>';
     box.hidden = !comboOpen;
     input.setAttribute('aria-expanded', String(comboOpen));
@@ -720,7 +732,7 @@
     return `<article class="feed-item${isWinner ? ' win' : ''}">
       <div class="feed-main">
         <div class="feed-top">
-          <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}</span>
+          <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}${streakBadge(byId(s.participantId) || byNick(s.nickname))}</span>
           ${late ? '<span class="tag bad">지각</span>' : ''}
           <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         </div>
@@ -844,7 +856,7 @@
           <div class="fame-row" data-fame="${esc(item.nickname)}" role="button" tabindex="0"
             aria-expanded="${isOpen}" title="클릭하면 이 사람이 쓴 인상 깊은 내용과 느낀 점을 볼 수 있어요">
             <span class="medal">${medal}</span>` +
-          `<span class="who">${esc(item.nickname)}</span>` +
+          `<span class="who">${esc(item.nickname)}${streakBadge(byNick(item.nickname))}</span>` +
           `<span class="cnt">${item.rank}등 · ${U.icon('thumb')}${item.votes}</span>
           </div>${isOpen ? fameDetailHtml(item) : ''}</li>`;
       }).join('')
@@ -983,7 +995,7 @@
       const statusTag = `<span class="tag ${rt.cls}">${rt.label}</span>`;
       const todayTag = s.submittedToday ? '<span class="tag ok">인증</span>' : '<span class="tag">-</span>';
       return `<tr>
-        <td>${esc(p.nickname)}</td>
+        <td>${esc(p.nickname)}${streakBadge(p)}</td>
         <td class="num">${s.verified}</td>
         <td class="num">${s.missed}</td>
         <td class="num">${s.rate}%</td>
