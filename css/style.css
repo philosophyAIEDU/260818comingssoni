@@ -861,6 +861,10 @@ button.ghost { background: transparent; }
 /* 회고 세션 안내(종료 후 ~ 다음 시즌 전) */
 .note.retro { text-align: left; line-height: 1.7; }
 
-/* 연속 참여 배지 — 2시즌째부터 이름 옆에 ②③… */
-.season-badge { display: inline-block; margin-left: 4px; color: var(--accent); font-weight: 700; font-size: .95em; vertical-align: 0; cursor: default; }
-.combo-option.active .season-badge, .picker-option.active .season-badge { color: #fff; }
+/* 연속 참여 배지 — 2시즌째부터 이름 옆에 🔥N (끊기지 않았다는 불꽃) */
+.season-badge {
+  display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; padding: 1px 7px 1px 4px;
+  border-radius: 999px; background: #fff1e6; color: #ea580c; border: 1px solid #fed7aa;
+  font-size: .82em; font-weight: 800; line-height: 1.45; vertical-align: 1px; white-space: nowrap; cursor: default;
+}
+.combo-option.active .season-badge { background: rgba(255,255,255,.22); color: #fff; border-color: transparent; }

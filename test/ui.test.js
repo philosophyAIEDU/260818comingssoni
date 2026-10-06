@@ -2044,17 +2044,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     ap.on('pageerror', (e) => errs.push('pageerror(s2): ' + e.message));
     await ap.goto(BASE + '/index.html');
     await ap.waitForTimeout(600);
-    // 연속 참여 배지: seasonStreak 2인 사람만 이름 옆에 ②
+    // 연속 참여 배지: seasonStreak 2인 사람만 이름 옆에 🔥2
     const feedNicks = await ap.locator('#socialFeedList .feed-nick').allInnerTexts();
-    t('피드 이름 옆에 연속 배지 ②', feedNicks.some((x) => x.includes('연속둘') && x.includes('②')), feedNicks);
+    t('피드 이름 옆에 연속 배지 🔥2', feedNicks.some((x) => x.includes('연속둘') && x.includes('🔥 2')), feedNicks);
     await ap.click('#overallTableFold summary');
     await ap.waitForTimeout(300);
     const statusCells = await ap.locator('#overallTable tbody td:first-child').allInnerTexts();
     t('전체 진행현황 표에도 배지가 붙고 1시즌째는 안 붙음',
-      statusCells.some((x) => x.includes('연속둘②')) && !statusCells.some((x) => x.includes('멤버하나②')), statusCells);
+      statusCells.some((x) => x.includes('연속둘🔥 2')) && !statusCells.some((x) => x.includes('멤버하나🔥')), statusCells);
     await ap.fill('#participantSearch', '연속');
     await ap.waitForTimeout(200);
-    t('이름 고르기 목록에도 배지', /②/.test(await ap.textContent('#participantListbox')));
+    t('이름 고르기 목록에도 배지', /🔥 2/.test(await ap.textContent('#participantListbox')));
     await ap.click('#todayRangeFold summary');
     await ap.waitForTimeout(200);
     t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
