@@ -276,14 +276,12 @@
 
   function comboLabel(p) { return `${p.nickname}${outSuffix(p)}`; }
 
-  /* ── 연속 참여 배지 — 2시즌째부터 이름 옆에 ②③… ──
+  /* ── 연속 참여 배지 — 2시즌째부터 이름 옆에 🔥N ──
    * participants/{id}.seasonStreak (roster-upload 도구가 앞 시즌 명단과 맞춰 넣는다). */
-  const CIRCLED = ['', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
   function streakBadge(p) {
     const n = p && Number(p.seasonStreak);
     if (!n || n < 2) return '';
-    const mark = CIRCLED[n] || `(${n})`;
-    return `<span class="season-badge" title="${n}시즌 연속 참여">${mark}</span>`;
+    return `<span class="season-badge" title="${n}시즌 연속 참여">🔥 ${n}</span>`;
   }
   const byId = (pid) => participants.find((x) => x.id === pid);
   const byNick = (nick) => participants.find((x) => x.nickname === nick);

@@ -170,7 +170,7 @@ node tools/roster-diff.mjs <신청자.xlsx> <카톡이름.txt>  # 명단 대조
 
 신청자 명단은 `node tools/roster-upload.mjs <신청자.xlsx> --season s3 --write`로 앱에 바로 넣는다
 (`FIREBASE_SERVICE_ACCOUNT_KEY` 필요 · 동명이인은 "이름(뒷4자리)"로 갈라 넣는다). 이때 앞 시즌 명단과 맞춰
-**연속 참여 시즌 수**(`seasonStreak`)도 넣는다 — 2시즌째부터 앱 이름 옆에 ②③ 배지가 붙는다. 다시 계산하려면
+**연속 참여 시즌 수**(`seasonStreak`)도 넣는다 — 2시즌째부터 앱 이름 옆에 🔥 배지가 붙는다. 다시 계산하려면
 `npm run streak:sync -- --season s3 --write`, 한 명만 고치려면 운영진 [명단 관리]의 "연속" 칸.
 
 시즌 중에는 라이브 날 앱 [오늘의 범위]에 그날 발제문(`weeklyPrompts`)이 자동으로 뜨고, 운영진 [공지문 › 발제문]에서
