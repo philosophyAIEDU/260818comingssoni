@@ -30,6 +30,9 @@ CS.COMMON = {
 
   // 관리자 구글 계정 화이트리스트
   adminEmails: ['warmcomfortforyou@gmail.com', 'comingssoni@gmail.com'],
+  // 🔥 연속 참여 배지를 세기 시작하는 시즌 — 멤버십 첫 시즌(꿈과 돈). 이보다 앞 시즌(챌린지)은 세지 않는다.
+  // 그래서 꿈과 돈 다음 시즌에 이어서 오신 분이 🔥 2, 그다음 시즌까지 이어지면 🔥 3.
+  streakFromSeason: 's2',
 
   // 참고용 원본 구글폼 링크 (안내 문구에만 사용)
   links: {

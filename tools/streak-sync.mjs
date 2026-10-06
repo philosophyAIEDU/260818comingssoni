@@ -35,7 +35,7 @@ admin.initializeApp({ credential: admin.credential.cert(JSON.parse(key)) });
 const db = admin.firestore();
 const colName = (prefix, name) => (prefix ? `${prefix}_${name}` : name);
 
-const prior = await loadPriorIndexes(db, CS.SEASONS, seasonId, colName);
+const prior = await loadPriorIndexes(db, CS.SEASONS, seasonId, colName, CS.COMMON.streakFromSeason);
 const snap = await db.collection(colName(CS.CONFIG.dataPrefix, 'participants')).get();
 const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
