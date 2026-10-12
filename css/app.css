@@ -144,7 +144,7 @@ body.app {
 /* 남의 글 맨 아래 버튼은 테두리 없는 아이콘 버튼(css/style.css의 .feed-acts) — 흰 바탕 버튼 규칙을 비켜 간다 */
 .app .feed-acts > button { background: transparent; }
 .app .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); }
-.app .feed-acts .upvote-btn.voted { background: var(--info-soft); }
+.app .feed-acts .upvote-btn.voted { background: transparent; }
 
 /* 인증 직후 바로가기(js/tabs.js) */
 .app .quick-go { display: flex; gap: 8px; margin-top: 10px; }

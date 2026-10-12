@@ -270,11 +270,15 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const body = it.querySelector('.feed-main').getBoundingClientRect();
     const up = it.querySelector('.upvote-btn').getBoundingClientRect();
     const copy = it.querySelector('.share-btn').getBoundingClientRect();
+    const nick = it.querySelector('.feed-top').getBoundingClientRect();
+    const ava = it.querySelector('.post-ava').getBoundingClientRect();
     return { below: acts.top >= body.bottom - 1, sameRow: Math.abs(up.top - copy.top) < 2, upFirst: up.left < copy.left,
-      bodyW: body.width, itemW: it.getBoundingClientRect().width };
+      bodyRight: Math.round(it.getBoundingClientRect().right - body.right), lineUp: Math.abs(body.left - nick.left) < 1.5,
+      avaLeft: ava.right <= body.left };
   });
   t('전체 보기: 버튼은 본문 아래 한 줄(엄지척 → 복사)', gridActs.below && gridActs.sameRow && gridActs.upFirst, gridActs);
-  t('전체 보기: 본문이 글 폭을 통째로 씀', gridActs.bodyW >= gridActs.itemW - 30, gridActs);
+  t('전체 보기: 스레드처럼 동그라미는 왼쪽 칸, 이름·본문은 같은 선에서 오른쪽 끝까지',
+    gridActs.lineUp && gridActs.avaLeft && gridActs.bodyRight <= 1, gridActs);
   // 회귀 테스트: 그리드 카드 안에서도(넓은 화면이어도 카드 자체가 좁아서) 작성자 이름이
   // 폭 0으로 눌려 안 보이던 문제가 있었다 — 첫 카드의 이름이 실제로 보이는 너비를 갖는지 확인.
   const firstNickBox = await feedAllPage.locator('#allFeedList .feed-nick').first().boundingBox();
@@ -332,13 +336,15 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
         sameRow: Math.abs(copy.top - up.top) < 2,
         copyRight: copy.left > up.left,
         below: up.top >= main.bottom - 1,
-        bodyW: Math.round(main.width),
-        itemW: Math.round(it.getBoundingClientRect().width),
+        lineUp: Math.abs(main.left - it.querySelector('.feed-top').getBoundingClientRect().left) < 1.5
+          && Math.abs(up.left - main.left) < 12,
+        bodyRight: Math.round(it.getBoundingClientRect().right - main.right),
       };
     });
     t('두 버튼이 본문 아래 한 줄로 나란히', acts.sameRow && acts.below, acts);
     t('엄지척 다음에 복사', acts.copyRight, acts);
-    t('본문이 글 폭을 통째로 씀(오른쪽 버튼 기둥 없음)', acts.bodyW >= acts.itemW - 30, acts);
+    t('스레드처럼 이름·본문·버튼이 같은 왼쪽 선, 본문은 오른쪽 끝까지(버튼 기둥 없음)',
+      acts.lineUp && acts.bodyRight <= 1, acts);
     t('새로고침·날짜 이동 버튼도 선 아이콘',
       (await page.locator('#feedRefresh svg.ico').count()) === 1
       && (await page.locator('#feedPrevDate svg.ico').count()) === 1
@@ -2204,7 +2210,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       return { bodyW: Math.round(body.getBoundingClientRect().width), mid,
         fs: parseFloat(getComputedStyle(body).fontSize), quote: it.querySelector('.feed-quote').textContent };
     });
-    t('휴대폰: 남의 글 본문이 화면 폭 대부분을 씀(360px 폰에서 300px 이상)', read.bodyW >= 300, read);
+    t('휴대폰: 남의 글 본문 폭이 넉넉함(360px 폰에서 270px 이상 — 예전 205px)', read.bodyW >= 270, read);
     t('휴대폰: 한글 단어가 줄 끝에서 중간에 끊기지 않음', read.mid === 0, read);
     t('휴대폰: 남의 글 본문 글자 15px 이상', read.fs >= 15, read);
     t('따옴표를 쳐서 올린 문장에 따옴표가 두 겹으로 붙지 않음', read.quote === '돈을 벌지 말고 신용을 벌어라.', read.quote);
