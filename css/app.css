@@ -19,6 +19,8 @@ body.app {
   --shadow: none;
   --radius: 16px;
   --tabbar-h: 62px;
+  --text-2: #333c52;          /* 안내·공지 본문 — 제목만큼 진하진 않게, 회색보다는 또렷하게 */
+  --placeholder: #a2a9b8;     /* 입력칸 속 회색 예시 글씨 */
   background: var(--bg);
 }
 @media (prefers-color-scheme: dark) {
@@ -33,6 +35,8 @@ body.app {
     --text-faint: #6f7a95;
     --accent: #ffe600;
     --navy: #ffe600;
+    --text-2: #cdd3e3;
+    --placeholder: #5f6a86;
   }
 }
 
@@ -42,7 +46,7 @@ body.app {
   padding: 10px 0; margin-bottom: 16px;
 }
 .app .brand-logo { height: 34px; border-radius: 8px; }
-.app .brand h1 { font-size: 16px; font-weight: 800; color: var(--text); }
+.app .brand h1 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
 .app .brand p { color: var(--text-faint); font-size: 12px; }
 .app .navlinks a {
   color: var(--text-dim); background: transparent; border-color: var(--border-strong); font-size: 12.5px; padding: 5px 12px;
@@ -55,12 +59,55 @@ body.app {
 
 /* ── 카드 ── */
 .app .card { box-shadow: none; border-radius: var(--radius); padding: 20px; }
-.app .card > h2, .app .feed-head h2 { font-size: 16.5px; font-weight: 800; letter-spacing: -.02em; }
-.app .card > .hint { font-size: 12.5px; }
+.app .card > h2, .app .feed-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
 .app .intro { background: var(--surface); }
 .app .intro-cover { box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
 .app .rule-key { background: var(--surface-2); border-color: transparent; }
 .app .fold > summary { border-radius: 10px; }
+
+/* ── 읽는 글씨 ── 안내·공지·예시 문구
+   전에는 안내문 대부분이 12~13px 연회색이라 폰에서 눈을 찡그려야 읽혔다.
+   한 문장 이상인 글은 14px 이상, 줄간격 1.7, 회색 대신 한 단계 진한 본문색(--text-2)으로.
+   굵은 글씨는 700 대신 600 + 본문색 — 군데군데 시커멓게 박히지 않고 차분하게 강조된다. */
+.app .card > .hint, .app .feed-card .hint { font-size: 14px; line-height: 1.7; color: var(--text-dim); }
+.app .card > .hint strong, .app .form-note strong, .app .rule-key strong,
+.app .card ul.muted strong, .app .intro-body strong { font-weight: 650; color: var(--text); }
+
+/* 책 소개 */
+.app .intro-body h2 { font-weight: 700; letter-spacing: -.025em; }
+.app .intro-body .tagline { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.app .intro-body .author { font-size: 13.5px; font-weight: 400; color: var(--text-dim); }
+.app .intro-body .meta { font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
+.app .intro-body .fineprint { font-size: 13px; line-height: 1.6; color: var(--text-faint); }
+.app .intro-body .desc { font-size: 14px; line-height: 1.75; color: var(--text-2); letter-spacing: -.005em; }
+
+/* 규칙 — 마감 한 줄 + 나머지 규칙 목록 */
+.app .rule-key { font-size: 14.5px; line-height: 1.7; color: var(--text-2); padding: 13px 15px; border-radius: 12px; }
+.app .card ul.muted {
+  font-size: 14.5px; line-height: 1.75; color: var(--text-2); padding-left: 18px; letter-spacing: -.005em;
+}
+.app .card ul.muted li + li { margin-top: 12px; }
+.app .card ul.muted li::marker { color: var(--text-faint); }
+.app .fold > summary { font-size: 14px; padding: 11px 14px; border-radius: 12px; }
+
+/* 인증 폼 — 질문(라벨)은 또렷하게, 덧붙인 설명은 그 아래 한 줄로 */
+.app .field label { font-size: 15px; font-weight: 650; line-height: 1.5; letter-spacing: -.015em; }
+.app .field .sub {
+  display: block; margin: 3px 0 0; font-size: 13px; font-weight: 400; line-height: 1.55;
+  color: var(--text-faint); letter-spacing: -.005em;
+}
+.app .field .hint { font-size: 13.5px; line-height: 1.6; }
+.app input::placeholder, .app textarea::placeholder { color: var(--placeholder); letter-spacing: -.005em; }
+.app input::placeholder { font-size: 14px; }
+.app textarea::placeholder { font-size: 15px; line-height: 1.7; }
+.app #sentence, .app #reflection { font-size: 16px; line-height: 1.7; padding: 14px 15px; }
+.app .form-note { font-size: 14px; line-height: 1.75; color: var(--text-dim); }
+
+/* 공지·알림 상자, 라이브 날 발제문 */
+.app .note { font-size: 14px; line-height: 1.65; border-radius: 12px; padding: 13px 15px; }
+.app .prompt-box { padding: 14px 16px; border-radius: 12px; }
+.app .prompt-box li { font-size: 15px; line-height: 1.7; margin: 8px 0; color: var(--text); }
+.app .prompt-box .muted { font-size: 13.5px; line-height: 1.6; }
 
 /* ── 오늘 띠 ── 큰 노란 상자 대신 흰 카드 + 노란 포인트 선 */
 .app .banner {
@@ -68,12 +115,14 @@ body.app {
   border: 1px solid var(--border); border-left: 4px solid var(--yellow);
   box-shadow: none; border-radius: var(--radius);
 }
-.app .banner .big { color: var(--text); font-size: 22px; font-weight: 800; }
+.app .banner .big { color: var(--text); font-size: clamp(17px, 5.2vw, 22px); font-weight: 700; white-space: nowrap; }
 .app .banner .lbl { color: var(--text-faint); font-weight: 600; letter-spacing: .02em; }
 .app .banner .sep { width: 1px; background: var(--border); }
 .app .banner .fold > summary { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
 .app .banner .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
 .app .banner .today-range, .app .banner .today-range-day { color: var(--text); }
+.app .banner .today-range { font-size: 15px; line-height: 1.7; }
+.app .banner .today-range-day { font-size: 14px; font-weight: 650; }
 .app .banner .today-range-nav button { color: var(--text-dim); border-color: var(--border-strong); }
 
 /* ── 입력·버튼 ── */
@@ -200,4 +249,15 @@ body.app {
   .app .compact-controls > div { min-width: 0; }
   .app .compact-controls > div:last-child { grid-column: 1 / -1; }
   .app .compact-controls select { width: 100%; padding: 0 8px; font-size: 13px; }
+
+  /* 책 소개 — 표지 옆 좁은 칸에 기간·안내·소개글까지 몰려 한 줄에 열 글자 남짓이었다.
+     표지 옆에는 제목·부제·저자만, 기간·안내·소개글은 그 아래 카드 폭 전체로 */
+  .app .intro { grid-template-columns: 76px minmax(0, 1fr); column-gap: 14px; row-gap: 0; align-items: start; }
+  .app .intro-body { display: contents; }
+  .app .intro-cover { grid-column: 1; grid-row: 1 / span 4; align-self: start; }
+  .app .intro-body > h2, .app .intro-body > .tagline, .app .intro-body > .author { grid-column: 2; }
+  .app .intro-body > .meta, .app .intro-body > .fineprint, .app .intro-body > .desc { grid-column: 1 / -1; }
+  .app .intro-body > .meta { margin-top: 14px; }
+  .app .intro-body > .meta + .meta { margin-top: 0; }
+  .app .intro-body > .desc { margin-top: 6px; }
 }

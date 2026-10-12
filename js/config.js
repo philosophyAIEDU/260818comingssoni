@@ -65,7 +65,7 @@ CS.SEASONS = [{
   headLinks: [],
   // '읽은 문장' 입력칸에 흐리게 보이는 예시
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 독서 후 나에게 어떻게 적용할지 적어주세요.',
-  sentencePlaceholder: 'ex) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. '
+  sentencePlaceholder: '예) 사람들은 왜 프로세스에 이끌릴까. 이는 그 사람만이 가진 ‘왜’ 때문이다. '
     + '흔들리지 않는 그 사람의 ‘왜’와 ‘가치관’에 반하고, 자신도 이를 닮고 싶어 한다. '
     + '그렇기 때문에 기꺼이 프로세스 이코노미의 참가자가 되어주고, 나아가 세컨드 크리에이터가 '
     + '되어 응원해주는 것이다. - 185쪽',
@@ -160,8 +160,8 @@ CS.SEASONS = [{
   rulesHeading: '안내 · 멤버십 규칙',
   // 일정표 안내: "오늘 범위에서 와닿은 한 문장 + 내 브랜드/일에 적용할 점"
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 읽은 내용을 내 브랜드·일에 어떻게 적용할지 적어주세요.',
-  sentencePlaceholder: 'ex) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
-    + '끝에 쪽수를 붙여 주세요. (예: … - 47쪽)',
+  sentencePlaceholder: '예) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
+    + '끝에 쪽수를 붙여 주세요. (… - 47쪽)',
   headLinks: [
     { label: '독서 멤버십 OT 보기', icon: 'play',
       url: 'https://youtu.be/ny6lJ-8PMXI' },
@@ -316,8 +316,8 @@ CS.SEASONS = [{
     '28일간 기록한 내용은 <strong>한 번에 내려받을 수</strong> 있습니다. 화면 맨 아래 <strong>[나의 진행 현황]</strong>에서 '
       + '지금까지 몇 번 인증했고 몇 번 놓쳤는지도 확인할 수 있습니다.'
   ].filter(Boolean),
-  sentencePlaceholder: 'ex) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
-    + '끝에 쪽수를 붙여 주세요. (예: … - 47쪽)',
+  sentencePlaceholder: '예) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
+    + '끝에 쪽수를 붙여 주세요. (… - 47쪽)',
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 읽은 내용을 내 브랜드·일에 어떻게 적용할지 적어주세요.',
   startDate: '2026-10-21',
   endDate: '2026-11-17',
