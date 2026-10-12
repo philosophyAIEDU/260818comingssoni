@@ -706,7 +706,7 @@
         <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
       </h4>
       <dl>
-        <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
+        <dt>인상 깊은 내용</dt><dd class="quote">${esc(CS.Post.stripQuotes(s.sentence))}</dd>
         <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
       </dl>
     </div>`;
@@ -756,10 +756,15 @@
   }
 
   /* 피드는 2분마다(+화면 복귀 시) 자동으로 다시 그려지는데, 그때마다 전체 목록을 새 HTML로
-   * 통째로 갈아 끼우다 보니 "느낀 점 보기"로 펼쳐 둔 <details>도 매번 닫힌 상태로 되돌아갔다
+   * 통째로 갈아 끼우다 보니 [더 보기]로 펼쳐 둔 긴 글도 매번 접힌 상태로 되돌아갔다
    * — 남의 글을 읽던 중 2분이 지나거나 다른 앱을 갔다 오면 저절로 접혀 버리는 문제였다.
-   * 펼쳐 둔 글의 id를 따로 기억해 뒀다가, 다시 그릴 때 그대로 열어 둔다. */
+   * 펼쳐 둔 글의 id를 따로 기억해 뒀다가, 다시 그릴 때 그대로 열어 둔다(CS.Post.fit). */
   const feedOpenIds = new Set();
+  // 긴 글 접기는 화면에 보이는 폭으로 재므로, 피드 탭이 열리거나 화면 폭이 바뀌면 다시 잰다.
+  const refitFeed = () => CS.Post.fit($('socialFeedList'), feedOpenIds);
+  document.addEventListener('cs:tab', refitFeed);
+  let refitTimer = null;
+  window.addEventListener('resize', () => { clearTimeout(refitTimer); refitTimer = setTimeout(refitFeed, 150); });
 
   function bindUpvoteButtons(container) {
     if (READONLY) return; // 지난 시즌을 들여다보는 중 — 기록을 바꾸지 않는다
@@ -783,16 +788,6 @@
     });
   }
 
-  /** 펼침 상태(feedOpenIds)를 계속 따라가도록, 열고 닫을 때마다 기억해 둔다. */
-  function bindFeedDetails(container) {
-    container.querySelectorAll('.feed-more').forEach((el) => {
-      el.addEventListener('toggle', () => {
-        if (el.open) feedOpenIds.add(el.dataset.subid);
-        else feedOpenIds.delete(el.dataset.subid);
-      });
-    });
-  }
-
   function renderFeedItem(s, isWinner, hasUpvoted) {
     const own = isOwnSubmission(s);
     const late = U.isLate(s.date, s.createdAt);
@@ -800,30 +795,27 @@
     const btnAttr = READONLY
       ? 'disabled title="지난 시즌 기록이라 추천할 수 없습니다"'
       : (own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '');
-    // 왼쪽에는 글(이름·시간·본문)만, 오른쪽에는 버튼만 모아 둔다 — 본문이 버튼 사이로 파고들지 않게.
-    return `<article class="feed-item${isWinner ? ' win' : ''}">
-      <div class="feed-main">
+    // 스레드처럼 한 글이 폭을 통째로 쓴다 — 이름 줄 / 본문 / 맨 아래 버튼 한 줄 (js/post.js)
+    return `<article class="feed-item post${isWinner ? ' win' : ''}">
+      <div class="post-head">
+        ${CS.Post.avatar(s.nickname)}
         <div class="feed-top">
           <span class="feed-nick">${isWinner ? '👑 ' : ''}${esc(s.nickname)}${streakBadge(byId(s.participantId) || byNick(s.nickname))}</span>
           ${late ? '<span class="tag bad">지각</span>' : ''}
-          <span class="feed-time">${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+          <span class="feed-time" title="${esc(U.stampLabel(s.updatedAt || s.createdAt))}">${esc(CS.Post.when(s.updatedAt || s.createdAt))}</span>
         </div>
-        <p class="feed-quote">“${esc(s.sentence)}”</p>
-        <details class="feed-more" data-subid="${esc(s.id)}"${feedOpenIds.has(s.id) ? ' open' : ''}>
-          <summary>느낀 점 보기</summary>
-          <dl class="body">
-            <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
-          </dl>
-        </details>
+      </div>
+      <div class="feed-main">
+        ${CS.Post.body(s, feedOpenIds.has(s.id))}
       </div>
       <div class="feed-acts">
+        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
+          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
           data-winner="${isWinner ? '1' : ''}"
           aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
-        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
-          ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
       </div>
     </article>`;
   }
@@ -878,7 +870,7 @@
     feedList.innerHTML = visible.map((s) =>
       renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
     bindUpvoteButtons(feedList);
-    bindFeedDetails(feedList);
+    CS.Post.fit(feedList, feedOpenIds);
     CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: U.shortLabel(date) });
 
     const remaining = shown.length - visible.length;
@@ -912,7 +904,7 @@
       </div>
       <div class="fame-entry">
         <div class="fame-entry-label">인상 깊은 내용</div>
-        <p class="quote">“${esc(item.sentence)}”</p>
+        <blockquote class="quote">${esc(CS.Post.stripQuotes(item.sentence))}</blockquote>
         <div class="fame-entry-label">느낀 점</div>
         <p>${esc(item.reflection)}</p>
       </div>

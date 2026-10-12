@@ -254,38 +254,27 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   // 한 줄에 4장이 들어가면 카드가 좁아 본문이 열 글자씩 끊긴다 — 넓은 화면에서도 최대 3장.
   await feedAllPage.setViewportSize({ width: 1440, height: 900 });
   await feedAllPage.waitForTimeout(200);
-  const gridCols = await feedAllPage.evaluate(() =>
-    getComputedStyle(document.querySelector('.all-feed-grid')).gridTemplateColumns.split(' ').length);
-  t('넓은 화면에서도 한 줄에 최대 3장', gridCols === 3, gridCols);
-  const cardHeights = await feedAllPage.evaluate(() =>
-    Array.from(document.querySelectorAll('.all-feed-grid .feed-item')).map((e) => Math.round(e.getBoundingClientRect().height)));
-  t('카드 높이가 서로 같음(글 길이와 무관)', new Set(cardHeights).size === 1, cardHeights);
-  const bodyScrolls = await feedAllPage.evaluate(() =>
-    Array.from(document.querySelectorAll('.all-feed-grid .feed-body'))
-      .every((e) => getComputedStyle(e).overflowY === 'auto'));
-  t('긴 글은 카드마다 따로 스크롤됨', bodyScrolls);
-  t('인상 깊은 내용에 항목 라벨이 붙음',
-    (await feedAllPage.locator('.all-feed-grid .feed-label').first().textContent()).includes('인상 깊은 내용'));
-  await feedAllPage.locator('.all-feed-grid .feed-more summary').first().click();
-  await feedAllPage.waitForTimeout(200);
-  t('느낀 점은 별도 패널로 구분되어 보임',
-    (await feedAllPage.locator('.all-feed-grid .feed-more .body.reflect').first().count()) === 1);
-  // 좁은 그리드 카드에서는 버튼을 세로로 쌓아(엄지척 위 / 복사 아래) 본문 폭을 넓힌다.
-  const gridActs = await feedAllPage.locator('.all-feed-grid .feed-acts').first().evaluate((el) => {
-    const btns = [...el.querySelectorAll('button')];
-    const copy = btns.find((b) => b.classList.contains('share-btn'));
-    const up = btns.find((b) => b.classList.contains('upvote-btn'));
-    return {
-      col: getComputedStyle(el).flexDirection.startsWith('column'),
-      copyBelow: copy.getBoundingClientRect().top > up.getBoundingClientRect().top,
-      actsW: el.getBoundingClientRect().width,
-      bodyW: el.closest('.feed-item').querySelector('.feed-main').getBoundingClientRect().width,
-    };
+  // 스레드처럼 한 줄에 한 글 — 넓은 화면에서도 카드 여러 장을 나란히 놓아 본문을 좁히지 않는다
+  const faLayout = await feedAllPage.evaluate(() => {
+    const items = [...document.querySelectorAll('.all-feed-grid .feed-item')].map((e) => e.getBoundingClientRect());
+    const list = document.querySelector('#allFeedList').getBoundingClientRect();
+    return { lefts: new Set(items.map((r) => Math.round(r.left))).size, listW: Math.round(list.width) };
   });
-  t('전체 보기 카드는 버튼을 세로로 쌓음', gridActs.col, gridActs);
-  t('복사 버튼이 엄지척 아래에 놓임', gridActs.copyBelow, gridActs);
-  t('버튼단이 한 칸 폭이라 본문이 훨씬 넓음',
-    gridActs.actsW < 60 && gridActs.bodyW > gridActs.actsW * 4, gridActs);
+  t('전체 보기는 넓은 화면에서도 한 줄에 한 글(스레드형)', faLayout.lefts === 1, faLayout);
+  t('전체 보기 글 폭이 읽기 좋은 너비(≤ 680px)로 가운데', faLayout.listW <= 680 && faLayout.listW >= 500, faLayout);
+  t('전체 보기에서도 느낀 점이 바로 보임(펼치지 않아도)',
+    await feedAllPage.locator('.all-feed-grid .feed-reflect').first().isVisible());
+  // 버튼(엄지척·복사)은 글 아래 한 줄 — 본문 옆에 세로 기둥을 세워 폭을 빼앗지 않는다
+  const gridActs = await feedAllPage.locator('.all-feed-grid .feed-item').first().evaluate((it) => {
+    const acts = it.querySelector('.feed-acts').getBoundingClientRect();
+    const body = it.querySelector('.feed-main').getBoundingClientRect();
+    const up = it.querySelector('.upvote-btn').getBoundingClientRect();
+    const copy = it.querySelector('.share-btn').getBoundingClientRect();
+    return { below: acts.top >= body.bottom - 1, sameRow: Math.abs(up.top - copy.top) < 2, upFirst: up.left < copy.left,
+      bodyW: body.width, itemW: it.getBoundingClientRect().width };
+  });
+  t('전체 보기: 버튼은 본문 아래 한 줄(엄지척 → 복사)', gridActs.below && gridActs.sameRow && gridActs.upFirst, gridActs);
+  t('전체 보기: 본문이 글 폭을 통째로 씀', gridActs.bodyW >= gridActs.itemW - 30, gridActs);
   // 회귀 테스트: 그리드 카드 안에서도(넓은 화면이어도 카드 자체가 좁아서) 작성자 이름이
   // 폭 0으로 눌려 안 보이던 문제가 있었다 — 첫 카드의 이름이 실제로 보이는 너비를 갖는지 확인.
   const firstNickBox = await feedAllPage.locator('#allFeedList .feed-nick').first().boundingBox();
@@ -293,25 +282,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     !!firstNickBox && firstNickBox.width > 10, firstNickBox);
   await feedAllPage.close();
 
-  // ── 인증 피드: 인상 깊은 구절은 항상 보이고, 느낀 점만 펼쳐야 보임 ──
+  // ── 인증 피드(스레드형): 인상 깊은 구절과 느낀 점이 둘 다 바로 보인다 ──
   const bomtolQuoteCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
   t('인상 깊은 구절은 펼치지 않아도 바로 보임',
     (await bomtolQuoteCard.locator('.feed-quote').textContent()).includes('읽는다는 건 버티는 일이다'));
-  t('느낀 점 영역은 기본적으로 접혀 있음', !(await bomtolQuoteCard.locator('.feed-more').evaluate((el) => el.open)));
-  t('접힌 상태에서는 느낀 점 텍스트가 화면에 노출되지 않음',
-    !(await bomtolQuoteCard.locator('dd').first().isVisible()));
-  await bomtolQuoteCard.locator('.feed-more summary').click();
-  await page.waitForTimeout(150);
-  t('느낀 점 보기를 누르면 느낀 점이 펼쳐짐',
-    (await bomtolQuoteCard.locator('.feed-more dd').first().textContent()).includes('오늘은 30분만 읽었다'));
-
-  // 회귀 테스트: 2분마다(또는 다른 화면에 갔다 돌아올 때) 피드가 자동으로 다시 그려지는데,
-  // 그때 펼쳐 둔 "느낀 점"이 저절로 접혀 버리던 문제가 있었다 — [🔄 새로고침]도 같은 방식으로
-  // 목록을 다시 그리므로, 그 이후에도 열린 상태가 유지되는지로 검증한다.
-  await page.click('#feedRefresh');
-  await page.waitForTimeout(400);
-  t('피드가 다시 그려져도 펼쳐 둔 느낀 점은 계속 열려 있음',
-    await bomtolQuoteCard.locator('.feed-more').evaluate((el) => el.open));
+  t('느낀 점도 누르지 않고 바로 보임',
+    await bomtolQuoteCard.locator('.feed-reflect').isVisible()
+    && (await bomtolQuoteCard.locator('.feed-reflect').textContent()).includes('오늘은 30분만 읽었다'));
+  t('짧은 글에는 [더 보기]가 붙지 않음', !(await bomtolQuoteCard.locator('.post-more').isVisible()));
+  t('작성자 머리글자 동그라미가 붙음',
+    (await bomtolQuoteCard.locator('.post-ava').textContent()).trim() === '밤');
 
   // ── 엄지척: 본인 글은 추천 불가, 남의 글은 추천/취소 가능 (날짜별 보기, 현재 선택: 밤톨) ──
   const bamtolCard = page.locator('#socialFeedList .feed-item', { hasText: '밤톨' });
@@ -344,20 +324,21 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       (await card.locator('.share-btn svg.ico').count()) === 1
       && !(await card.locator('.share-btn').textContent()).includes('\u{1F4CB}'));
     t('엄지척 버튼도 선 아이콘', (await card.locator('.upvote-btn svg.ico').count()) === 1);
-    const acts = await card.locator('.feed-acts').evaluate((el) => {
-      const copy = el.querySelector('.share-btn').getBoundingClientRect();
-      const up = el.querySelector('.upvote-btn').getBoundingClientRect();
-      const main = el.closest('.feed-item').querySelector('.feed-main').getBoundingClientRect();
+    const acts = await card.evaluate((it) => {
+      const copy = it.querySelector('.share-btn').getBoundingClientRect();
+      const up = it.querySelector('.upvote-btn').getBoundingClientRect();
+      const main = it.querySelector('.feed-main').getBoundingClientRect();
       return {
-        col: getComputedStyle(el).flexDirection.startsWith('column'),
-        copyBelow: copy.top > up.top,
-        actsW: Math.round(el.getBoundingClientRect().width),
+        sameRow: Math.abs(copy.top - up.top) < 2,
+        copyRight: copy.left > up.left,
+        below: up.top >= main.bottom - 1,
         bodyW: Math.round(main.width),
+        itemW: Math.round(it.getBoundingClientRect().width),
       };
     });
-    t('두 버튼이 세로로 쌓임', acts.col, acts);
-    t('복사가 엄지척 아래에 놓임', acts.copyBelow, acts);
-    t('버튼단이 한 칸 폭이라 본문이 넓게 남음', acts.actsW < 60 && acts.bodyW > acts.actsW * 5, acts);
+    t('두 버튼이 본문 아래 한 줄로 나란히', acts.sameRow && acts.below, acts);
+    t('엄지척 다음에 복사', acts.copyRight, acts);
+    t('본문이 글 폭을 통째로 씀(오른쪽 버튼 기둥 없음)', acts.bodyW >= acts.itemW - 30, acts);
     t('새로고침·날짜 이동 버튼도 선 아이콘',
       (await page.locator('#feedRefresh svg.ico').count()) === 1
       && (await page.locator('#feedPrevDate svg.ico').count()) === 1
@@ -2191,6 +2172,55 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await m.click('#formMsg .quick-go [data-go="me"]');
     await m.waitForTimeout(200);
     t('휴대폰: 바로가기로 [내 현황] — 이름을 골랐으니 내 기록 카드가 보임', await vis('#myCard') && !(await vis('#myEmpty')));
+    // ── 남의 글 읽기(스레드형) — 360px 폰에서 본문 폭·줄바꿈·긴 글 접기 ──
+    await m.click('#tabbar [data-go="certify"]');
+    await m.waitForTimeout(150);
+    const LONG = '오늘 읽은 부분은 순서를 거꾸로 하라고 말한다. 매출보다 신용이 먼저라는 이야기다.\n\n'
+      + '그래서 이번 주에는 내 강의 소개 페이지에서 무료로 먼저 보여 줄 것을 세 가지 정해 보려고 한다. '
+      + '첫째, 강의 첫 회차 전체 공개. 둘째, 수강생 후기 원문 그대로. 셋째, 내가 실패했던 기록.\n\n'
+      + '이게 신용을 쌓는 첫걸음이 될 수 있을까? 해 보고 다음 주에 다시 적어 보겠다. 끝까지 읽어 주셔서 고맙습니다.';
+    await m.fill('#sentence', '“돈을 벌지 말고 신용을 벌어라.”');
+    await m.fill('#reflection', LONG);
+    await m.click('#submitBtn');
+    await m.waitForTimeout(500);
+    await m.click('#tabbar [data-go="feed"]'); // 숨어 있던 탭이 열리는 순간 긴 글 접기를 다시 잰다
+    await m.waitForTimeout(250);
+    const mine = m.locator('#socialFeedList .feed-item', { hasText: '커밍쏜' });
+    const read = await mine.evaluate((it) => {
+      const body = it.querySelector('.post-body');
+      let mid = 0;
+      const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+      const r = document.createRange();
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        let prev = null;
+        for (let i = 0; i < n.length; i++) {
+          r.setStart(n, i); r.setEnd(n, i + 1);
+          const rc = r.getClientRects()[0];
+          if (!rc) continue;
+          if (prev !== null && rc.top > prev + 2 && /[가-힣]/.test(n.data[i - 1]) && /[가-힣]/.test(n.data[i])) mid++;
+          prev = rc.top;
+        }
+      }
+      return { bodyW: Math.round(body.getBoundingClientRect().width), mid,
+        fs: parseFloat(getComputedStyle(body).fontSize), quote: it.querySelector('.feed-quote').textContent };
+    });
+    t('휴대폰: 남의 글 본문이 화면 폭 대부분을 씀(360px 폰에서 300px 이상)', read.bodyW >= 300, read);
+    t('휴대폰: 한글 단어가 줄 끝에서 중간에 끊기지 않음', read.mid === 0, read);
+    t('휴대폰: 남의 글 본문 글자 15px 이상', read.fs >= 15, read);
+    t('따옴표를 쳐서 올린 문장에 따옴표가 두 겹으로 붙지 않음', read.quote === '돈을 벌지 말고 신용을 벌어라.', read.quote);
+    t('휴대폰: 긴 글은 접히고 [더 보기]가 붙음(숨은 탭에서 그려졌어도)', await mine.locator('.post-more').isVisible());
+    await mine.locator('.post-more').click();
+    await m.waitForTimeout(150);
+    t('[더 보기]를 누르면 글 끝까지 펼쳐짐',
+      !(await mine.locator('.post-more').isVisible()) && await mine.locator('.post-body').evaluate((b) => b.scrollHeight <= b.clientHeight + 1));
+    // 회귀 테스트: 피드는 2분마다(또는 화면 복귀 시) 통째로 다시 그려지는데, 그때 펼쳐 둔 글이
+    // 저절로 접혀 버리던 문제가 있었다 — [새로고침]도 같은 경로로 다시 그린다.
+    await m.click('#feedRefresh');
+    await m.waitForTimeout(400);
+    t('피드가 다시 그려져도 펼쳐 둔 긴 글은 계속 펼쳐져 있음',
+      !(await mine.locator('.post-more').isVisible()) && await mine.locator('.post-body').evaluate((b) => b.classList.contains('open')));
+    await m.click('#tabbar [data-go="me"]');
+    await m.waitForTimeout(150);
     const mo = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     t('휴대폰: 탭 화면에서도 가로 오버플로 없음', mo <= 1, mo);
     const m2 = await ctx.newPage();

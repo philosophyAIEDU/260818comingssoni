@@ -92,6 +92,11 @@ body.app {
 /* 숫자 타일 */
 .app .stat { background: var(--surface-2); border-color: transparent; border-radius: 12px; }
 
+/* 남의 글 맨 아래 버튼은 테두리 없는 아이콘 버튼(css/style.css의 .feed-acts) — 흰 바탕 버튼 규칙을 비켜 간다 */
+.app .feed-acts > button { background: transparent; }
+.app .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); }
+.app .feed-acts .upvote-btn.voted { background: var(--info-soft); }
+
 /* 인증 직후 바로가기(js/tabs.js) */
 .app .quick-go { display: flex; gap: 8px; margin-top: 10px; }
 .app .quick-go button { flex: 1 1 0; min-height: 42px; font-size: 13.5px; }
@@ -124,7 +129,17 @@ body.app {
   .app .intro-body .desc.open { display: block; -webkit-line-clamp: unset; }
 
   /* 피드는 탭 하나를 통째로 쓰니 안쪽 스크롤 없이 길게 */
-  .app .feed-scroll { max-height: none; }
+  .app .feed-scroll { max-height: none; padding-right: 0; }
+
+  .app .card { padding: 16px; }
+
+  /* [내 현황] 지난 기록 — 상자 안 상자 대신 얇은 선으로 나누고, 안쪽 스크롤 없이 길게 */
+  .app .entry-list { max-height: none; overflow: visible; gap: 0; }
+  .app .entry-list .entry {
+    background: transparent; border: none; border-radius: 0; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app .entry-list .entry:last-child { border-bottom: none; }
 
   .tabbar {
     display: grid; grid-template-columns: repeat(4, 1fr);
@@ -171,4 +186,18 @@ body.app {
   .app #myCard .stat { padding: 10px 4px; text-align: center; }
   .app #myCard .stat .n { font-size: 18px; }
   .app #myCard .stat .k { font-size: 11px; }
+}
+
+@media (max-width: 640px) {
+  /* 글을 읽는 화면(피드·전체 보기)은 카드 상자를 화면 끝까지 펴서 본문 폭을 최대로 —
+     상자 테두리·바깥 여백에 빼앗기던 폭(양쪽 30px 남짓)을 본문에 돌려준다(.wrap 좌우 여백이 13px) */
+  .app .feed-card {
+    margin-left: -13px; margin-right: -13px; border-radius: 0;
+    border-left: none; border-right: none; padding: 18px 16px 6px;
+  }
+  /* 전체 보기 위쪽 고르기 칸 — 한 칸씩 세로로 쌓여 첫 글이 화면 아래로 밀려나던 것을 두 줄로 */
+  .app .compact-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .app .compact-controls > div { min-width: 0; }
+  .app .compact-controls > div:last-child { grid-column: 1 / -1; }
+  .app .compact-controls select { width: 100%; padding: 0 8px; font-size: 13px; }
 }
