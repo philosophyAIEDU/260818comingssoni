@@ -2217,9 +2217,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('휴대폰: 남의 글 본문 폭이 넉넉함(360px 폰에서 270px 이상 — 예전 205px)', read.bodyW >= 270, read);
     t('휴대폰: 한글 단어가 줄 끝에서 중간에 끊기지 않음', read.mid === 0, read);
     t('휴대폰: 남의 글 본문 글자 15px 이상', read.fs >= 15, read);
-    t('스레드 모바일과 같은 치수: 본문 15px/21px, 이름 15px 600, 시간 15px, 동그라미 36px',
-      read.fs === 15 && read.lh === '21px' && read.nickFs === '15px' && read.nickW === '600'
-      && read.timeFs === '15px' && read.ava === 36, read);
+    t('스레드 앱과 같은 치수: 본문 15px/22.5px, 이름 15px 600, 시간 15px, 동그라미 40px',
+      read.fs === 15 && read.lh === '22.5px' && read.nickFs === '15px' && read.nickW === '600'
+      && read.timeFs === '15px' && read.ava === 40, read);
     t('따옴표를 쳐서 올린 문장에 따옴표가 두 겹으로 붙지 않음', read.quote === '돈을 벌지 말고 신용을 벌어라.', read.quote);
     t('휴대폰: 긴 글은 접히고 [더 보기]가 붙음(숨은 탭에서 그려졌어도)', await mine.locator('.post-more').isVisible());
     await mine.locator('.post-more').click();
