@@ -33,12 +33,22 @@ function t(name, cond, extra) {
   console.log('— 시즌 —');
   const s1 = CS.SEASONS.find((x) => x.id === 's1');
   const s2 = CS.SEASONS.find((x) => x.id === 's2');
-  t('시즌이 두 개(프로세스 이코노미 / 꿈과 돈)', !!s1 && !!s2 && CS.SEASONS.length === 2);
+  const s3 = CS.SEASONS.find((x) => x.id === 's3');
+  t('시즌이 세 개(프로세스 이코노미 / 꿈과 돈 / 혁명의 팡파르)', !!s1 && !!s2 && !!s3 && CS.SEASONS.length === 3);
   t('전환 1분 전에는 아직 시즌1', CS.pickSeason('2026-09-21T01:59').id === 's1');
   t('전환 시각(새벽 2시)부터 시즌2', CS.pickSeason('2026-09-21T02:00').id === 's2');
-  t('그 이후로도 계속 시즌2', CS.pickSeason('2026-11-30T12:00').id === 's2');
+  t('전환 1분 전(00:59)까지는 시즌2', CS.pickSeason('2026-10-21T00:59').id === 's2');
+  t('10/21 새벽 1시부터 혁명의 팡파르', CS.pickSeason('2026-10-21T01:00').id === 's3');
+  t('그 이후로도 계속 혁명의 팡파르', CS.pickSeason('2026-11-30T12:00').id === 's3');
   t('?season= 으로 시즌 고정 가능', CS.pickSeason('2026-11-30T12:00', 's1').id === 's1');
-  t('없는 시즌 id는 무시하고 자동 선택', CS.pickSeason('2026-11-30T12:00', 'nope').id === 's2');
+  t('없는 시즌 id는 무시하고 자동 선택', CS.pickSeason('2026-11-30T12:00', 'nope').id === 's3');
+  t('꿈과 돈은 전환 한 시간 뒤 잠김', s2.lockAt === '2026-10-21T02:00' && !s3.lockAt);
+  t('혁명의 팡파르: 화요일 라이브·s3_ 접두사·정리본 6회', /화/.test(JSON.stringify(s3.live)) && s3.dataPrefix === 's3'
+    && s3.storagePrefix !== s2.storagePrefix && s3.giftMissLimit === 6);
+  t('혁명의 팡파르: 10/21 ~ 11/17, 회고 11/20까지', s3.startDate === '2026-10-21' && s3.endDate === '2026-11-17'
+    && s3.retroUntil === '2026-11-20');
+  t('혁명의 팡파르: 28일 커리큘럼 · 라이브 4회 발제문', (s3.readingPlan || []).length === 28
+    && JSON.stringify((s3.weeklyPrompts || []).map((w) => w.day)) === '[7,14,21,28]');
 
   // 시즌1은 접두사가 없어야 한다 — 기존 데이터를 옮기지 않고 그대로 쓰기 위한 조건.
   t('시즌1 컬렉션 이름은 예전 그대로', s1.dataPrefix === '');

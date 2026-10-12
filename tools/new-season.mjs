@@ -56,8 +56,8 @@ if (!startDate) {
 }
 const endDate = spec.endDate || addDays(startDate, DAYS - 1);
 const days = Math.round((D(endDate) - D(startDate)) / 86400000) + 1;
-const switchAt = spec.switchAt || `${startDate}T02:00`;
-const lockPrevAt = `${startDate}T03:00`;
+const switchAt = spec.switchAt || `${startDate}T01:00`;
+const lockPrevAt = `${startDate}T02:00`;
 const retroFrom = addDays(endDate, 1);
 // 회고는 다음 달 20일까지 — 다음 시즌이 21일에 시작하니까
 const nextStart = (() => { const d = D(startDate); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(21); return iso(d); })();
@@ -178,7 +178,7 @@ const seasonSrc = `, {
     tagline: ${q(spec.book.tagline || '')},
     byline: ${q(spec.book.byline)},
     cover: ${q(spec.book.cover)},
-    desc: ${q(spec.book.desc)}
+    desc: ${q(String(spec.book.desc || "").replace(/<[^>]+>/g, ""))}   // 앱은 글자 그대로 보여 준다 — 태그 빼고
   },
   live: {
     label: '매주 ${liveWd}요일 ${esc(liveTime)} (${liveDates.map(md).join(' · ')})',
