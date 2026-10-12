@@ -8,9 +8,9 @@
  *   - 매달 21일에 시작해서 28일(4주). 라이브는 각 주 7일째 = 7·14·21·28일차, 22:00.
  *     그래서 라이브 요일은 시작일 요일과 같다(9/21 월요일 시작 → 일요일 라이브).
  *   - 종료 다음 날부터 다음 달 20일까지는 내 글 자산화 기간(28일 기록을 블로그·SNS에 올리기 · 정리본 발송).
- *   - 커리큘럼: 1회독 3주 · 2회독 1주. 주마다 "준비/복습 하루 + 읽는 날 5일 + 라이브"로 같은 모양이다.
- *       1일차 목차 훑기 · 2~6 / 8~12 / 15~19일차 1회독(15일) · 13일차 1·2주차 따라잡기 · 20일차 결산
- *       → 22~26일차 2회독(1회독 분량을 5등분) → 27일차 밑줄 총정리.
+ *   - 커리큘럼: 1회독 3주 · 2회독 1주. 매주 7일째는 라이브(발제문 고민), 나머지는 읽고 인증하는 날이다.
+ *       1일차 책 준비·목차 훑기 · 2~6 / 8~13 / 15~20일차 1회독(17일, 20일차에 완독·BEST 10)
+ *       → 22~27일차 2회독(1회독 분량을 6등분, 27일차에 최고 문장).
  *     목차(toc)만 주면 쪽수 비중으로(쪽수가 없으면 꼭지 수로) 고르게 나눈다.
  *
  * 만들어 주는 것
@@ -79,19 +79,11 @@ const liveDay = (n) => [{ ch: '', s: [
   `🔴 <strong>라이브 ${n}회차</strong> — ${n === 4 ? '마지막 시간입니다. ' : (n === 3 ? '완독 기념. ' : '')}새로 읽을 분량은 없습니다. 밀린 분량이 있다면 오늘 따라잡아 주세요.`,
   '오전에 올라오는 <strong>발제문</strong>을 보고 생각을 정리해 <strong>[읽고 느낀 점]</strong>에 남기면 오늘 인증 완료입니다.'
 ] }];
-const RECAP_DAY = [{ ch: '', s: [
-  '📝 <strong>1회독 결산 — 내 밑줄 BEST 10 선정</strong>',
-  '전체 밑줄 중 <strong>최고의 5문장</strong>을 골라 인증해주세요. (2회독과 마지막 라이브의 재료가 됩니다)',
-  '못 읽은 부분이 있다면 오늘 마저!'
-] }];
-const FINAL_DAY = [{ ch: '', s: ['밑줄 총정리 · 🏆 <strong>28일 중 나의 최고 문장 1개</strong> 선정'] }];
-// 2주차에만 읽는 날이 6일이라 한 주가 무거워지던 것을 막는다 — 1주차(1일차 준비)·3주차(20일차 결산)처럼
-// 2주차에도 쉬어 가는 날을 하나 둬서, 세 주 모두 "읽는 날 5일"로 같게 만든다.
-const CATCHUP_DAY = [{ ch: '', s: [
-  '📌 <strong>1·2주차 따라잡기 · 밑줄 복습</strong> — 새로 읽을 분량은 없습니다.',
-  '밀린 분량을 마저 읽고, 지금까지 그은 밑줄 중 마음에 남은 한 문장을 골라 인증해 주세요.'
-] }];
-const CATCHUP = 13;
+// 1회독 마지막 날(20일차)·2회독 마지막 날(27일차)에 그날 분량 뒤로 붙이는 한 줄
+const RECAP_NOTE = '📗 <strong>1회독 완독!</strong> 내 밑줄 BEST 10을 골라 두세요 (2회독과 마지막 라이브의 재료가 됩니다)';
+const FINAL_NOTE = '🏆 내일 마지막 라이브 전에 <strong>28일 중 나의 최고 문장 1개</strong>를 골라 두세요';
+const FIRST_READ_LAST = 20;
+const REREAD_DAYS = [22, 23, 24, 25, 26, 27];
 
 /** 무게(쪽수)가 있는 항목들을 순서를 지키며 n개 묶음으로 나눈다. 묶음마다 최소 1개. */
 function splitByWeight(items, n) {
@@ -117,7 +109,7 @@ function splitByWeight(items, n) {
 /** 목차 → 28일 커리큘럼. toc: [{ ch:'1장', title:'…', s:['소제목'…], pages?: 40 }] */
 function planFromToc(toc) {
   const firstReadDays = [];
-  for (let d = 2; d <= 19; d++) if (!LIVE_DAYS.includes(d) && d !== CATCHUP) firstReadDays.push(d);
+  for (let d = 2; d <= FIRST_READ_LAST; d++) if (!LIVE_DAYS.includes(d)) firstReadDays.push(d);
   // 소제목 단위로 펼치고, 장의 쪽수를 소제목 수로 나눠 무게로 쓴다(쪽수가 없으면 1)
   const items = [];
   toc.forEach((c) => {
@@ -140,16 +132,15 @@ function planFromToc(toc) {
     });
     plan[d - 1] = groups;
   });
-  plan[CATCHUP - 1] = CATCHUP_DAY;
-  plan[19] = RECAP_DAY;
-  // 2회독: 22~26일차 — 1회독과 같은 무게로 5등분해 "몇 번째 꼭지부터 몇 번째까지"로 보여 준다
-  const rechunks = splitByWeight(items, 5);
+  plan[FIRST_READ_LAST - 1] = [...plan[FIRST_READ_LAST - 1], { ch: '', s: [RECAP_NOTE] }];
+  // 2회독: 22~27일차 — 1회독과 같은 무게로 6등분해 "몇 번째 꼭지부터 몇 번째까지"로 보여 준다
+  const rechunks = splitByWeight(items, REREAD_DAYS.length);
   const head = (it) => `「${String(it.text).split(' / ')[0]}」`;
-  [22, 23, 24, 25, 26].forEach((d, i) => {
+  REREAD_DAYS.forEach((d, i) => {
     const cs = rechunks[i];
     plan[d - 1] = [{ ch: '2회독', s: [cs ? `${head(cs[0])} ~ ${head(cs[cs.length - 1])}` : '밑줄 친 부분 다시 읽기'] }];
   });
-  plan[26] = FINAL_DAY;
+  plan[REREAD_DAYS[REREAD_DAYS.length - 1] - 1][0].s.push(FINAL_NOTE);
   return plan;
 }
 
@@ -290,12 +281,12 @@ console.log(`   모집   ${recruitLabel}`);
 const notLiveDay = liveDates.filter((d) => !LIVE_DAYS.includes(Math.round((D(d) - D(startDate)) / 86400000) + 1));
 if (notLiveDay.length) console.log(`   ⚠ 7·14·21·28일차가 아닌 라이브: ${notLiveDay.map(shortD).join(', ')}`);
 if (spec.toc) {
-  console.log('\n■ 목차로 짠 커리큘럼 (1회독)');
+  console.log('\n■ 목차로 짠 커리큘럼 (1·2회독)');
   plan.forEach((day, i) => {
-    if (LIVE_DAYS.includes(i + 1) || i === 0 || i >= 19) return;
+    if (LIVE_DAYS.includes(i + 1) || i === 0 || i >= 27) return;
     console.log(`   ${String(i + 1).padStart(2)}일차 ${shortD(addDays(startDate, i))}  ${day.map((g) => (g.ch ? g.ch + ' ' : '') + g.s.join(' / ')).join(' | ')}`);
   });
-  console.log('   … 13일차 따라잡기 · 20일차 결산 · 22~26일차 2회독 · 27일차 총정리 · 라이브 7·14·21·28일차');
+  console.log('   … 20일차 1회독 완독 · 22~27일차 2회독 · 라이브(발제문) 7·14·21·28일차');
 }
 if (!(spec.weeklyPrompts || []).length) console.log('\n   ⚠ 발제문(weeklyPrompts)이 비어 있습니다 — 스킬이 목차로 초안을 써서 채워야 합니다.');
 
