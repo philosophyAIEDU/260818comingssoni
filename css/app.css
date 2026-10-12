@@ -1,154 +1,197 @@
-/* 참여자 화면(인증 앱) — 미니멀 정리 + 휴대폰 하단 탭
+/* 참여자 화면(인증 앱) — 스레드(Threads) 모바일과 같은 결 + 휴대폰 하단 탭
  *
  * body.app 아래로만 건다(운영진 화면은 css/admin.css, 공통 뼈대는 css/style.css).
- * 방향: 흰 바탕에 선 하나짜리 둥근 카드, 남색(커밍쏜)은 버튼·선택 상태에만, 노랑은 "오늘"을 짚는 작은 포인트로만.
- * 900px보다 좁으면 네 묶음(.pane)을 하단 탭으로 나눠 보여 주고(js/tabs.js), 넓으면 지금처럼 이어서 보여 준다. */
+ * 스레드 모바일 웹(threads.com, 390px 화면)에서 실제로 잰 값에 맞췄다:
+ *   글꼴   system-ui · -apple-system · BlinkMacSystemFont · Roboto … (기기 기본 글꼴), 자간 normal
+ *   본문   15px / 줄높이 21px(1.4), 검정 #000 — 어두운 화면 #f3f5f7
+ *   보조   #999(시간·출처) — 어두운 화면 #777, 반응 숫자 13px #424242 — 어두운 화면 #ccc
+ *   선     1px rgba(0,0,0,.15) — 어두운 화면 rgba(243,245,247,.15)
+ *   바탕   #fff — 어두운 화면 #101010, 회색 면 #f5f5f5
+ *   버튼   검정 바탕 흰 글씨(주 버튼) / 테두리만(보조 버튼), 15px 600, 모서리 10px
+ * 커밍쏜 색(남색 로고·노랑)은 머리의 로고에만 남긴다.
+ * 900px보다 좁으면 네 묶음(.pane)을 하단 탭으로 나눠 보여 주고(js/tabs.js), 넓으면 이어서 보여 준다. */
 
 body.app {
-  --bg: #f6f7fa;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f4f6fb;
-  --border: #e7e9f0;
-  --border-strong: #d7dbe5;
-  --text: #121a2e;
-  --text-dim: #586178;
-  --text-faint: #8e96a8;
-  --accent: #173fa7;
-  --navy: #102d84;
+  --surface-2: #f5f5f5;
+  --border: rgba(0, 0, 0, .15);
+  --border-strong: rgba(0, 0, 0, .2);
+  --text: #000000;
+  --text-2: #1a1a1a;          /* 안내·공지 본문 */
+  --text-dim: #737373;        /* 덧붙임 설명 */
+  --text-faint: #999999;      /* 시간·출처 같은 곁가지 */
+  --icon: #424242;            /* 반응 버튼 아이콘·숫자 */
+  --nav-icon: #b8b8b8;        /* 하단 탭 — 고르지 않은 칸 */
+  --link: #0095f6;
+  --accent: #000000;
+  --navy: #000000;            /* 주 버튼·고른 상태 (이름은 예전 그대로 둔다) */
+  --on-navy: #ffffff;
   --yellow: #ffe600;
+  --placeholder: #999999;
   --shadow: none;
   --radius: 16px;
   --tabbar-h: 62px;
-  --text-2: #333c52;          /* 안내·공지 본문 — 제목만큼 진하진 않게, 회색보다는 또렷하게 */
-  --placeholder: #a2a9b8;     /* 입력칸 속 회색 예시 글씨 */
   background: var(--bg);
+  letter-spacing: normal;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) body.app {
-    --bg: #0b1020;
-    --surface: #121a2e;
-    --surface-2: #172036;
-    --border: #232c44;
-    --border-strong: #2f3a57;
-    --text: #edf0f8;
-    --text-dim: #a5aec6;
-    --text-faint: #6f7a95;
-    --accent: #ffe600;
-    --navy: #ffe600;
-    --text-2: #cdd3e3;
-    --placeholder: #5f6a86;
+    --bg: #101010;
+    --surface: #101010;
+    --surface-2: #1e1e1e;
+    --border: rgba(243, 245, 247, .15);
+    --border-strong: rgba(243, 245, 247, .22);
+    --text: #f3f5f7;
+    --text-2: #e4e6e9;
+    --text-dim: #a0a0a0;
+    --text-faint: #777777;
+    --icon: #cccccc;
+    --nav-icon: #4d4d4d;
+    --link: #18a3fe;
+    --accent: #f3f5f7;
+    --navy: #f3f5f7;
+    --on-navy: #101010;
+    --placeholder: #777777;
   }
 }
 
-/* ── 머리 ── 흰 띠 한 줄 */
+/* ── 머리 ── 반투명 흰 띠(스레드 머리와 같은 85% + 흐림) */
 .app .top {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 10px 0; margin-bottom: 16px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
+  border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 16px;
 }
-.app .brand-logo { height: 34px; border-radius: 8px; }
-.app .brand h1 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+.app .brand-logo { height: 32px; border-radius: 8px; }
+.app .brand h1 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
 .app .brand p { color: var(--text-faint); font-size: 12px; }
 .app .navlinks a {
-  color: var(--text-dim); background: transparent; border-color: var(--border-strong); font-size: 12.5px; padding: 5px 12px;
+  color: var(--text); background: transparent; border-color: var(--border); font-size: 13px; font-weight: 600;
+  padding: 6px 14px; border-radius: 10px;
 }
-.app .navlinks a:hover { color: var(--accent); border-color: var(--accent); }
-.app .navlinks a[aria-current="page"] { background: var(--navy); border-color: var(--navy); color: #fff; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .app .navlinks a[aria-current="page"] { color: #081d58; }
-}
+.app .navlinks a:hover { border-color: var(--text); }
+.app .navlinks a[aria-current="page"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
 
-/* ── 카드 ── */
-.app .card { box-shadow: none; border-radius: var(--radius); padding: 20px; }
-.app .card > h2, .app .feed-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+/* ── 카드 ── 넓은 화면에서는 선 하나짜리 둥근 상자, 휴대폰에서는 상자 없이 선으로만 나눈 면(아래 640px 규칙) */
+.app .card { box-shadow: none; border-radius: var(--radius); padding: 20px; background: var(--surface); border-color: var(--border); }
+.app .card > h2, .app .feed-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .app .intro { background: var(--surface); }
-.app .intro-cover { box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.app .intro-cover { box-shadow: 0 1px 6px rgba(0, 0, 0, .14); border-radius: 6px; }
 .app .rule-key { background: var(--surface-2); border-color: transparent; }
-.app .fold > summary { border-radius: 10px; }
+.app a { color: var(--link); }
+.app .navlinks a, .app .head-links a, .app .feed-tabs a, .app .pane-foot a { color: var(--text); }
+.app .pane-foot a { color: var(--text-faint); }
 
 /* ── 읽는 글씨 ── 안내·공지·예시 문구
-   전에는 안내문 대부분이 12~13px 연회색이라 폰에서 눈을 찡그려야 읽혔다.
-   한 문장 이상인 글은 14px 이상, 줄간격 1.7, 회색 대신 한 단계 진한 본문색(--text-2)으로.
-   굵은 글씨는 700 대신 600 + 본문색 — 군데군데 시커멓게 박히지 않고 차분하게 강조된다. */
-.app .card > .hint, .app .feed-card .hint { font-size: 14px; line-height: 1.7; color: var(--text-dim); }
+   스레드 본문과 같은 15px을 기본으로, 여러 줄로 이어지는 안내만 줄높이를 1.5로 조금 띄운다.
+   덧붙임 설명은 #737373, 시간·출처 같은 곁가지만 #999. 굵은 글씨는 600. */
+.app .card > .hint, .app .feed-card .hint { font-size: 14px; line-height: 1.5; color: var(--text-dim); }
 .app .card > .hint strong, .app .form-note strong, .app .rule-key strong,
-.app .card ul.muted strong, .app .intro-body strong { font-weight: 650; color: var(--text); }
+.app .card ul.muted strong, .app .intro-body strong { font-weight: 600; color: var(--text); }
 
 /* 책 소개 */
-.app .intro-body h2 { font-weight: 700; letter-spacing: -.025em; }
-.app .intro-body .tagline { font-size: 14px; font-weight: 600; color: var(--text-2); }
-.app .intro-body .author { font-size: 13.5px; font-weight: 400; color: var(--text-dim); }
-.app .intro-body .meta { font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
-.app .intro-body .fineprint { font-size: 13px; line-height: 1.6; color: var(--text-faint); }
-.app .intro-body .desc { font-size: 14px; line-height: 1.75; color: var(--text-2); letter-spacing: -.005em; }
+.app .intro-body h2 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.3; }
+.app .intro-body .tagline { font-size: 15px; font-weight: 600; color: var(--text-2); }
+.app .intro-body .author { font-size: 14px; font-weight: 400; color: var(--text-dim); }
+.app .intro-body .meta { font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.app .intro-body .fineprint { font-size: 13px; line-height: 1.45; color: var(--text-faint); }
+.app .intro-body .desc { font-size: 15px; line-height: 1.5; color: var(--text-2); }
 
 /* 규칙 — 마감 한 줄 + 나머지 규칙 목록 */
-.app .rule-key { font-size: 14.5px; line-height: 1.7; color: var(--text-2); padding: 13px 15px; border-radius: 12px; }
-.app .card ul.muted {
-  font-size: 14.5px; line-height: 1.75; color: var(--text-2); padding-left: 18px; letter-spacing: -.005em;
-}
+.app .rule-key { font-size: 15px; line-height: 1.5; color: var(--text-2); padding: 14px 16px; border-radius: 12px; }
+.app .card ul.muted { font-size: 15px; line-height: 1.5; color: var(--text-2); padding-left: 18px; }
 .app .card ul.muted li + li { margin-top: 12px; }
 .app .card ul.muted li::marker { color: var(--text-faint); }
-.app .fold > summary { font-size: 14px; padding: 11px 14px; border-radius: 12px; }
+.app .fold > summary {
+  font-size: 15px; font-weight: 600; padding: 11px 14px; border-radius: 10px;
+  color: var(--text); background: transparent; border-color: var(--border);
+}
+.app .fold > summary:hover { border-color: var(--text); color: var(--text); }
 
 /* 인증 폼 — 질문(라벨)은 또렷하게, 덧붙인 설명은 그 아래 한 줄로 */
-.app .field label { font-size: 15px; font-weight: 650; line-height: 1.5; letter-spacing: -.015em; }
+.app .field label { font-size: 15px; font-weight: 600; line-height: 1.4; }
 .app .field .sub {
-  display: block; margin: 3px 0 0; font-size: 13px; font-weight: 400; line-height: 1.55;
-  color: var(--text-faint); letter-spacing: -.005em;
+  display: block; margin: 3px 0 0; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--text-faint);
 }
-.app .field .hint { font-size: 13.5px; line-height: 1.6; }
-.app input::placeholder, .app textarea::placeholder { color: var(--placeholder); letter-spacing: -.005em; }
-.app input::placeholder { font-size: 14px; }
-.app textarea::placeholder { font-size: 15px; line-height: 1.7; }
-.app #sentence, .app #reflection { font-size: 16px; line-height: 1.7; padding: 14px 15px; }
-.app .form-note { font-size: 14px; line-height: 1.75; color: var(--text-dim); }
+.app .field .hint { font-size: 13.5px; line-height: 1.5; }
+.app input::placeholder, .app textarea::placeholder { color: var(--placeholder); }
+.app input::placeholder { font-size: 15px; }
+.app textarea::placeholder { font-size: 15px; line-height: 1.5; }
+.app #sentence, .app #reflection { font-size: 16px; line-height: 1.5; padding: 14px 15px; }
+.app .form-note { font-size: 14px; line-height: 1.5; color: var(--text-dim); }
 
 /* 공지·알림 상자, 라이브 날 발제문 */
-.app .note { font-size: 14px; line-height: 1.65; border-radius: 12px; padding: 13px 15px; }
-.app .prompt-box { padding: 14px 16px; border-radius: 12px; }
-.app .prompt-box li { font-size: 15px; line-height: 1.7; margin: 8px 0; color: var(--text); }
-.app .prompt-box .muted { font-size: 13.5px; line-height: 1.6; }
+.app .note { font-size: 14.5px; line-height: 1.5; border-radius: 12px; padding: 13px 15px; }
+.app .note:not(.ok):not(.bad):not(.warn):not(.info) { background: var(--surface-2); border-color: transparent; color: var(--text-2); }
+.app .prompt-box { padding: 14px 16px; border-radius: 12px; background: var(--surface-2); }
+.app .prompt-box li { font-size: 15px; line-height: 1.5; margin: 8px 0; color: var(--text); }
+.app .prompt-box .muted { font-size: 13.5px; line-height: 1.5; }
 
-/* ── 오늘 띠 ── 큰 노란 상자 대신 흰 카드 + 노란 포인트 선 */
+/* ── 오늘 띠 ── 상자·노란 선 없이, 숫자 셋만 또렷하게 */
 .app .banner {
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-left: 4px solid var(--yellow);
-  box-shadow: none; border-radius: var(--radius);
+  border: 1px solid var(--border); box-shadow: none; border-radius: var(--radius);
 }
-.app .banner .big { color: var(--text); font-size: clamp(17px, 5.2vw, 22px); font-weight: 700; white-space: nowrap; }
-.app .banner .lbl { color: var(--text-faint); font-weight: 600; letter-spacing: .02em; }
+.app .banner .big { color: var(--text); font-size: clamp(17px, 5.2vw, 22px); font-weight: 700; white-space: nowrap; letter-spacing: -.02em; }
+.app .banner .lbl { color: var(--text-faint); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .app .banner .sep { width: 1px; background: var(--border); }
-.app .banner .fold > summary { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
-.app .banner .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
+.app .banner .fold > summary { color: var(--text); border-color: var(--border); background: transparent; }
+.app .banner .fold > summary:hover { border-color: var(--text); color: var(--text); }
 .app .banner .today-range, .app .banner .today-range-day { color: var(--text); }
-.app .banner .today-range { font-size: 15px; line-height: 1.7; }
-.app .banner .today-range-day { font-size: 14px; font-weight: 650; }
-.app .banner .today-range-nav button { color: var(--text-dim); border-color: var(--border-strong); }
+.app .banner .today-range { font-size: 15px; line-height: 1.5; }
+.app .banner .today-range-day { font-size: 15px; font-weight: 600; }
+.app .banner .today-range-nav button { color: var(--text); border-color: var(--border); }
 
-/* ── 입력·버튼 ── */
+/* ── 입력·버튼 ── 스레드처럼 모서리 10px, 테두리는 15% 선 한 겹 */
 .app input[type="text"], .app input[type="search"], .app select, .app textarea, .app .picker-btn {
-  border-radius: 12px; border-color: var(--border-strong); background: var(--surface);
+  border-radius: 12px; border-color: var(--border); background: var(--surface); color: var(--text);
 }
-.app button, .app .btn { border-radius: 12px; background: var(--surface); }
-.app button.primary { background: var(--navy); border-color: var(--navy); color: #fff; box-shadow: none; }
-.app button.primary:hover { filter: brightness(1.12); color: #fff; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .app button.primary,
-  :root:not([data-theme="light"]) .app button.primary:hover { color: #081d58; }
+.app input:focus, .app select:focus, .app textarea:focus { outline: 1px solid var(--text); outline-offset: 0; border-color: var(--text); }
+.app button, .app .btn {
+  border-radius: 10px; background: var(--surface); color: var(--text); border-color: var(--border);
+  font-weight: 600; letter-spacing: normal;
 }
-.app .form-actions .btn-verify { border-radius: 14px; font-size: 16px; }
+.app .wrap button:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+.app button.primary { background: var(--navy); border-color: var(--navy); color: var(--on-navy); box-shadow: none; }
+.app button.primary:hover:not(:disabled) { background: var(--navy); color: var(--on-navy); opacity: .85; }
+.app .form-actions .btn-verify { border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: none; }
+.app .feed-filters .feed-search, .app .feed-filters select {
+  background-color: var(--surface-2); border-color: transparent; border-radius: 10px; font-size: 14px; height: 36px;
+}
+.app .feed-filters .feed-search:focus, .app .feed-filters select:focus { outline: 1px solid var(--border-strong); }
+.app .season-badge { font-size: 11.5px; font-weight: 700; }
+.app .picker-btn { font-weight: 400; font-size: 16px; }
 
 /* 숫자 타일 */
 .app .stat { background: var(--surface-2); border-color: transparent; border-radius: 12px; }
+.app .stat .n { font-weight: 700; letter-spacing: -.02em; }
+.app .stat .k { color: var(--text-dim); }
+
+/* 명예의 전당 — 상자 줄 대신 스레드 목록처럼 선으로 나눈 줄 */
+.app .fame { gap: 0; }
+.app .fame-row, .app .fame .none {
+  background: transparent; border: none; border-bottom: 1px solid var(--border); border-radius: 0;
+  padding: 13px 2px; font-size: 15px;
+}
+.app .fame-row:hover, .app .fame-row:focus-visible { background: transparent; border-color: var(--border); }
+.app .fame-row[aria-expanded="true"] { border-color: transparent; background: transparent; }
+.app .fame .who { font-weight: 600; }
+.app .fame .cnt { color: var(--icon); font-weight: 500; font-size: 13.5px; }
+.app .fame-detail {
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  margin: 0 0 12px; padding: 14px 16px; font-size: 15px;
+}
+.app .fame-entry { font-size: 15px; line-height: 1.45; }
+.app .fame-entry .quote { color: var(--text); border-left-color: var(--border-strong); }
 
 /* 남의 글 맨 아래 버튼은 테두리 없는 아이콘 버튼(css/style.css의 .feed-acts) — 흰 바탕 버튼 규칙을 비켜 간다 */
-.app .feed-acts > button { background: transparent; }
-.app .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); }
-.app .feed-acts .upvote-btn.voted { background: transparent; }
+.app .feed-acts > button { background: transparent; border-color: transparent; color: var(--icon); font-weight: 400; }
+.app .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; color: var(--text); }
+.app .feed-acts .upvote-btn.voted { background: transparent; color: var(--link); }
 
 /* 인증 직후 바로가기(js/tabs.js) */
 .app .quick-go { display: flex; gap: 8px; margin-top: 10px; }
-.app .quick-go button { flex: 1 1 0; min-height: 42px; font-size: 13.5px; }
+.app .quick-go button { flex: 1 1 0; min-height: 42px; font-size: 14px; }
 
 /* 이름을 고르기 전 [내 현황] 안내 · 맨 아래 운영진 링크 — 휴대폰 탭 화면에서만 */
 .app .my-empty, .app .pane-foot { display: none; }
@@ -190,32 +233,30 @@ body.app {
   }
   .app .entry-list .entry:last-child { border-bottom: none; }
 
+  /* 하단 탭 — 스레드 하단 막대처럼 반투명 바탕, 고르지 않은 칸은 연회색, 고른 칸은 검정.
+     (스레드는 아이콘만 두지만, 네 칸이 무엇인지 처음 보는 분도 알 수 있게 작은 이름은 남긴다) */
   .tabbar {
     display: grid; grid-template-columns: repeat(4, 1fr);
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-    padding: 6px 6px env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    -webkit-backdrop-filter: saturate(1.6) blur(12px); backdrop-filter: saturate(1.6) blur(12px);
-    border-top: 1px solid var(--border);
+    padding: 4px 6px env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
+    border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   }
   .tabbar button {
     all: unset; box-sizing: border-box; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    color: var(--text-faint); font-size: 11px; font-weight: 600; letter-spacing: -.01em;
+    color: var(--nav-icon); font-size: 10.5px; font-weight: 600;
     border-radius: 12px; -webkit-tap-highlight-color: transparent; position: relative;
   }
-  .tabbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tabbar button:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
   .tabbar .tab-ico {
-    width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7;
+    width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8;
     stroke-linecap: round; stroke-linejoin: round;
   }
-  .tabbar button[aria-current="page"] { color: var(--navy); font-weight: 800; }
-  .tabbar button[aria-current="page"] .tab-ico { stroke-width: 2.1; }
-  /* 지금 탭 위에 노란 점 하나 — 커밍쏜 시그니처 컬러는 여기에만 */
-  .tabbar button[aria-current="page"]::before {
-    content: ''; position: absolute; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--yellow);
-  }
+  .tabbar button[aria-current="page"] { color: var(--text); }
+  .tabbar button[aria-current="page"] .tab-ico { stroke-width: 2.2; }
 }
 
 @media (max-width: 899px) {
@@ -238,12 +279,18 @@ body.app {
 }
 
 @media (max-width: 640px) {
-  /* 글을 읽는 화면(피드·전체 보기)은 카드 상자를 화면 끝까지 펴서 본문 폭을 최대로 —
-     상자 테두리·바깥 여백에 빼앗기던 폭(양쪽 30px 남짓)을 본문에 돌려준다(.wrap 좌우 여백이 13px) */
-  .app .feed-card {
-    margin-left: -13px; margin-right: -13px; border-radius: 0;
-    border-left: none; border-right: none; padding: 18px 16px 6px;
+  /* 휴대폰: 스레드처럼 상자 없이 화면 끝까지 펼친 면을 얇은 선으로만 나눈다(.wrap 좌우 여백이 13px).
+     상자 테두리·바깥 여백에 빼앗기던 폭을 글에 돌려주고, 화면이 한 장의 종이처럼 이어진다. */
+  .app .top { margin-bottom: 0; }
+  .app .pane > .card, .app .pane > .banner, .app main > .card, .app main > .banner {
+    margin: 0 -13px; border-radius: 0; border-width: 0 0 1px; border-style: solid; border-color: var(--border);
+    padding: 22px 16px;
   }
+  .app #pane-certify > .banner { padding: 16px 16px 18px; }
+  .app .pane > .note, .app main > .note { margin: 14px 0; }
+  .app .feed-card { padding: 20px 16px 4px; }
+  /* 글 사이 선도 화면 끝에서 끝까지(스레드와 같게) */
+  .app .feed-item { margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
   /* 전체 보기 위쪽 고르기 칸 — 한 칸씩 세로로 쌓여 첫 글이 화면 아래로 밀려나던 것을 두 줄로 */
   .app .compact-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .app .compact-controls > div { min-width: 0; }

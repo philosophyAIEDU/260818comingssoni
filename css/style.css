@@ -725,10 +725,10 @@ button.ghost { background: transparent; }
    이름·본문·버튼이 모두 같은 왼쪽 선에 서서 눈이 한 줄기로 내려간다. 글 사이는 얇은 선 하나.
    (예전에는 버튼단이 오른쪽에 세로로 서 있어 본문이 화면 폭의 57%에 갇혔었다) */
 .feed-item {
-  --post-fs: 15.5px;
-  --post-lh: 1.6;
-  display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 11px;
-  padding: 16px 0 8px; border-bottom: 1px solid var(--border);
+  --post-fs: 15px;
+  --post-lh: 1.4;             /* 스레드 본문: 15px / 21px */
+  display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 12px;
+  padding: 14px 0 6px; border-bottom: 1px solid var(--border);
 }
 .feed-item:last-child { border-bottom: none; }
 .post-head { display: contents; }
@@ -737,15 +737,15 @@ button.ghost { background: transparent; }
   width: 36px; height: 36px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--ava, var(--surface-2)); color: var(--ava-ink, var(--text-dim));
-  font-size: 15px; font-weight: 700; letter-spacing: 0;
+  font-size: 15px; font-weight: 600; letter-spacing: 0;
 }
 .feed-top, .feed-main, .feed-acts { grid-column: 2; min-width: 0; }
 .feed-main { display: flex; flex-direction: column; }
 /* 이름 🔥2 7시간 — 스레드처럼 가운뎃점 없이 시간만 흐리게 */
-.feed-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; row-gap: 0; line-height: 1.35; padding-top: 1px; }
-.feed-nick { font-size: 15px; font-weight: 700; letter-spacing: -.01em; white-space: normal; overflow: visible; text-overflow: clip; }
+.feed-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; row-gap: 0; line-height: 1.4; }
+.feed-nick { font-size: 15px; font-weight: 600; letter-spacing: normal; white-space: normal; overflow: visible; text-overflow: clip; }
 .feed-nick .season-badge { margin-left: 4px; font-size: 11.5px; padding: 0 6px 0 4px; vertical-align: 1px; }
-.feed-time { font-size: 14px; color: var(--text-faint); white-space: nowrap; }
+.feed-time { font-size: 15px; color: var(--text-faint); white-space: nowrap; }
 /* 그날 1등은 이름 앞 왕관(👑) 하나로만 — 배경을 칠하지 않는다 */
 @media (prefers-color-scheme: dark) {
   /* 어두운 화면에서 밝은 파스텔 동그라미가 튀지 않게 — 이름 색을 옅게 깐 동그라미 + 흰 글자 */
@@ -755,15 +755,15 @@ button.ghost { background: transparent; }
 }
 
 /* 본문 — 15.5px · 줄간격 1.6. 멤버가 쓴 글은 기울임을 쓰지 않는다(한글 기울임은 합성이라 획이 뭉개진다). */
-.post-body { margin-top: 8px; font-size: var(--post-fs); line-height: var(--post-lh); color: var(--text); position: relative; }
+.post-body { margin-top: 4px; font-size: var(--post-fs); line-height: var(--post-lh); color: var(--text); position: relative; }
 /* 책 문장 — 스레드의 링크 미리보기 카드처럼 둥근 테두리 상자 */
 .post-quote {
-  margin: 0; padding: 11px 14px 12px; border: 1px solid var(--border-strong); border-radius: 14px;
+  margin: 4px 0 0; padding: 13px 16px 14px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface);
 }
-.quote-src { font-size: 12.5px; line-height: 1.4; color: var(--text-faint); margin-bottom: 4px; }
+.quote-src { font-size: 12px; line-height: 1.4; color: var(--text-faint); margin-bottom: 3px; }
 .post-body .feed-quote { margin: 0; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-.post-body .feed-reflect { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-body .feed-reflect { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .post-body .feed-reflect:empty { display: none; }
 /* 긴 글은 여덟 줄쯤에서 접고 [더 보기] — 아래쪽은 흐리게 사라지게 */
 .post-body.clamp { max-height: calc(var(--post-fs) * var(--post-lh) * 9); overflow: hidden; }
@@ -773,19 +773,20 @@ button.ghost { background: transparent; }
 }
 .post-more {
   all: unset; cursor: pointer; margin-top: 2px; align-self: flex-start;
-  color: var(--text-faint); font-size: 15px; font-weight: 500; padding: 4px 0;
+  color: var(--text-faint); font-size: 15px; font-weight: 400; padding: 4px 0;
 }
 .post-more:hover, .post-more:focus-visible { color: var(--accent); }
 .post-more[hidden] { display: none; }
 
 /* 버튼 한 줄 — 스레드처럼 테두리 없는 큰 아이콘 + 숫자, 넉넉한 간격(엄지척 → 복사) */
-.feed-acts { display: flex; align-items: center; gap: 14px; margin: 6px 0 0 -9px; }
+/* 스레드: 아이콘 20px, 숫자 13px #424242, 아이콘 묶음 사이 24px 남짓 */
+.feed-acts { display: flex; align-items: center; gap: 10px; margin: 6px 0 0 -9px; }
 .feed-acts > button {
   border: none; background: transparent; box-shadow: none;
-  min-height: 38px; min-width: 38px; padding: 6px 9px; gap: 6px;
-  font-size: 14.5px; font-weight: 500; color: var(--text-dim); border-radius: 999px;
+  min-height: 36px; min-width: 38px; padding: 6px 9px; gap: 4px;
+  font-size: 13px; font-weight: 400; color: var(--icon, var(--text-dim)); border-radius: 999px;
 }
-.feed-acts .ico { width: 21px; height: 21px; stroke-width: 1.55; }
+.feed-acts .ico { width: 20px; height: 20px; stroke-width: 1.6; }
 .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .feed-acts .upvote-btn.voted { background: transparent; color: var(--info); }
 .feed-acts .upvote-btn.voted .ico { fill: currentColor; fill-opacity: .18; }
