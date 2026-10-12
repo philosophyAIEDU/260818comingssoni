@@ -742,7 +742,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('안내 규칙 카드가 책 소개와 배너 사이에 위치',
     await beforePage.evaluate(() => {
       const intro = document.querySelector('section.intro');
-      const rules = [...document.querySelectorAll('main.wrap > section.card')]
+      // 휴대폰 탭(js/tabs.js) 때문에 카드는 main 바로 아래가 아니라 탭 묶음(.pane) 안에 있다
+      const rules = [...document.querySelectorAll('main.wrap .pane > section.card')]
         .find((s) => s.textContent.includes('안내 · 챌린지 규칙'));
       const banner = document.querySelector('section.banner');
       if (!intro || !rules || !banner) return false;
@@ -2155,6 +2156,58 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   });
   t('좁은 화면에서 피드 이름이 "커…" 처럼 뭉개지지 않고 한 줄을 다 씀(white-space: normal)',
     feedNickWS === 'normal', feedNickWS);
+
+  // ── 휴대폰 하단 탭(js/tabs.js): 인증 / 피드 / 명예의 전당 / 내 현황 ──
+  {
+    const vis = (sel) => m.isVisible(sel);
+    t('휴대폰: 하단 탭바가 보임', await vis('#tabbar'));
+    t('휴대폰: 처음엔 [인증] 탭 — 인증 폼만 보이고 피드는 숨김', await vis('#certifyCard') && !(await vis('.feed-card')));
+    t('휴대폰: [인증] 탭에서 오늘 띠가 인증 폼보다 위에 옴(매일 여는 화면)',
+      await m.evaluate(() => document.querySelector('.banner').getBoundingClientRect().top
+        < document.querySelector('#certifyCard').getBoundingClientRect().top));
+    await m.click('#tabbar [data-go="feed"]');
+    await m.waitForTimeout(150);
+    t('휴대폰: [피드] 탭 — 피드가 보이고 인증 폼은 숨김', await vis('.feed-card') && !(await vis('#certifyCard')));
+    t('휴대폰: 지금 탭이 주소(#feed)에 남음', (await m.evaluate(() => location.hash)) === '#feed');
+    t('휴대폰: 누른 탭에 aria-current', (await m.getAttribute('#tabbar [data-go="feed"]', 'aria-current')) === 'page');
+    await m.click('#tabbar [data-go="fame"]');
+    await m.waitForTimeout(150);
+    t('휴대폰: [명예의 전당] 탭 — 명예의 전당과 전체 진행현황이 보임',
+      await vis('.fame-card') && await vis('#overallStats') && !(await vis('.feed-card')));
+    await m.click('#tabbar [data-go="me"]');
+    await m.waitForTimeout(150);
+    t('휴대폰: [내 현황] — 이름을 안 골랐으면 안내 카드', await vis('#myEmpty') && !(await vis('#myCard')));
+    await m.click('#myEmptyGo');
+    await m.waitForTimeout(200);
+    t('휴대폰: 안내 카드의 버튼은 [인증] 탭의 이름 칸으로 데려감',
+      await vis('#certifyCard') && (await m.evaluate(() => document.activeElement && document.activeElement.id)) === 'participantSearch');
+    await m.selectOption('#participant', { label: '커밍쏜' });
+    await m.waitForTimeout(300);
+    await m.fill('#sentence', '휴대폰에서 남긴 문장');
+    await m.fill('#reflection', '탭 화면에서도 잘 된다');
+    await m.click('#submitBtn');
+    await m.waitForTimeout(500);
+    t('휴대폰: 인증 직후 "다른 분들 글 보기 · 내 현황 보기" 바로가기', await vis('#formMsg .quick-go'));
+    await m.click('#formMsg .quick-go [data-go="me"]');
+    await m.waitForTimeout(200);
+    t('휴대폰: 바로가기로 [내 현황] — 이름을 골랐으니 내 기록 카드가 보임', await vis('#myCard') && !(await vis('#myEmpty')));
+    const mo = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    t('휴대폰: 탭 화면에서도 가로 오버플로 없음', mo <= 1, mo);
+    const m2 = await ctx.newPage();
+    await m2.setViewportSize({ width: 390, height: 844 });
+    await m2.goto(BASE + '/index.html#fame');
+    await m2.waitForTimeout(400);
+    t('휴대폰: 주소에 #fame이 있으면 그 탭으로 열림', await m2.isVisible('.fame-card') && !(await m2.isVisible('#certifyCard')));
+    await m2.close();
+    const d = await ctx.newPage();
+    await d.setViewportSize({ width: 1280, height: 900 });
+    await d.goto(BASE + '/index.html#feed');
+    await d.waitForTimeout(400);
+    t('넓은 화면: 탭바 없이 네 묶음이 모두 이어서 보임(주소에 #feed가 있어도)',
+      !(await d.isVisible('#tabbar')) && await d.isVisible('#certifyCard') && await d.isVisible('.feed-card')
+      && await d.isVisible('.fame-card'));
+    await d.close();
+  }
 
   await page.screenshot({ path: (process.env.SHOT_DIR || '.') + '/admin.png', fullPage: true });
   await m.screenshot({ path: (process.env.SHOT_DIR || '.') + '/mobile.png', fullPage: true });

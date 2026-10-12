@@ -1,0 +1,174 @@
+/* 참여자 화면(인증 앱) — 미니멀 정리 + 휴대폰 하단 탭
+ *
+ * body.app 아래로만 건다(운영진 화면은 css/admin.css, 공통 뼈대는 css/style.css).
+ * 방향: 흰 바탕에 선 하나짜리 둥근 카드, 남색(커밍쏜)은 버튼·선택 상태에만, 노랑은 "오늘"을 짚는 작은 포인트로만.
+ * 900px보다 좁으면 네 묶음(.pane)을 하단 탭으로 나눠 보여 주고(js/tabs.js), 넓으면 지금처럼 이어서 보여 준다. */
+
+body.app {
+  --bg: #f6f7fa;
+  --surface: #ffffff;
+  --surface-2: #f4f6fb;
+  --border: #e7e9f0;
+  --border-strong: #d7dbe5;
+  --text: #121a2e;
+  --text-dim: #586178;
+  --text-faint: #8e96a8;
+  --accent: #173fa7;
+  --navy: #102d84;
+  --yellow: #ffe600;
+  --shadow: none;
+  --radius: 16px;
+  --tabbar-h: 62px;
+  background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.app {
+    --bg: #0b1020;
+    --surface: #121a2e;
+    --surface-2: #172036;
+    --border: #232c44;
+    --border-strong: #2f3a57;
+    --text: #edf0f8;
+    --text-dim: #a5aec6;
+    --text-faint: #6f7a95;
+    --accent: #ffe600;
+    --navy: #ffe600;
+  }
+}
+
+/* ── 머리 ── 흰 띠 한 줄 */
+.app .top {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 0; margin-bottom: 16px;
+}
+.app .brand-logo { height: 34px; border-radius: 8px; }
+.app .brand h1 { font-size: 16px; font-weight: 800; color: var(--text); }
+.app .brand p { color: var(--text-faint); font-size: 12px; }
+.app .navlinks a {
+  color: var(--text-dim); background: transparent; border-color: var(--border-strong); font-size: 12.5px; padding: 5px 12px;
+}
+.app .navlinks a:hover { color: var(--accent); border-color: var(--accent); }
+.app .navlinks a[aria-current="page"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app .navlinks a[aria-current="page"] { color: #081d58; }
+}
+
+/* ── 카드 ── */
+.app .card { box-shadow: none; border-radius: var(--radius); padding: 20px; }
+.app .card > h2, .app .feed-head h2 { font-size: 16.5px; font-weight: 800; letter-spacing: -.02em; }
+.app .card > .hint { font-size: 12.5px; }
+.app .intro { background: var(--surface); }
+.app .intro-cover { box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.app .rule-key { background: var(--surface-2); border-color: transparent; }
+.app .fold > summary { border-radius: 10px; }
+
+/* ── 오늘 띠 ── 큰 노란 상자 대신 흰 카드 + 노란 포인트 선 */
+.app .banner {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 4px solid var(--yellow);
+  box-shadow: none; border-radius: var(--radius);
+}
+.app .banner .big { color: var(--text); font-size: 22px; font-weight: 800; }
+.app .banner .lbl { color: var(--text-faint); font-weight: 600; letter-spacing: .02em; }
+.app .banner .sep { width: 1px; background: var(--border); }
+.app .banner .fold > summary { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.app .banner .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
+.app .banner .today-range, .app .banner .today-range-day { color: var(--text); }
+.app .banner .today-range-nav button { color: var(--text-dim); border-color: var(--border-strong); }
+
+/* ── 입력·버튼 ── */
+.app input[type="text"], .app input[type="search"], .app select, .app textarea, .app .picker-btn {
+  border-radius: 12px; border-color: var(--border-strong); background: var(--surface);
+}
+.app button, .app .btn { border-radius: 12px; background: var(--surface); }
+.app button.primary { background: var(--navy); border-color: var(--navy); color: #fff; box-shadow: none; }
+.app button.primary:hover { filter: brightness(1.12); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app button.primary,
+  :root:not([data-theme="light"]) .app button.primary:hover { color: #081d58; }
+}
+.app .form-actions .btn-verify { border-radius: 14px; font-size: 16px; }
+
+/* 숫자 타일 */
+.app .stat { background: var(--surface-2); border-color: transparent; border-radius: 12px; }
+
+/* 인증 직후 바로가기(js/tabs.js) */
+.app .quick-go { display: flex; gap: 8px; margin-top: 10px; }
+.app .quick-go button { flex: 1 1 0; min-height: 42px; font-size: 13.5px; }
+
+/* 이름을 고르기 전 [내 현황] 안내 · 맨 아래 운영진 링크 — 휴대폰 탭 화면에서만 */
+.app .my-empty, .app .pane-foot { display: none; }
+
+/* ── 하단 탭바 ── 기본은 숨김(넓은 화면) */
+.tabbar { display: none; }
+
+@media (max-width: 899px) {
+  .app .top { position: sticky; top: 0; z-index: 30; margin-bottom: 12px; }
+  .app.has-tabs .navlinks { display: none; }        /* 운영진 링크는 [내 현황] 맨 아래로 */
+  .app.has-tabs .wrap { padding-bottom: calc(var(--tabbar-h) + 28px + env(safe-area-inset-bottom)); }
+  .app.has-tabs footer.foot { display: none; }
+
+  /* 지금 탭의 묶음만 보인다 */
+  .app .pane { display: none; }
+  .app .pane.active { display: block; animation: pane-in .18s ease-out; }
+  @keyframes pane-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .app .my-empty:not([hidden]) { display: block; text-align: left; }
+  .app .pane-foot { display: block; text-align: center; margin: 18px 0 0; font-size: 12.5px; }
+  .app .pane-foot a { color: var(--text-faint); }
+
+  /* 책 소개는 짧게 — 설명은 세 줄까지만, 누르면 펼친다(js/tabs.js) */
+  .app .intro-body .desc {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer;
+  }
+  .app .intro-body .desc.open { display: block; -webkit-line-clamp: unset; }
+
+  /* 피드는 탭 하나를 통째로 쓰니 안쪽 스크롤 없이 길게 */
+  .app .feed-scroll { max-height: none; }
+
+  .tabbar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    padding: 6px 6px env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    -webkit-backdrop-filter: saturate(1.6) blur(12px); backdrop-filter: saturate(1.6) blur(12px);
+    border-top: 1px solid var(--border);
+  }
+  .tabbar button {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--text-faint); font-size: 11px; font-weight: 600; letter-spacing: -.01em;
+    border-radius: 12px; -webkit-tap-highlight-color: transparent; position: relative;
+  }
+  .tabbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tabbar .tab-ico {
+    width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .tabbar button[aria-current="page"] { color: var(--navy); font-weight: 800; }
+  .tabbar button[aria-current="page"] .tab-ico { stroke-width: 2.1; }
+  /* 지금 탭 위에 노란 점 하나 — 커밍쏜 시그니처 컬러는 여기에만 */
+  .tabbar button[aria-current="page"]::before {
+    content: ''; position: absolute; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--yellow);
+  }
+}
+
+@media (max-width: 899px) {
+  /* [인증] 탭은 매일 여는 화면 — 오늘 띠와 인증 폼을 맨 위로, 책 소개·규칙은 그 아래로 */
+  .app #pane-certify.active { display: flex; flex-direction: column; }
+  .app #pane-certify > .banner { order: 1; }
+  .app #pane-certify > #phaseNote { order: 2; }
+  .app #pane-certify > #certifyCard { order: 3; }
+  .app #pane-certify > .intro { order: 4; }
+  .app #pane-certify > .card:not(.intro):not(#certifyCard) { order: 5; }
+
+  .app .quick-go { margin-bottom: 14px; }
+
+  /* [내 현황] 28일 도장판 — 한 줄이 한 주(7일째가 라이브 날)가 되도록 7칸 */
+  .app #myStrip { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px 6px; }
+  .app #myCard .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .app #myCard .stat { padding: 10px 4px; text-align: center; }
+  .app #myCard .stat .n { font-size: 18px; }
+  .app #myCard .stat .k { font-size: 11px; }
+}

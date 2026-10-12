@@ -4,7 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#102d84">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1020" media="(prefers-color-scheme: dark)">
   <meta name="format-detection" content="telephone=no">
   <meta name="color-scheme" content="light dark">
   <title>퍼스널메이커스 독서 챌린지 · 인증하기</title>
@@ -13,11 +14,12 @@
   <link rel="stylesheet"
   href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/app.css">
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 </head>
 
-<body>
+<body class="app">
 
   <header class="top">
     <div class="top-in">
@@ -38,6 +40,9 @@
 
     <!-- 지난 시즌을 읽기 전용으로 열어 둔 경우에만 보이는 안내 -->
     <div id="seasonBanner" hidden></div>
+
+    <!-- ── 탭 1: 인증 ── 휴대폰에서는 아래 탭바로 네 화면을 오가고, 넓은 화면에서는 전부 이어서 보인다(js/tabs.js) -->
+    <div class="pane" data-pane="certify" id="pane-certify">
 
     <!-- 책 소개 -->
     <section class="card intro">
@@ -167,6 +172,11 @@
       </form>
     </section>
 
+    </div><!-- /pane-certify -->
+
+    <!-- ── 탭 2: 피드 ── -->
+    <div class="pane" data-pane="feed" id="pane-feed">
+
     <!-- 인증 피드 -->
     <section class="card feed-card">
       <div class="feed-head">
@@ -178,8 +188,7 @@
           <button type="button" id="feedRefresh" class="icon-btn" title="새로고침" aria-label="피드 새로고침"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/></svg></button>
         </div>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮기며 이전 인사이트를 볼 수 있습니다.
-        내게 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
+      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨 이전 인사이트를 볼 수 있어요. 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
       <div id="feedDateView">
         <!-- 날짜 이동(왼쪽) + 찾기·정렬(오른쪽)을 한 줄에 묶어 컨트롤이 흩어지지 않게 한다 -->
@@ -210,6 +219,11 @@
         </div>
       </div>
     </section>
+
+    </div><!-- /pane-feed -->
+
+    <!-- ── 탭 3: 명예의 전당 ── -->
+    <div class="pane" data-pane="fame" id="pane-fame">
 
     <!-- 명예의 전당 -->
     <section class="card fame-card">
@@ -259,6 +273,18 @@
           <table id="overallTable"></table>
         </div>
       </details>
+    </section>
+
+    </div><!-- /pane-fame -->
+
+    <!-- ── 탭 4: 내 현황 ── -->
+    <div class="pane" data-pane="me" id="pane-me">
+
+    <!-- 이름을 아직 고르지 않았을 때(휴대폰 탭 화면에서만) 보이는 안내 -->
+    <section class="card my-empty" id="myEmpty" hidden>
+      <h2>나의 진행 현황</h2>
+      <p class="hint">[인증] 탭에서 내 이름을 한 번 고르면, 여기서 지금까지의 인증 기록과 누락 횟수, 28일치 글 모음을 볼 수 있어요.</p>
+      <div class="actions"><button type="button" class="primary" id="myEmptyGo">이름 고르러 가기</button></div>
     </section>
 
     <!-- 나의 진행 현황 -->
@@ -313,7 +339,30 @@
       </details>
     </section>
 
+    <p class="pane-foot"><a href="admin.html">운영진 화면</a></p>
+    </div><!-- /pane-me -->
+
   </main>
+
+  <!-- 하단 탭바 — 휴대폰에서만 보인다 -->
+  <nav class="tabbar" id="tabbar" aria-label="화면 이동">
+    <button type="button" data-go="certify" aria-current="page">
+      <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h4.2L19.5 8.7a2.1 2.1 0 0 0 0-3l-1.2-1.2a2.1 2.1 0 0 0-3 0L4 15.8V20z"/><path d="m13.5 6.5 4 4"/></svg>
+      <span>인증</span>
+    </button>
+    <button type="button" data-go="feed">
+      <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 5.5h15v10.5H9l-4.5 3.5z"/><path d="M8.5 9.5h7"/><path d="M8.5 12.5h4.5"/></svg>
+      <span>피드</span>
+    </button>
+    <button type="button" data-go="fame">
+      <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 4h8v5.5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5.2a3 3 0 0 0 3.1 4.2"/><path d="M16 6h2.8a3 3 0 0 1-3.1 4.2"/><path d="M12 13.5V17"/><path d="M8.5 20h7"/></svg>
+      <span>명예의 전당</span>
+    </button>
+    <button type="button" data-go="me">
+      <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7"/><path d="M12 20V5"/><path d="M19 20v-10"/></svg>
+      <span>내 현황</span>
+    </button>
+  </nav>
 
   <footer class="foot">
     퍼스널메이커스 독서 챌린지 · <span id="footRange"></span> · 데이터는 Firestore DB에 저장되어 공유됩니다.
@@ -325,6 +374,7 @@
   <script src="js/store.js"></script>
   <script src="js/share-card.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/tabs.js"></script>
 </body>
 
 </html>
