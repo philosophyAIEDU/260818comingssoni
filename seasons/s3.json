@@ -1,0 +1,29 @@
+{
+  "_설명": "시즌 2 『혁명의 팡파르』 — 2026년 10월 기수. 외부 모집 10/18~10/20, 진행 10/21~11/17, 라이브는 7일차마다(화요일).",
+
+  "id": "s3",
+  "label": "시즌 2",
+  "month": "2026-10",
+  "monthLabel": "10월",
+  "recruitLabel": "10/18(일) ~ 10/20(화) 23:59, 3일간 모집",
+
+  "book": {
+    "name": "혁명의 팡파르",
+    "tagline": "현대의 돈과 광고",
+    "byline": "니시노 아키히로 지음 · 민경욱 옮김 · 소미미디어",
+    "cover": "혁명의팡파르.jpg",
+    "desc": "__TOC_PENDING__"
+  },
+
+  "otUrl": "https://youtu.be/ny6lJ-8PMXI",
+  "guideUrl": "__NOTION_PENDING__",
+  "appUrl": "https://personalmakersbook.netlify.app/",
+
+  "liveTime": "22:00 - 22:30",
+  "giftMissLimit": 6,
+  "bookEditionRule": "",
+  "bookBuyNote": "",
+
+  "toc": [],
+  "weeklyPrompts": []
+}
