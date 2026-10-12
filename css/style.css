@@ -726,15 +726,15 @@ button.ghost { background: transparent; }
    (예전에는 버튼단이 오른쪽에 세로로 서 있어 본문이 화면 폭의 57%에 갇혔었다) */
 .feed-item {
   --post-fs: 15px;
-  --post-lh: 1.4;             /* 스레드 본문: 15px / 21px */
-  display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 12px;
+  --post-lh: 1.5;             /* 스레드 앱 본문: 15pt / 약 22.5pt */
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px;
   padding: 14px 0 6px; border-bottom: 1px solid var(--border);
 }
 .feed-item:last-child { border-bottom: none; }
 .post-head { display: contents; }
 .post-ava {
   grid-column: 1; grid-row: 1 / span 3; align-self: start;
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--ava, var(--surface-2)); color: var(--ava-ink, var(--text-dim));
   font-size: 15px; font-weight: 600; letter-spacing: 0;
@@ -763,8 +763,10 @@ button.ghost { background: transparent; }
 }
 .quote-src { font-size: 12px; line-height: 1.4; color: var(--text-faint); margin-bottom: 3px; }
 .post-body .feed-quote { margin: 0; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-.post-body .feed-reflect { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-body .feed-reflect { margin: 12px 0 0; }
 .post-body .feed-reflect:empty { display: none; }
+.post-body .feed-reflect > p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-body .feed-reflect > p + p { margin-top: 8px; }
 /* 긴 글은 여덟 줄쯤에서 접고 [더 보기] — 아래쪽은 흐리게 사라지게 */
 .post-body.clamp { max-height: calc(var(--post-fs) * var(--post-lh) * 9); overflow: hidden; }
 .post-body.clamp::after {
@@ -780,7 +782,7 @@ button.ghost { background: transparent; }
 
 /* 버튼 한 줄 — 스레드처럼 테두리 없는 큰 아이콘 + 숫자, 넉넉한 간격(엄지척 → 복사) */
 /* 스레드: 아이콘 20px, 숫자 13px #424242, 아이콘 묶음 사이 24px 남짓 */
-.feed-acts { display: flex; align-items: center; gap: 10px; margin: 6px 0 0 -9px; }
+.feed-acts { display: flex; align-items: center; gap: 18px; margin: 6px 0 0 -9px; }
 .feed-acts > button {
   border: none; background: transparent; box-shadow: none;
   min-height: 36px; min-width: 38px; padding: 6px 9px; gap: 4px;
@@ -789,7 +791,7 @@ button.ghost { background: transparent; }
 .feed-acts .ico { width: 20px; height: 20px; stroke-width: 1.6; }
 .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .feed-acts .upvote-btn.voted { background: transparent; color: var(--info); }
-.feed-acts .upvote-btn.voted .ico { fill: currentColor; fill-opacity: .18; }
+.feed-acts .upvote-btn.voted .ico { fill: currentColor; }
 
 .upvote-btn {
   font-size: 12.5px; font-weight: 700; padding: 6px 12px; min-height: 34px;

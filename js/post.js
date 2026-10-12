@@ -49,6 +49,12 @@
       .replace(/\.\s*/g, '/').replace(/\/$/, '');
   }
 
+  /** 빈 줄로 나눈 문단은 스레드 앱처럼 반 줄 남짓만 띄운다(빈 줄을 통째로 두면 구멍처럼 벌어진다). */
+  function paras(text) {
+    return String(text == null ? '' : text).trim().split(/\n[ \t]*\n+/)
+      .map((t) => `<p>${esc(t.trim())}</p>`).join('');
+  }
+
   /** 본문(인상 깊은 내용 + 느낀 점). id가 있으면 '더 보기'로 펼친 상태를 기억할 수 있다. */
   function body(s, open) {
     const book = (CS.CONFIG && CS.CONFIG.book && CS.CONFIG.book.name) || '';
@@ -57,7 +63,7 @@
           <figcaption class="quote-src">${book ? `『${esc(book)}』에서` : '인상 깊은 내용'}</figcaption>
           <blockquote class="feed-quote">${esc(stripQuotes(s.sentence))}</blockquote>
         </figure>
-        <p class="feed-reflect">${esc(s.reflection)}</p>
+        <div class="feed-reflect">${paras(s.reflection)}</div>
       </div>
       <button type="button" class="post-more" hidden>더 보기</button>`;
   }
