@@ -2010,6 +2010,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const copied = await gp.evaluate(() => window.__copiedGiftText);
     t('이름·이메일 복사 — 한 줄에 "이름 <이메일>", 정렬 순서 그대로',
       copied === '둘놓침 <two@ex.com>\n다받음 <all@ex.com>', copied);
+    // 운영진 화면은 미니멀 스타일(admin.css)을 쓴다 — 참여자 화면에는 붙지 않는다.
+    t('운영진 화면에 admin 스타일 적용', await gp.evaluate(() => document.body.classList.contains('admin')
+      && [...document.styleSheets].some((s) => (s.href || '').endsWith('css/admin.css'))));
   }
   await giftCtx.close();
 
@@ -2105,6 +2108,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('누락 5회 안내 기본 문구가 정리본 문구', /정리본/.test(await adp.inputValue('#missed5TemplateBody')));
     t('선물 대상자 섹션에 정리본 발송 버튼이 있음', await adp.isVisible('#giftSendBtn'));
     t('정리본 발송 제목이 기본값으로 채워짐', /정리본/.test(await adp.inputValue('#giftMailSubject')));
+    // 킥아웃 없는 시즌에서는 "1/Infinity"처럼 기준이 붙지 않고 "1회"로만 보여야 한다.
+    const warnText = await adp.textContent('#missedWarnTable');
+    t('킥아웃 없는 시즌의 미인증 안내 표에 Infinity가 보이지 않음', !/Infinity/.test(warnText), warnText);
   }
   await s2Ctx.close();
 

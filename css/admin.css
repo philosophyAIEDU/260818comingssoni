@@ -1,0 +1,205 @@
+/* 운영진 화면 전용 — 미니멀 정리
+ *
+ * 참여자 화면(index.html)은 건드리지 않도록 전부 body.admin 아래로만 건다.
+ * 방향: 밝은 바탕 위에 선 하나짜리 흰 카드, 그림자·굵은 테두리·큰 노란 덩어리를 걷어 내고
+ * 정보 밀도는 그대로 둔다. 색은 상태(인증/누락/면제)와 주요 버튼에만 쓴다. */
+
+body.admin {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-2: #f6f7fa;
+  --border: #e6e8ee;
+  --border-strong: #d5d9e2;
+  --text: #141a2b;
+  --text-dim: #5d6679;
+  --text-faint: #8d95a7;
+  --accent: #173fa7;
+  --shadow: none;
+  --radius: 12px;
+  background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.admin {
+    --bg: #0b1020;
+    --surface: #121a2e;
+    --surface-2: #172036;
+    --border: #232c44;
+    --border-strong: #2f3a57;
+    --text: #e9edf7;
+    --text-dim: #a2acc4;
+    --text-faint: #6f7a95;
+    --accent: #ffe600;
+  }
+}
+
+/* ── 머리 ── 남색 띠는 브랜드라 남기되 얇게 */
+.admin .top { padding: 12px 0; margin-bottom: 18px; }
+.admin .brand-logo { height: 40px; border-radius: 8px; }
+.admin .brand h1 { font-size: 17px; }
+.admin .brand p { font-size: 12px; }
+.admin .navlinks a { font-size: 13px; padding: 5px 12px; }
+
+/* ── 오늘 띠 ── 큰 노란 상자 대신 한 줄 요약 */
+.admin .banner {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); box-shadow: none;
+  padding: 12px 18px; gap: 22px; margin-bottom: 12px;
+  border-left: 4px solid #ffe600;
+}
+.admin .banner .big { font-size: 18px; font-weight: 700; color: var(--text); }
+.admin .banner .lbl { font-size: 11px; letter-spacing: .04em; color: var(--text-faint); font-weight: 600; }
+.admin .banner .sep { width: 1px; background: var(--border); }
+
+/* ── 카드 ── */
+.admin .card { box-shadow: none; padding: 20px 22px; margin-bottom: 14px; }
+.admin .card h2 {
+  font-size: 15.5px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.01em;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text);
+}
+.admin .card h3 { font-size: 14px; font-weight: 700; margin: 18px 0 4px; color: var(--text); }
+.admin .card .hint, .admin .card > .hint {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim); margin: 0 0 12px; max-width: 72ch;
+}
+.admin .card .hint strong { color: var(--text); font-weight: 600; }
+.admin .muted { font-size: 12.5px; }
+
+/* 한 패널 안의 덩어리(명단 등록 / 시트 업로드 / 목록 …)는 위에 선을 긋고 띄워 구획한다.
+   기존 h2 style="margin-top:26px" 자리를 그대로 이어받는다. */
+.admin .card [style*="margin-top:26px"] {
+  margin-top: 26px !important; padding-top: 20px; border-top: 1px solid var(--border);
+}
+
+/* ── 시즌 선택 줄 ── */
+.admin #seasonBar { padding: 14px 18px; }
+.admin #seasonBar .row { gap: 18px; }
+.admin #seasonBar .hint { margin: 8px 0 0; }
+
+/* ── 숫자 타일 ── */
+.admin .stats { gap: 10px; margin-bottom: 14px !important; }
+.admin .stat { background: var(--surface); padding: 12px 14px; border-radius: 10px; }
+.admin .stat .n { font-size: 20px; }
+.admin .stat .k { font-size: 11.5px; }
+
+/* ── 탭 ── 한 줄, 스크롤해도 위에 붙어 있게 */
+.admin .tabs {
+  position: sticky; top: 0; z-index: 20;
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  gap: 2px; margin: 0 0 14px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.admin .tabs::-webkit-scrollbar { display: none; }
+.admin .tabs button {
+  flex: 0 0 auto; border: 0; background: transparent; color: var(--text-dim);
+  border-radius: 8px; padding: 7px 14px; font-size: 13.5px; font-weight: 600;
+}
+.admin .tabs button:hover { background: var(--surface-2); color: var(--text); }
+.admin .tabs button.on { background: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .admin .tabs button.on { color: #081d58; }
+}
+
+/* ── 입력칸 ── 기본 크기를 줄이고, 이메일·전화·URL 칸도 같은 모양으로 */
+.admin input[type="text"], .admin input[type="date"], .admin input[type="number"],
+.admin input[type="email"], .admin input[type="tel"], .admin input[type="url"],
+.admin select, .admin textarea {
+  width: 100%; padding: 8px 11px; font-size: 14px; line-height: 1.45;
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--surface); color: var(--text); font-family: inherit;
+}
+.admin select { padding-right: 34px; background-position: right 11px center; }
+.admin textarea { min-height: 64px; }
+.admin .field { margin-bottom: 12px; }
+.admin .field label { font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
+.admin label.muted { display: block; font-size: 12px; margin-bottom: 5px; }
+.admin textarea.report { min-height: 260px; font-size: 12.5px; }
+
+/* ── 버튼 ── 그림자 없이 얇게 */
+.admin button, .admin .btn {
+  font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: none;
+}
+.admin button.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: none; }
+.admin button.primary:hover { filter: brightness(1.12); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .admin button.primary,
+  :root:not([data-theme="light"]) .admin button.primary:hover { color: #081d58; }
+}
+.admin button.small { font-size: 12px; padding: 4px 9px; font-weight: 500; }
+.admin button.danger { background: transparent; }
+.admin .actions { gap: 8px; }
+.admin .actions > .muted { font-size: 12px; flex: 0 1 auto; }
+
+/* ── 표 ── */
+.admin table { font-size: 13px; }
+.admin th { font-size: 11.5px; font-weight: 600; color: var(--text-faint); padding: 8px 8px; }
+.admin td { padding: 7px 8px; }
+.admin tbody tr:hover td { background: var(--surface-2); }
+.admin .scroll { border: 1px solid var(--border); border-radius: 10px; }
+.admin .scroll > table th:first-child, .admin .scroll > table td:first-child { padding-left: 12px; }
+
+/* 명단 표: 칸 안 입력은 평소엔 글자처럼, 손을 대면 칸처럼 */
+.admin #rosterTable input, .admin #rosterTable select {
+  border-color: transparent; background-color: transparent;
+  padding: 5px 8px; font-size: 13px; border-radius: 6px; min-width: 0 !important;
+}
+.admin #rosterTable select { padding-right: 26px; background-position: right 7px center; background-size: 12px 12px; }
+.admin #rosterTable input:hover, .admin #rosterTable select:hover { border-color: var(--border-strong); }
+.admin #rosterTable input:focus, .admin #rosterTable select:focus { border-color: var(--accent); background-color: var(--surface); }
+.admin #rosterTable [data-rename] { width: 108px; font-weight: 600; }
+.admin #rosterTable [data-editemail] { width: 160px; }
+.admin #rosterTable [data-editphone] { width: 112px; }
+.admin #rosterTable [data-editkakao] { width: 66px; }
+.admin #rosterTable [data-editstreak] { width: 52px !important; }
+.admin #rosterTable [data-exemptdate] { width: 124px !important; border-color: var(--border); padding: 4px 6px; font-size: 12px; }
+.admin #rosterTable td, .admin #rosterTable th { padding-left: 5px; padding-right: 5px; }
+.admin #rosterTable .chips:empty { display: none; }
+.admin #rosterTable .chips { margin-top: 4px; }
+.admin #rosterTable td > div[style*="display:flex"] { flex-wrap: nowrap !important; }
+.admin #rosterTable .actions { flex-wrap: nowrap; gap: 4px; }
+
+/* 일일현황 매트릭스: 이름 칸이 옆으로 밀릴 때도 보이게 */
+.admin .matrix td.name, .admin .matrix th.name { background: var(--surface); }
+.admin .legend { font-size: 12px; }
+
+/* ── 제출 기록 ── 넓은 화면에선 두 줄로 */
+.admin #entryList { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 10px; }
+.admin #entryList > .empty, .admin #entryList > .entries-more { grid-column: 1 / -1; }
+.admin .entry { margin: 0; background: var(--surface); padding: 12px 14px; }
+.admin .entry h4 { font-size: 13px; margin-bottom: 6px; }
+.admin .entry dl { grid-template-columns: 88px 1fr; font-size: 13px; line-height: 1.6; }
+.admin .entries-more { text-align: center; padding-top: 4px; }
+
+/* ── 접이식 도움말 ── 긴 설명은 접어 두고 필요할 때만 */
+.admin details.help { margin: 0 0 12px; }
+.admin details.help > summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--text-faint);
+}
+.admin details.help > summary::-webkit-details-marker { display: none; }
+.admin details.help > summary::before {
+  content: '?'; display: inline-grid; place-items: center; width: 16px; height: 16px;
+  border-radius: 50%; border: 1px solid var(--border-strong); font-size: 10.5px;
+}
+.admin details.help[open] > summary { color: var(--text-dim); margin-bottom: 6px; }
+.admin details.help .hint { margin-bottom: 6px; }
+
+.admin details.fold > summary { font-size: 13px; }
+.admin footer.foot { padding: 18px 16px 28px; }
+
+/* 파일 고르기 입력(복원)도 버튼 모양에 맞춘다 */
+.admin input[type="file"] { font-size: 12.5px; color: var(--text-dim); }
+.admin input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 600; margin-right: 10px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer;
+}
+
+/* ── 좁은 화면 ── */
+@media (max-width: 640px) {
+  .admin .card { padding: 16px; }
+  .admin .banner { gap: 14px; padding: 10px 14px; }
+  .admin .banner .big { font-size: 16px; }
+  .admin .stats { grid-template-columns: repeat(3, 1fr); }
+  .admin .stat { padding: 10px; }
+  .admin .stat .n { font-size: 18px; }
+  .admin #entryList { grid-template-columns: 1fr; }
+}
