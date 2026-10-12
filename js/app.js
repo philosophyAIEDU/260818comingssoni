@@ -1192,6 +1192,8 @@
       feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
       await calculateRanksAndFame();
+      // 휴대폰 탭 화면(js/tabs.js)은 이 신호를 받아 "피드 보기 · 내 현황 보기" 바로가기를 띄운다.
+      document.dispatchEvent(new CustomEvent('cs:submitted', { detail: { late } }));
       $('myCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       msg($('formMsg'), `저장 실패: ${esc(err.message)}`, 'bad');
