@@ -8,8 +8,10 @@
  *   - 매달 21일에 시작해서 28일(4주). 라이브는 각 주 7일째 = 7·14·21·28일차, 22:00.
  *     그래서 라이브 요일은 시작일 요일과 같다(9/21 월요일 시작 → 일요일 라이브).
  *   - 종료 다음 날부터 다음 달 20일까지는 내 글 자산화 기간(28일 기록을 블로그·SNS에 올리기 · 정리본 발송).
- *   - 커리큘럼: 1일차 목차 훑기 → 2~19일차 1회독(라이브 날 제외 16일) → 20일차 1회독 결산
- *     → 22~26일차 2회독 → 27일차 밑줄 총정리. 목차(toc)만 주면 쪽수 비중으로 나눈다.
+ *   - 커리큘럼: 1회독 3주 · 2회독 1주. 주마다 "준비/복습 하루 + 읽는 날 5일 + 라이브"로 같은 모양이다.
+ *       1일차 목차 훑기 · 2~6 / 8~12 / 15~19일차 1회독(15일) · 13일차 1·2주차 따라잡기 · 20일차 결산
+ *       → 22~26일차 2회독(1회독 분량을 5등분) → 27일차 밑줄 총정리.
+ *     목차(toc)만 주면 쪽수 비중으로(쪽수가 없으면 꼭지 수로) 고르게 나눈다.
  *
  * 만들어 주는 것
  *   1) js/config.js 의 CS.SEASONS 에 시즌 객체 추가 (+ 앞 시즌 lockAt 자동)
@@ -83,6 +85,13 @@ const RECAP_DAY = [{ ch: '', s: [
   '못 읽은 부분이 있다면 오늘 마저!'
 ] }];
 const FINAL_DAY = [{ ch: '', s: ['밑줄 총정리 · 🏆 <strong>28일 중 나의 최고 문장 1개</strong> 선정'] }];
+// 2주차에만 읽는 날이 6일이라 한 주가 무거워지던 것을 막는다 — 1주차(1일차 준비)·3주차(20일차 결산)처럼
+// 2주차에도 쉬어 가는 날을 하나 둬서, 세 주 모두 "읽는 날 5일"로 같게 만든다.
+const CATCHUP_DAY = [{ ch: '', s: [
+  '📌 <strong>1·2주차 따라잡기 · 밑줄 복습</strong> — 새로 읽을 분량은 없습니다.',
+  '밀린 분량을 마저 읽고, 지금까지 그은 밑줄 중 마음에 남은 한 문장을 골라 인증해 주세요.'
+] }];
+const CATCHUP = 13;
 
 /** 무게(쪽수)가 있는 항목들을 순서를 지키며 n개 묶음으로 나눈다. 묶음마다 최소 1개. */
 function splitByWeight(items, n) {
@@ -108,7 +117,7 @@ function splitByWeight(items, n) {
 /** 목차 → 28일 커리큘럼. toc: [{ ch:'1장', title:'…', s:['소제목'…], pages?: 40 }] */
 function planFromToc(toc) {
   const firstReadDays = [];
-  for (let d = 2; d <= 19; d++) if (!LIVE_DAYS.includes(d)) firstReadDays.push(d);
+  for (let d = 2; d <= 19; d++) if (!LIVE_DAYS.includes(d) && d !== CATCHUP) firstReadDays.push(d);
   // 소제목 단위로 펼치고, 장의 쪽수를 소제목 수로 나눠 무게로 쓴다(쪽수가 없으면 1)
   const items = [];
   toc.forEach((c) => {
@@ -131,13 +140,14 @@ function planFromToc(toc) {
     });
     plan[d - 1] = groups;
   });
+  plan[CATCHUP - 1] = CATCHUP_DAY;
   plan[19] = RECAP_DAY;
-  // 2회독: 22~26일차, 장 단위
-  const chapters = toc.map((c) => ({ label: `${c.ch}${c.title ? ' ' + c.title : ''}`.trim(), w: c.pages || (c.s ? c.s.length : 1) }));
-  const rechunks = splitByWeight(chapters, 5);
+  // 2회독: 22~26일차 — 1회독과 같은 무게로 5등분해 "몇 번째 꼭지부터 몇 번째까지"로 보여 준다
+  const rechunks = splitByWeight(items, 5);
+  const head = (it) => `「${String(it.text).split(' / ')[0]}」`;
   [22, 23, 24, 25, 26].forEach((d, i) => {
     const cs = rechunks[i];
-    plan[d - 1] = [{ ch: '2회독', s: [cs ? cs.map((c) => c.label).join(' + ') : '밑줄 친 부분 다시 읽기'] }];
+    plan[d - 1] = [{ ch: '2회독', s: [cs ? `${head(cs[0])} ~ ${head(cs[cs.length - 1])}` : '밑줄 친 부분 다시 읽기'] }];
   });
   plan[26] = FINAL_DAY;
   return plan;
@@ -285,7 +295,7 @@ if (spec.toc) {
     if (LIVE_DAYS.includes(i + 1) || i === 0 || i >= 19) return;
     console.log(`   ${String(i + 1).padStart(2)}일차 ${shortD(addDays(startDate, i))}  ${day.map((g) => (g.ch ? g.ch + ' ' : '') + g.s.join(' / ')).join(' | ')}`);
   });
-  console.log('   … 20일차 결산 · 22~26일차 2회독 · 27일차 총정리 · 라이브 7·14·21·28일차');
+  console.log('   … 13일차 따라잡기 · 20일차 결산 · 22~26일차 2회독 · 27일차 총정리 · 라이브 7·14·21·28일차');
 }
 if (!(spec.weeklyPrompts || []).length) console.log('\n   ⚠ 발제문(weeklyPrompts)이 비어 있습니다 — 스킬이 목차로 초안을 써서 채워야 합니다.');
 
