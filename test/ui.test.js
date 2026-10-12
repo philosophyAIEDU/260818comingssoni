@@ -2055,6 +2055,24 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await ap.fill('#participantSearch', '연속');
     await ap.waitForTimeout(200);
     t('이름 고르기 목록에도 배지', /🔥 2/.test(await ap.textContent('#participantListbox')));
+    // 내 기록 내보내기: 고르면 [내 기록 전체 복사]가 보이고, 복사 내용이 블로그용 글 형태
+    await ap.locator('#participantListbox .combo-option').first().click();
+    await ap.waitForTimeout(500);
+    t('기록이 있으면 [내 기록 전체 복사]가 보임', await ap.isVisible('#myCopyAll'));
+    await ap.evaluate(() => { navigator.clipboard.writeText = (x) => { window.__mine = x; return Promise.resolve(); }; });
+    await ap.click('#myCopyAll');
+    await ap.waitForTimeout(200);
+    const mine = await ap.evaluate(() => window.__mine || '');
+    t('복사 내용: 책·이름·일차·문장·느낀 점', /『꿈과 돈』 28일 독서 기록 — 연속둘/.test(mine) && /7일차/.test(mine) && mine.includes('“문장”') && mine.includes('느낌'), mine);
+    // 이 샌드박스 크로미움은 한글 파일명을 "download"로 보고하므로 <a download> 값을 직접 본다(위 피드 다운로드 테스트와 같은 방식).
+    const namePromise = ap.evaluate(() => new Promise((resolve) => {
+      const orig = document.body.appendChild.bind(document.body);
+      document.body.appendChild = (el) => { if (el.tagName === 'A' && el.download) resolve(el.download); return orig(el); };
+    }));
+    const [dl] = await Promise.all([ap.waitForEvent('download'), ap.click('#mySaveAll')]);
+    const saved = await namePromise;
+    t('텍스트 파일로 저장 — 파일명', saved === '꿈과 돈_독서기록_연속둘.txt', saved);
+    t('저장한 파일 내용도 같은 글', fs.readFileSync(await dl.path(), 'utf-8').includes('“문장”'));
     await ap.click('#todayRangeFold summary');
     await ap.waitForTimeout(200);
     t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
@@ -2108,9 +2126,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     rp.on('pageerror', (e) => errs.push('pageerror(retro): ' + e.message));
     await rp.goto(BASE + '/index.html');
     await rp.waitForTimeout(600);
-    t('회고 세션 안내가 보임', await rp.isVisible('#phaseNote .note.retro'));
-    t('회고 안내에 기간과 할 일이 적힘', /회고 세션/.test(await rp.textContent('#phaseNote')) && /최고 문장/.test(await rp.textContent('#phaseNote')));
-    t('회고 기간에는 제출이 잠김', await rp.isDisabled('#submitBtn'));
+    t('자산화 기간 안내가 보임', await rp.isVisible('#phaseNote .note.retro'));
+    t('자산화 안내에 기간과 할 일(복사·블로그)이 적힘',
+      /자산화/.test(await rp.textContent('#phaseNote')) && /블로그/.test(await rp.textContent('#phaseNote'))
+      && /내 기록 전체 복사/.test(await rp.textContent('#phaseNote')));
+    t('자산화 기간에는 제출이 잠김', await rp.isDisabled('#submitBtn'));
   }
   await retroCtx.close();
 

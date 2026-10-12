@@ -200,9 +200,12 @@
     // 회고 세션: 종료 다음 날 ~ retroUntil. 인증은 닫힌 채로 안내만 띄운다.
     const today = U.today();
     if (CONFIG.retroUntil && today > CONFIG.endDate && today <= CONFIG.retroUntil) {
-      box.innerHTML = `<div class="note retro">📚 <strong>회고 세션</strong> (${esc(U.shortLabel(U.addDays(CONFIG.endDate, 1)))} ~ ${esc(U.shortLabel(CONFIG.retroUntil))})<br>`
-        + `${U.challengeDates().length}일 동안 고생 많으셨습니다. 인증은 끝났고, 이 기간엔 세 가지만 합니다.<br>`
-        + '① 아래 [나의 현황]에서 내 기록을 내려받기 ② 28일 중 나의 최고 문장 하나를 단톡방에 나누기 ③ 정리본이 오면 한 꼭지 골라 적용해 보기</div>';
+      const days = U.challengeDates().length;
+      box.innerHTML = `<div class="note retro">✍️ <strong>내 글 자산화 기간</strong> (${esc(U.shortLabel(U.addDays(CONFIG.endDate, 1)))} ~ ${esc(U.shortLabel(CONFIG.retroUntil))})<br>`
+        + `${days}일 동안 고생 많으셨습니다. 인증은 끝났고, 다음 기수 전까지 이것만 해 보세요.<br>`
+        + `① 아래에서 내 이름을 고르고 <strong>[내 기록 전체 복사]</strong>로 ${days}일치 글을 한 번에 가져가기<br>`
+        + `② 그중 가장 좋았던 3개를 골라 <strong>블로그·스레드·인스타</strong>에 올리기 — "『${esc(CONFIG.book.name)}』을 읽고 내 브랜드에 적용한 3가지" 같은 제목이면 충분합니다<br>`
+        + '③ 책 한 권을 읽고 글 한 편을 남기면, 그게 쌓여 나만의 콘텐츠이자 자산이 됩니다.</div>';
     }
 
     if (!open) {
@@ -588,6 +591,53 @@
     $('draftNote').textContent = '';
   }
 
+  /* ── 내 기록 내보내기 — 블로그·스레드에 바로 붙여 넣을 수 있는 글 형태로 ── */
+  let mineForExport = null; // { p, subs }
+
+  function myRecordText(p, subs) {
+    const all = subs.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const head = [
+      `『${CONFIG.book.name}』 ${U.challengeDates().length}일 독서 기록 — ${p.nickname}`,
+      `${CONFIG.title} · ${U.shortLabel(CONFIG.startDate)} ~ ${U.shortLabel(CONFIG.endDate)} · ${all.length}개의 기록`,
+      ''
+    ];
+    const body = all.map((s) => {
+      const idx = U.dayIndex(s.date);
+      return [
+        `■ ${idx ? `${idx}일차 · ` : ''}${U.shortLabel(s.date)}`,
+        `“${s.sentence}”`,
+        s.reflection,
+        ''
+      ].join('\n');
+    });
+    return head.concat(body).join('\n').trim() + '\n';
+  }
+
+  async function copyMine() {
+    if (!mineForExport) return;
+    const text = myRecordText(mineForExport.p, mineForExport.subs);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e2) { /* noop */ }
+      ta.remove();
+    }
+    msg($('myExportMsg'), `${mineForExport.subs.length}개의 기록을 복사했습니다. 블로그·스레드 글쓰기 창에 붙여 넣으세요.`, 'ok');
+  }
+
+  function saveMine() {
+    if (!mineForExport) return;
+    const text = myRecordText(mineForExport.p, mineForExport.subs);
+    const blob = new Blob(['\ufeff' + text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${CONFIG.book.name}_독서기록_${mineForExport.p.nickname}.txt`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
   /* ── 나의 현황 ───────────────────────── */
   async function paintMine(pid) {
     const p = participants.find((x) => x.id === pid);
@@ -633,6 +683,14 @@
       '<div class="empty">아직 제출한 인증이 없습니다.</div>';
     $('myEntriesFold').querySelector('summary').textContent =
       all.length ? `전체 인증 기록 ${all.length}건 보기` : '전체 인증 기록 보기';
+
+    // 내보내기: 기록이 하나라도 있으면 보인다. 회고 기간엔 "자산화" 문구로 더 크게 권한다.
+    mineForExport = { p, subs: all };
+    $('myExport').hidden = !all.length;
+    const inRetro = CONFIG.retroUntil && U.today() > CONFIG.endDate && U.today() <= CONFIG.retroUntil;
+    $('myExportHint').innerHTML = inRetro
+      ? `✍️ <strong>${all.length}개의 기록이 쌓였습니다.</strong> 한 번에 복사해서 블로그·스레드에 올려 보세요. 내가 쓴 글이 내 콘텐츠이자 자산이 됩니다.`
+      : `지금까지 쓴 <strong>${all.length}개</strong>의 기록을 한 번에 복사하거나 저장할 수 있습니다.`;
   }
 
   function labelOf(st) {
@@ -1183,6 +1241,8 @@
     paintHeader();
     renderTodayRange();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));
+    $('myCopyAll').addEventListener('click', copyMine);
+    $('mySaveAll').addEventListener('click', saveMine);
     $('rangeNextDay').addEventListener('click', () => shiftRangeDay(1));
     paintPhase();
     tickCountdown();

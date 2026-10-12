@@ -297,6 +297,16 @@
         <span><b class="cell cell-p">P</b> 면제 <span class="muted">— 미인증으로 세지 않습니다</span></span>
       </div>
 
+      <!-- 내 글을 내 자산으로 — 28일치 기록을 블로그·SNS에 옮기기 좋게 한 번에 가져간다 -->
+      <div class="my-export" id="myExport" hidden>
+        <p class="hint" id="myExportHint"></p>
+        <div class="actions">
+          <button class="primary" type="button" id="myCopyAll">📋 내 기록 전체 복사</button>
+          <button type="button" id="mySaveAll">⬇ 텍스트 파일로 저장</button>
+        </div>
+        <div id="myExportMsg"></div>
+      </div>
+
       <details class="fold" id="myEntriesFold">
         <summary>전체 인증 기록 보기</summary>
         <div id="myEntries" class="entry-list"></div>
