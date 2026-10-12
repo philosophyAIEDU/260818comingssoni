@@ -380,9 +380,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   padding: 14px; margin-bottom: 10px; background: var(--surface-2);
 }
 .entry h4 { margin: 0 0 8px; font-size: 13.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.entry dl { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 5px 12px; font-size: 13.5px; line-height: 1.7; }
+.entry dl { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 5px 12px; font-size: 15px; line-height: 1.72; }
 .entry dt { color: var(--text-dim); font-size: 12.5px; }
-.entry dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.entry dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry dd.quote { color: var(--text-dim); padding-left: 12px; border-left: 3px solid var(--border-strong); }
 /* 멤버가 쓴 글은 기울임을 쓰지 않는다 — 한글 기울임은 가짜 기울임(합성)이라
    획이 뭉개지고, 여기 올라오는 글은 대개 길어서 읽기가 더 힘들어진다.
    강조색과 따옴표만으로 충분히 구분된다. */
@@ -390,7 +391,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── 리포트 텍스트 영역 (읽기전용 <pre>·수정 가능한 <textarea> 공용) ── */
 .report {
-  white-space: pre-wrap; word-break: break-word;
+  white-space: pre-wrap; overflow-wrap: anywhere;
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.65;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -606,11 +607,16 @@ footer.foot {
 .fame-entry-label { font-size: 11.5px; font-weight: 700; color: var(--text-faint); margin-top: 8px; }
 .fame-entry-label:first-child { margin-top: 0; }
 .fame-entry .quote { margin: 3px 0 0; }
-.fame-entry > p { margin: 3px 0 0; white-space: pre-wrap; word-break: break-word; }
+.fame-entry > p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fame-entry { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
 .fame-entry:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
 .fame-entry-date { font-size: 11.5px; color: var(--text-faint); font-weight: 700; }
-.fame-entry .quote { color: var(--accent); margin: 4px 0; line-height: 1.65; }
+/* 펼친 기록 본문 — 피드 글(.post-body)과 같은 읽기 크기·인용 모양 */
+.fame-entry { font-size: 15px; line-height: 1.72; }
+.fame-entry .quote {
+  color: var(--text-dim); margin: 4px 0 0; padding: 1px 0 1px 12px;
+  border-left: 3px solid var(--border-strong); white-space: pre-wrap; overflow-wrap: anywhere;
+}
 
 /* ── 인증 피드 ────────────────────────── */
 .feed-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -648,43 +654,13 @@ button.ghost { background: transparent; }
 }
 .compact-controls button { height: 34px; min-height: 0; font-size: 13px; }
 
-/* 전체 보기: 인증 카드들을 그리드로 한눈에.
-   한 줄에 4장까지 들어가면 카드가 너무 좁아 본문이 열 글자씩 끊겨 읽기 어려웠다.
-   그래서 넓은 화면에서도 한 줄에 최대 3장까지만 놓는다. */
-.all-feed-grid {
-  display: grid; grid-template-columns: minmax(0, 1fr);
-  gap: 12px; max-height: 640px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px;
-}
-@media (min-width: 660px) { .all-feed-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1000px) { .all-feed-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-
-/* 카드 높이를 맞춰 두고(글이 긴 사람 때문에 다른 카드가 비어 보이지 않게),
-   넘치는 본문은 카드마다 따로 스크롤한다. */
-.all-feed-grid .feed-item { height: 340px; align-items: stretch; }
-.all-feed-grid .feed-main { display: flex; flex-direction: column; min-height: 0; }
-/* 전체 보기 카드는 폭이 좁다 — 버튼을 세로로 쌓아(엄지척 위, 복사 아래) 한 칸 폭만 쓰고,
-   그만큼 본문이 넓어지게 한다. column-reverse라 DOM 순서(복사 → 엄지척)와 반대로 보인다. */
-.all-feed-grid .feed-acts > button { min-width: 42px; }
-.all-feed-grid .feed-item { column-gap: 8px; padding: 12px 11px; }
-.all-feed-grid .feed-body {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px;
-}
-.all-feed-grid .feed-body::-webkit-scrollbar { width: 6px; }
-.all-feed-grid .feed-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
-
-/* 인상 깊은 내용 / 느낀 점 구분 — 별도의 칸을 두지 않고 라벨과 색으로만 나눈다.
-   인상 깊은 내용은 강조색(.feed-quote), 느낀 점은 본문색이라 눈으로 바로 갈린다. */
-.feed-label { font-size: 11px; font-weight: 700; color: var(--text-faint); margin-top: 7px; }
-.feed-more .body.reflect { padding: 0; }
-.feed-more .body.reflect p { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
-.all-feed-grid::-webkit-scrollbar { width: 8px; }
-.all-feed-grid::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+/* 전체 보기: 글 목록 — 스레드처럼 한 줄에 한 글, 읽기 좋은 폭(약 680px)으로 가운데에.
+   예전에는 넓은 화면에서 카드 3장을 나란히 놓고 높이를 340px로 묶어 카드마다 따로 스크롤했는데,
+   카드 폭이 좁아 본문이 열 글자 남짓에서 끊기고 아래로 한없이 길어져 읽기 힘들었다. */
+.all-feed-grid { display: flex; flex-direction: column; }
 .all-feed-grid .empty { grid-column: 1 / -1; }
-/* feed-all.html 전용: 카드 안에 갇힌 스크롤 대신 페이지 자체가 스크롤되는 전체 페이지 버전 */
-.all-feed-grid.full { max-height: none; overflow-y: visible; padding-right: 0; }
-
 /* 전체 보기: 날짜별로 묶어서 보여주는 바깥 컨테이너(각 날짜 그룹 안에 .all-feed-grid를 둔다) */
-.all-feed-groups { display: flex; flex-direction: column; gap: 22px; }
+.all-feed-groups { display: flex; flex-direction: column; gap: 22px; max-width: 680px; margin: 0 auto; }
 .all-feed-date-heading {
   display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
   font-size: 14.5px; font-weight: 700; color: var(--text-dim);
@@ -724,7 +700,7 @@ button.ghost { background: transparent; }
 .feed-date { font-size: 14px; font-weight: 700; min-width: 8.4em; text-align: center; }
 
 .feed-scroll {
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 0;
   max-height: 620px; overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; padding-right: 4px;
   touch-action: pan-y;
@@ -742,46 +718,66 @@ button.ghost { background: transparent; }
 .feed-more-wrap { display: flex; justify-content: center; margin-top: 12px; }
 .feed-more-wrap[hidden] { display: none; }
 
-/* 글(이름·시간·본문)은 왼쪽 한 덩어리로, 버튼(텍스트 복사·엄지척)은 오른쪽 한 덩어리로 나눈다.
-   버튼이 글 흐름 안에 섞여 있으면 줄바꿈 위치에 따라 본문이 버튼 사이로 파고들어 깨져 보인다. */
+/* ── 남의 글 한 편(.post) — 스레드처럼 읽히게 (js/post.js) ──
+   한 글이 폭을 통째로 쓴다: 이름 줄 → 본문 → 맨 아래 버튼 한 줄. 글과 글 사이는 상자 대신 얇은 선 하나.
+   예전에는 버튼단이 오른쪽에 세로로 서서 본문이 화면 폭의 57%(360px 폰에서 205px)에 갇혔고,
+   한 줄에 열서너 글자씩만 들어가 문장이 아래로 길게 늘어졌다. */
 .feed-item {
-  border: 1px solid var(--border); border-radius: 11px;
-  background: var(--surface-2); padding: 12px 13px;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 12px; align-items: start;
+  --post-fs: 15.5px;
+  padding: 16px 2px 10px; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 0;
 }
-.feed-item.win { border-color: var(--warn); background: var(--warn-soft); }
+.feed-item:last-child { border-bottom: none; }
+.feed-item.win {
+  background: linear-gradient(90deg, rgba(255, 230, 0, .16), rgba(255, 230, 0, 0) 70%);
+  border-radius: 12px; padding-left: 10px; padding-right: 10px;
+}
+.post-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.post-ava {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ava, var(--surface-2)); color: var(--ava-ink, var(--text-dim));
+  font-size: 14px; font-weight: 800; letter-spacing: 0;
+}
 .feed-main { min-width: 0; }
-/* 오른쪽 버튼단 — 세로로 쌓아 폭을 좁게 유지(가로로 놓으면 본문 자리를 크게 잡아먹는다) */
-/* 복사·엄지척 두 버튼은 세로로 쌓는다(엄지척 위 / 복사 아래).
-   가로로 두면 버튼단이 두 칸 폭을 차지해 좁은 화면에서 본문이 눌린다.
-   DOM 순서는 복사 → 엄지척이라 column-reverse로 뒤집어 보여 준다. */
-.feed-acts {
-  display: flex; flex-direction: column-reverse; align-self: start; gap: 5px;
+/* 이름 + 🔥 + 지각 배지 + 시간. 좁으면 시간만 다음 줄로. */
+.feed-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; row-gap: 0; min-width: 0; }
+.feed-nick { font-size: 15px; font-weight: 700; white-space: normal; overflow: visible; text-overflow: clip; }
+.feed-time { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
+.feed-time::before { content: '·'; margin-right: 6px; }
+
+/* 본문 — 15.5px · 줄간격 1.72. 책 문장(인용)은 왼쪽 선 하나, 느낀 점은 본문색 그대로.
+   멤버가 쓴 글은 기울임을 쓰지 않는다 — 한글 기울임은 합성이라 획이 뭉개진다. */
+.post-body { margin-top: 10px; font-size: var(--post-fs); line-height: 1.72; color: var(--text); position: relative; }
+.post-body .feed-quote {
+  margin: 0; padding: 1px 0 1px 12px; border-left: 3px solid var(--border-strong);
+  color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere;
 }
+.post-body .feed-reflect { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-body .feed-reflect:empty { display: none; }
+/* 긴 글은 여덟 줄쯤에서 접고 [더 보기] — 아래쪽은 흐리게 사라지게 */
+.post-body.clamp { max-height: calc(var(--post-fs) * 1.72 * 8); overflow: hidden; }
+.post-body.clamp::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3.2em; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--post-bg, var(--surface)));
+}
+.feed-item.win .post-body.clamp::after { display: none; }
+.post-more {
+  all: unset; cursor: pointer; margin-top: 4px; align-self: flex-start;
+  color: var(--text-faint); font-size: 14px; font-weight: 600; padding: 4px 0;
+}
+.post-more:hover, .post-more:focus-visible { color: var(--accent); }
+.post-more[hidden] { display: none; }
+
+/* 맨 아래 버튼 한 줄 — 테두리 없는 아이콘 버튼(엄지척 → 복사) */
+.feed-acts { display: flex; align-items: center; gap: 4px; margin: 6px 0 0 -8px; }
 .feed-acts > button {
-  width: 100%; justify-content: center; min-height: 32px; min-width: 44px; padding: 5px 9px; gap: 4px;
+  border: none; background: transparent; box-shadow: none;
+  min-height: 36px; min-width: 40px; padding: 6px 10px; gap: 5px;
+  color: var(--text-dim); border-radius: 999px;
 }
-/* 이름 + 지각 배지 + 시간. 버튼이 빠졌으므로 한 줄에 들어가고, 좁으면 시간만 아래로 내려간다. */
-.feed-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
-.feed-nick { font-size: 14px; font-weight: 700; white-space: normal; overflow: visible; text-overflow: clip; }
-.feed-time { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
-.feed-quote {
-  margin: 8px 0 0; font-size: 13.5px; line-height: 1.7; color: var(--accent);
-  white-space: pre-wrap; word-break: break-word;
-}
-.feed-more { margin-top: 8px; }
-.feed-more > summary {
-  cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 600;
-  color: var(--text-dim); display: inline-flex; align-items: center; gap: 4px; padding: 3px 0;
-}
-.feed-more > summary::-webkit-details-marker { display: none; }
-.feed-more > summary::before { content: '＋'; font-size: 11px; }
-.feed-more[open] > summary::before { content: '－'; }
-.feed-more .body { margin-top: 8px; font-size: 13.5px; line-height: 1.7; }
-.feed-more .body dt { font-size: 11.5px; color: var(--text-faint); margin-top: 8px; }
-.feed-more .body dt:first-child { margin-top: 0; }
-.feed-more .body dd { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
+.feed-acts > button:hover:not(:disabled) { background: var(--surface-2); color: var(--accent); }
+.feed-acts .upvote-btn.voted { background: var(--info-soft); color: var(--info); }
 
 .upvote-btn {
   font-size: 12.5px; font-weight: 700; padding: 6px 12px; min-height: 34px;
@@ -848,7 +844,6 @@ button.ghost { background: transparent; }
   .entry-list { max-height: 60vh; }
   .feed-scroll { max-height: 70vh; }
   .upvote-btn { min-height: 38px; padding: 7px 13px; }
-  .feed-item { column-gap: 10px; }
 }
 
 /* 라이브 날 [오늘의 범위] 안에 붙는 발제문 */

@@ -11,6 +11,12 @@
   let feedPerson = ''; // 선택한 참가자 id. 빈 값이면 전체.
   let feedDate = '';   // 선택한 날짜(YYYY-MM-DD). 빈 값이면 전체 날짜.
   let participants = [];
+  const openIds = new Set(); // [더 보기]로 펼쳐 둔 글 — 다시 그려도 펼친 채로
+  let refitTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(refitTimer);
+    refitTimer = setTimeout(() => CS.Post.fit($('allFeedList'), openIds), 150);
+  });
 
   // 중복 추천 방지를 위해 로컬 고유 식별자 생성 (index.html과 동일한 키를 써서 기기별로 통일)
   let clientId = localStorage.getItem(CLIENT_KEY);
@@ -29,30 +35,26 @@
     const late = U.isLate(s.date, s.createdAt);
     const hasUpvoted = (s.upvotedBy || []).includes(clientId);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : ''].filter(Boolean).join(' ');
-    // index.html의 피드와 동일한 구조: 왼쪽 글 / 오른쪽 버튼
-    return `<article class="feed-item">
-      <div class="feed-main">
+    // index.html의 인증 피드와 같은 구조(js/post.js) — 이름 줄 / 본문 / 맨 아래 버튼 한 줄
+    return `<article class="feed-item post">
+      <div class="post-head">
+        ${CS.Post.avatar(s.nickname)}
         <div class="feed-top">
           <span class="feed-nick">${esc(s.nickname)}</span>
           ${late ? '<span class="tag bad">지각</span>' : ''}
           <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
         </div>
-        <div class="feed-body">
-          <div class="feed-label">인상 깊은 내용</div>
-          <p class="feed-quote">“${esc(s.sentence)}”</p>
-          <details class="feed-more">
-            <summary>느낀 점 보기</summary>
-            <div class="body reflect"><p>${esc(s.reflection)}</p></div>
-          </details>
-        </div>
+      </div>
+      <div class="feed-main">
+        ${CS.Post.body(s, openIds.has(s.id))}
       </div>
       <div class="feed-acts">
+        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
+          aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
           aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
-        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
-          aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
       </div>
     </article>`;
   }
@@ -192,6 +194,7 @@
         <div class="all-feed-grid full">${items.map(renderItem).join('')}</div>
       </div>`).join('');
     bindUpvoteButtons(list);
+    CS.Post.fit(list, openIds);
     CS.ShareCard.bindButtons(list, { title: CS.CONFIG.title });
 
     const remaining = all.length - visible.length;

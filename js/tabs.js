@@ -29,6 +29,8 @@
       try { history.replaceState(null, '', url); } catch (e) { /* 주소를 못 바꿔도 탭 전환은 된다 */ }
     }
     if (isMobile() && !(opts && opts.keepScroll)) window.scrollTo(0, 0);
+    // 숨어 있던 탭이 막 보이게 됐다 — 긴 글 [더 보기] 같은 "보이는 폭으로 재는" 일을 다시 하라고 알린다
+    document.dispatchEvent(new CustomEvent('cs:tab', { detail: { tab: name } }));
   }
 
   function fromHash() {
