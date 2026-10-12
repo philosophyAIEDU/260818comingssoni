@@ -785,7 +785,12 @@
     if (keep) sel.value = keep;
   }
 
-  function paintEntries() {
+  // 제출 기록은 시즌 후반이면 천 건이 넘는다 — 한 번에 30건씩만 그리고 [더 보기]로 늘린다.
+  const ENTRY_PAGE = 30;
+  let entryLimit = ENTRY_PAGE;
+
+  function paintEntries(opts) {
+    if (!(opts && opts.keepLimit)) entryLimit = ENTRY_PAGE;
     const date = $('fDate').value;
     const pid = $('fParticipant').value;
     const kw = $('fKeyword').value.trim().toLowerCase();
@@ -799,7 +804,7 @@
     }
 
     const list = $('entryList');
-    list.innerHTML = rows.length ? rows.slice(0, 200).map((s) => `
+    list.innerHTML = rows.length ? rows.slice(0, entryLimit).map((s) => `
       <div class="entry">
         <h4>${esc(s.nickname)} <span class="tag">${esc(U.shortLabel(s.date))}</span>
           ${U.isLate(s.date, s.createdAt) ? '<span class="tag bad">지각</span>' : ''}
@@ -809,8 +814,12 @@
           <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
           <dt>느낀 점</dt><dd>${esc(s.reflection)}</dd>
         </dl>
-      </div>`).join('') + (rows.length > 200 ? '<p class="muted">최근 200건만 표시합니다.</p>' : '')
+      </div>`).join('') + (rows.length > entryLimit
+        ? `<div class="entries-more"><button type="button" id="entriesMore">더 보기 · ${rows.length - entryLimit}건 남음</button></div>`
+        : '')
       : '<div class="empty">조건에 맞는 제출 기록이 없습니다.</div>';
+    const more = $('entriesMore');
+    if (more) more.addEventListener('click', () => { entryLimit += ENTRY_PAGE; paintEntries({ keepLimit: true }); });
 
     list.querySelectorAll('[data-delentry]').forEach((el) => {
       el.addEventListener('click', async () => {
@@ -1140,7 +1149,7 @@
       ? `${sortHead('warn', cols)}<tbody>${
         sortRows('warn', cols, rows).map(({ stat: s, email }) => `<tr>
           <td>${esc(s.participant.nickname)}</td>
-          <td class="num">${s.missed}/${CONFIG.kickoutThreshold}</td>
+          <td class="num">${s.missed}${CONFIG.kickoutEnabled ? `/${CONFIG.kickoutThreshold}` : '회'}</td>
           <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
           <td>${email
             ? `<button class="small" data-warnmail="${esc(s.participant.id)}">메일 작성</button>`
