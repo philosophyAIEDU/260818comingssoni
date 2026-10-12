@@ -42,7 +42,7 @@
         <div class="feed-top">
           <span class="feed-nick">${esc(s.nickname)}</span>
           ${late ? '<span class="tag bad">지각</span>' : ''}
-          <span class="feed-time">${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}</span>
+          <span class="feed-time" title="${esc(U.shortLabel(s.date))} · ${esc(U.stampLabel(s.updatedAt || s.createdAt))}">${esc(CS.Post.when(s.updatedAt || s.createdAt))}</span>
         </div>
       </div>
       <div class="feed-main">

@@ -1,13 +1,14 @@
 /* 남의 인증글을 "읽기 좋게" 보여 주는 공용 조각 — 인증 피드(js/app.js)와 전체 보기(js/feed-all.js)가 같이 쓴다.
  *
- * 스레드(Threads)처럼 한 글이 화면 폭을 통째로 쓴다:
- *   [동그란 이름 머리글자] 이름 · 🔥 · 몇 분 전
- *   ┃ 인상 깊은 내용(책 문장 — 왼쪽 선 하나로 '인용'임을 알린다)
- *   느낀 점(그 사람의 말 — 본문색 그대로)
- *   (길면 여덟 줄쯤에서 접고 [더 보기])
- *   👍 3   ⧉
- * 예전에는 버튼단이 오른쪽에 세로로 서 있어 본문이 화면의 절반 남짓한 폭에 갇혔고,
- * 느낀 점은 한 번 더 눌러야 보였다. 이제 버튼은 글 아래 한 줄로 내려가고, 느낀 점은 바로 보인다. */
+ * 스레드(Threads) 앱과 같은 짜임:
+ *   (머리글자)  이름 🔥2  7시간
+ *               ┌ 📖 혁명의 팡파르 ─────────┐
+ *               │ 인상 깊은 내용(책 문장)      │   ← 스레드의 링크 미리보기 카드처럼 둥근 테두리 상자
+ *               └──────────────────────────┘
+ *               느낀 점(그 사람의 말)
+ *               (길면 여덟 줄쯤에서 접고 [더 보기])
+ *               👍 3    ⧉
+ * 동그라미는 왼쪽 칸에만 있고, 이름·본문·버튼은 모두 그 오른쪽 한 줄(같은 왼쪽 선)에 맞춰 선다. */
 (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -34,20 +35,28 @@
     return m && !/["“”]/.test(m[1]) ? m[1].trim() : t;
   }
 
-  /** 오늘 올라온 글은 "12분 전"처럼, 하루가 넘으면 날짜·시각으로. */
+  /** 스레드처럼 짧게 — 방금 · 12분 · 7시간 · 3일, 일주일이 넘으면 10/21. (정확한 시각은 title로) */
   function when(iso) {
     if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    if (diff >= 0 && diff < 60 * 1000) return '방금';
-    if (diff >= 0 && diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)}분 전`;
-    if (diff >= 0 && diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / 3600000)}시간 전`;
-    return CS.U.stampLabel(iso);
+    const t = new Date(iso).getTime();
+    const diff = Date.now() - t;
+    const M = 60 * 1000, H = 60 * M, D = 24 * H;
+    if (diff >= 0 && diff < M) return '방금';
+    if (diff >= 0 && diff < H) return `${Math.floor(diff / M)}분`;
+    if (diff >= 0 && diff < D) return `${Math.floor(diff / H)}시간`;
+    if (diff >= 0 && diff < 7 * D) return `${Math.floor(diff / D)}일`;
+    return new Date(t).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })
+      .replace(/\.\s*/g, '/').replace(/\/$/, '');
   }
 
   /** 본문(인상 깊은 내용 + 느낀 점). id가 있으면 '더 보기'로 펼친 상태를 기억할 수 있다. */
   function body(s, open) {
+    const book = (CS.CONFIG && CS.CONFIG.book && CS.CONFIG.book.name) || '';
     return `<div class="post-body${open ? ' open' : ''}" data-subid="${esc(s.id)}">
-        <blockquote class="feed-quote">${esc(stripQuotes(s.sentence))}</blockquote>
+        <figure class="post-quote">
+          <figcaption class="quote-src">${book ? `『${esc(book)}』에서` : '인상 깊은 내용'}</figcaption>
+          <blockquote class="feed-quote">${esc(stripQuotes(s.sentence))}</blockquote>
+        </figure>
         <p class="feed-reflect">${esc(s.reflection)}</p>
       </div>
       <button type="button" class="post-more" hidden>더 보기</button>`;

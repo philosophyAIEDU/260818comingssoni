@@ -720,66 +720,75 @@ button.ghost { background: transparent; }
 .feed-more-wrap { display: flex; justify-content: center; margin-top: 12px; }
 .feed-more-wrap[hidden] { display: none; }
 
-/* ── 남의 글 한 편(.post) — 스레드처럼 읽히게 (js/post.js) ──
-   한 글이 폭을 통째로 쓴다: 이름 줄 → 본문 → 맨 아래 버튼 한 줄. 글과 글 사이는 상자 대신 얇은 선 하나.
-   예전에는 버튼단이 오른쪽에 세로로 서서 본문이 화면 폭의 57%(360px 폰에서 205px)에 갇혔고,
-   한 줄에 열서너 글자씩만 들어가 문장이 아래로 길게 늘어졌다. */
+/* ── 남의 글 한 편(.post) — 스레드(Threads) 앱과 같은 짜임 (js/post.js) ──
+   왼쪽 칸에 머리글자 동그라미, 오른쪽 칸에 이름 줄 → 책 문장 카드 → 느낀 점 → 버튼 한 줄.
+   이름·본문·버튼이 모두 같은 왼쪽 선에 서서 눈이 한 줄기로 내려간다. 글 사이는 얇은 선 하나.
+   (예전에는 버튼단이 오른쪽에 세로로 서 있어 본문이 화면 폭의 57%에 갇혔었다) */
 .feed-item {
   --post-fs: 15.5px;
-  padding: 16px 2px 10px; border-bottom: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 0;
+  --post-lh: 1.6;
+  display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 11px;
+  padding: 16px 0 8px; border-bottom: 1px solid var(--border);
 }
 .feed-item:last-child { border-bottom: none; }
-.feed-item.win {
-  background: linear-gradient(90deg, rgba(255, 230, 0, .16), rgba(255, 230, 0, 0) 70%);
-  border-radius: 12px; padding-left: 10px; padding-right: 10px;
-}
-.post-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.post-head { display: contents; }
 .post-ava {
-  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  grid-column: 1; grid-row: 1 / span 3; align-self: start;
+  width: 36px; height: 36px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--ava, var(--surface-2)); color: var(--ava-ink, var(--text-dim));
-  font-size: 14px; font-weight: 800; letter-spacing: 0;
+  font-size: 15px; font-weight: 700; letter-spacing: 0;
 }
-.feed-main { min-width: 0; }
-/* 이름 + 🔥 + 지각 배지 + 시간. 좁으면 시간만 다음 줄로. */
-.feed-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; row-gap: 0; min-width: 0; }
-.feed-nick { font-size: 15px; font-weight: 700; white-space: normal; overflow: visible; text-overflow: clip; }
-.feed-time { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
-.feed-time::before { content: '·'; margin-right: 6px; }
+.feed-top, .feed-main, .feed-acts { grid-column: 2; min-width: 0; }
+.feed-main { display: flex; flex-direction: column; }
+/* 이름 🔥2 7시간 — 스레드처럼 가운뎃점 없이 시간만 흐리게 */
+.feed-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; row-gap: 0; line-height: 1.35; padding-top: 1px; }
+.feed-nick { font-size: 15px; font-weight: 700; letter-spacing: -.01em; white-space: normal; overflow: visible; text-overflow: clip; }
+.feed-nick .season-badge { margin-left: 4px; font-size: 11.5px; padding: 0 6px 0 4px; vertical-align: 1px; }
+.feed-time { font-size: 14px; color: var(--text-faint); white-space: nowrap; }
+/* 그날 1등은 이름 앞 왕관(👑) 하나로만 — 배경을 칠하지 않는다 */
+@media (prefers-color-scheme: dark) {
+  /* 어두운 화면에서 밝은 파스텔 동그라미가 튀지 않게 — 이름 색을 옅게 깐 동그라미 + 흰 글자 */
+  :root:not([data-theme="light"]) .post-ava {
+    background: color-mix(in srgb, var(--ava-ink, #455680) 45%, #0b1020); color: #fff;
+  }
+}
 
-/* 본문 — 15.5px · 줄간격 1.72. 책 문장(인용)은 왼쪽 선 하나, 느낀 점은 본문색 그대로.
-   멤버가 쓴 글은 기울임을 쓰지 않는다 — 한글 기울임은 합성이라 획이 뭉개진다. */
-.post-body { margin-top: 10px; font-size: var(--post-fs); line-height: 1.72; color: var(--text); position: relative; }
-.post-body .feed-quote {
-  margin: 0; padding: 1px 0 1px 12px; border-left: 3px solid var(--border-strong);
-  color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere;
+/* 본문 — 15.5px · 줄간격 1.6. 멤버가 쓴 글은 기울임을 쓰지 않는다(한글 기울임은 합성이라 획이 뭉개진다). */
+.post-body { margin-top: 8px; font-size: var(--post-fs); line-height: var(--post-lh); color: var(--text); position: relative; }
+/* 책 문장 — 스레드의 링크 미리보기 카드처럼 둥근 테두리 상자 */
+.post-quote {
+  margin: 0; padding: 11px 14px 12px; border: 1px solid var(--border-strong); border-radius: 14px;
+  background: var(--surface);
 }
+.quote-src { font-size: 12.5px; line-height: 1.4; color: var(--text-faint); margin-bottom: 4px; }
+.post-body .feed-quote { margin: 0; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .post-body .feed-reflect { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .post-body .feed-reflect:empty { display: none; }
 /* 긴 글은 여덟 줄쯤에서 접고 [더 보기] — 아래쪽은 흐리게 사라지게 */
-.post-body.clamp { max-height: calc(var(--post-fs) * 1.72 * 8); overflow: hidden; }
+.post-body.clamp { max-height: calc(var(--post-fs) * var(--post-lh) * 9); overflow: hidden; }
 .post-body.clamp::after {
   content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3.2em; pointer-events: none;
   background: linear-gradient(to bottom, transparent, var(--post-bg, var(--surface)));
 }
-.feed-item.win .post-body.clamp::after { display: none; }
 .post-more {
-  all: unset; cursor: pointer; margin-top: 4px; align-self: flex-start;
-  color: var(--text-faint); font-size: 14px; font-weight: 600; padding: 4px 0;
+  all: unset; cursor: pointer; margin-top: 2px; align-self: flex-start;
+  color: var(--text-faint); font-size: 15px; font-weight: 500; padding: 4px 0;
 }
 .post-more:hover, .post-more:focus-visible { color: var(--accent); }
 .post-more[hidden] { display: none; }
 
-/* 맨 아래 버튼 한 줄 — 테두리 없는 아이콘 버튼(엄지척 → 복사) */
-.feed-acts { display: flex; align-items: center; gap: 4px; margin: 6px 0 0 -8px; }
+/* 버튼 한 줄 — 스레드처럼 테두리 없는 큰 아이콘 + 숫자, 넉넉한 간격(엄지척 → 복사) */
+.feed-acts { display: flex; align-items: center; gap: 14px; margin: 6px 0 0 -9px; }
 .feed-acts > button {
   border: none; background: transparent; box-shadow: none;
-  min-height: 36px; min-width: 40px; padding: 6px 10px; gap: 5px;
-  color: var(--text-dim); border-radius: 999px;
+  min-height: 38px; min-width: 38px; padding: 6px 9px; gap: 6px;
+  font-size: 14.5px; font-weight: 500; color: var(--text-dim); border-radius: 999px;
 }
-.feed-acts > button:hover:not(:disabled) { background: var(--surface-2); color: var(--accent); }
-.feed-acts .upvote-btn.voted { background: var(--info-soft); color: var(--info); }
+.feed-acts .ico { width: 21px; height: 21px; stroke-width: 1.55; }
+.feed-acts > button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.feed-acts .upvote-btn.voted { background: transparent; color: var(--info); }
+.feed-acts .upvote-btn.voted .ico { fill: currentColor; fill-opacity: .18; }
 
 .upvote-btn {
   font-size: 12.5px; font-weight: 700; padding: 6px 12px; min-height: 34px;
