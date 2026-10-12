@@ -201,8 +201,8 @@ const seasonSrc = `, {
     '${days}일간 기록한 내용은 <strong>한 번에 내려받을 수</strong> 있습니다. 화면 맨 아래 <strong>[나의 현황]</strong>에서 '
       + '지금까지 몇 번 인증했고 몇 번 놓쳤는지도 확인할 수 있습니다.'
   ].filter(Boolean),
-  sentencePlaceholder: 'ex) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
-    + '끝에 쪽수를 붙여 주세요. (예: … - 47쪽)',
+  sentencePlaceholder: '예) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
+    + '끝에 쪽수를 붙여 주세요. (… - 47쪽)',
   reflectionPlaceholder: '짧아도 좋습니다. 오늘 읽은 내용을 내 브랜드·일에 어떻게 적용할지 적어주세요.',
   startDate: ${q(startDate)},
   endDate: ${q(endDate)},

@@ -675,7 +675,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(400);
   t('브랜드 서브타이틀 제거됨', (await page.locator('#brandSub').count()) === 0);
   const sentencePh = await page.getAttribute('#sentence', 'placeholder');
-  t('예시 placeholder에 중복 안내문 없음', sentencePh.startsWith('ex)'), sentencePh.slice(0, 30));
+  t('예시 placeholder에 중복 안내문 없음', sentencePh.startsWith('예)'), sentencePh.slice(0, 30));
   const rulesCard = page.locator('.wrap section.card', { hasText: '안내 · 챌린지 규칙' });
   const rulesText = await rulesCard.textContent();
   t('참여 아이디 안내 문구 삭제됨', !rulesText.includes('참여 아이디는 드롭다운'));
@@ -2219,6 +2219,20 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await m.waitForTimeout(400);
     t('피드가 다시 그려져도 펼쳐 둔 긴 글은 계속 펼쳐져 있음',
       !(await mine.locator('.post-more').isVisible()) && await mine.locator('.post-body').evaluate((b) => b.classList.contains('open')));
+    // ── 글꼴·안내 글씨: 스레드와 같은 시스템 글꼴, 한 문장 이상인 안내는 14px 이상 ──
+    const ty = await m.evaluate(() => {
+      const fs = (sel) => { const el = document.querySelector(sel); return el ? parseFloat(getComputedStyle(el).fontSize) : 0; };
+      return {
+        family: getComputedStyle(document.body).fontFamily,
+        webfont: !!document.querySelector('link[href*="pretendard"]'),
+        rules: fs('#ruleList li'), ruleKey: fs('.rule-key'), hint: fs('#certifyCard > .hint'),
+        desc: fs('#introDesc'), note: fs('.form-note'),
+      };
+    });
+    t('글꼴: 스레드와 같은 시스템 글꼴(system-ui)을 쓰고 웹폰트를 따로 받지 않음',
+      ty.family.startsWith('system-ui') && !ty.webfont, ty);
+    t('안내·공지 글씨가 14px 이상(규칙·마감·안내·책 소개·응원 문구)',
+      [ty.rules, ty.ruleKey, ty.hint, ty.desc, ty.note].every((n) => n >= 14), ty);
     await m.click('#tabbar [data-go="me"]');
     await m.waitForTimeout(150);
     const mo = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

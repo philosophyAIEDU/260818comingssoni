@@ -25,10 +25,12 @@
   --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.2 6.3 8 10.1l3.8-3.8'/%3E%3C/svg%3E");
   --radius: 14px;
   --shadow: 0 4px 14px rgba(0, 28, 120, 0.12);
-  /* Pretendard Variable — index.html에서 실제로 불러온다(전에는 이름만 적혀 있어
-     기기마다 제각각 시스템 폰트로 떨어졌다). 못 받아오면 아래 순서로 물러난다. */
-  --font: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont,
-          'Apple SD Gothic Neo', 'Segoe UI', Roboto, 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  /* 스레드(Threads)와 같은 글꼴 — 따로 내려받지 않고 기기에 들어 있는 시스템 글꼴을 쓴다.
+     (스레드 웹 CSS의 본문 글꼴: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial)
+     아이폰·맥은 Apple SD Gothic Neo, 안드로이드는 기기 기본 한글 글꼴(본고딕/삼성 One UI), 윈도는 맑은 고딕으로
+     그려진다 — 멤버가 스레드·카톡에서 매일 보는 바로 그 글씨라 낯설지 않고, 글꼴 파일을 받느라 늦어지지도 않는다. */
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', Roboto,
+          'Noto Sans KR', 'Malgun Gothic', Helvetica, Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -815,7 +817,6 @@ button.ghost { background: transparent; }
 
   .intro { grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: start; }
   .intro-body h2 { font-size: 17px; }
-  .intro-body .meta { font-size: 12.5px; }
 
   .banner {
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
