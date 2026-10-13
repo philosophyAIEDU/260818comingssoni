@@ -93,7 +93,7 @@
       </div>
 
       <details class="fold" id="todayRangeFold">
-        <summary>📖 오늘의 범위</summary>
+        <summary>📖 오늘 읽을 분량</summary>
         <div class="today-range-nav">
           <button type="button" id="rangePrevDay" class="small ghost" aria-label="이전 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
           <span class="today-range-day" id="rangeDayLabel">-</span>
@@ -176,6 +176,7 @@
 
     <!-- 인증 피드 -->
     <section class="card feed-card">
+      <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 작게 정렬(추천순/최신순)·전체 보기·새로고침 -->
       <div class="feed-head">
         <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
         <div class="feed-head-actions">
@@ -183,30 +184,30 @@
             <a href="feed-all.html" target="_blank" rel="noopener" class="btn on">전체 보기<svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 10 10.4 5.6"/><path d="M6.3 5.6h4.1v4.1"/></svg></a>
           </div>
           <button type="button" id="feedRefresh" class="icon-btn" title="새로고침" aria-label="피드 새로고침"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/></svg></button>
+          <select id="feedSortSelect" class="sort-mini" aria-label="정렬 기준">
+            <option value="likes">추천순</option>
+            <option value="recent">최신순</option>
+          </select>
         </div>
       </div>
-      <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨 이전 인사이트를 볼 수 있어요. 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
       <div id="feedDateView">
-        <!-- 날짜 이동(왼쪽) + 찾기·정렬(오른쪽)을 한 줄에 묶어 컨트롤이 흩어지지 않게 한다 -->
+        <!-- 그 아래: 이름 검색(화면 폭 전체) → 날짜 넘기기 -->
         <div class="feed-toolbar">
-          <div class="feed-datenav">
-            <button type="button" id="feedPrevDate" class="icon-btn" aria-label="이전 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
-            <span class="feed-date" id="feedDateLabel">-</span>
-            <button type="button" id="feedNextDate" class="icon-btn" aria-label="다음 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.4 10.4 8 6 12.6"/></svg></button>
-          </div>
           <div class="feed-filters">
             <span class="field-icon">
               <svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7.2" cy="7.2" r="4.3"/><path d="M10.4 10.4 13.6 13.6"/></svg>
               <input type="search" id="feedSearch" class="feed-search"
                 placeholder="이름 검색" autocomplete="off" aria-label="인증 피드에서 이름으로 찾기">
             </span>
-            <select id="feedSortSelect" aria-label="정렬 기준">
-              <option value="likes">추천 많은순</option>
-              <option value="recent">최신순</option>
-            </select>
+          </div>
+          <div class="feed-datenav">
+            <button type="button" id="feedPrevDate" class="icon-btn" aria-label="이전 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
+            <span class="feed-date" id="feedDateLabel">-</span>
+            <button type="button" id="feedNextDate" class="icon-btn" aria-label="다음 날짜"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.4 10.4 8 6 12.6"/></svg></button>
           </div>
         </div>
+        <p class="hint">좌우로 넘기거나 화살표로 날짜를 옮겨 이전 인사이트를 볼 수 있어요. 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
         <div id="socialFeedList" class="feed-scroll">
           <div class="empty">제출된 인증글이 없습니다.</div>
@@ -224,9 +225,15 @@
 
     <!-- 명예의 전당 -->
     <section class="card fame-card">
-      <h2>🏆 명예의 전당 <span class="tag warn">전일 Top 5</span></h2>
+      <h2>🏆 명예의 전당 <span class="tag warn" id="fameTag">전일 Top 5</span></h2>
       <p class="hint"><strong id="fameDateLabel">어제</strong> 올라온 인증글 중 추천을 많이 받은 분들입니다.
         이름을 클릭하면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. 오늘 순위는 인증 피드에서 확인해주세요.</p>
+      <!-- 일자별로 넘겨 보기 — 기본은 어제, ◀로 첫날까지 -->
+      <div class="feed-datenav fame-datenav" id="fameDateNav" hidden>
+        <button type="button" id="famePrevDate" class="icon-btn" aria-label="이전 날짜 순위"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.4 5.6 8l4.4 4.6"/></svg></button>
+        <span class="feed-date" id="fameNavLabel">-</span>
+        <button type="button" id="fameNextDate" class="icon-btn" aria-label="다음 날짜 순위"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.4 10.4 8 6 12.6"/></svg></button>
+      </div>
       <ol id="hallOfFameList" class="fame">
         <li class="none">집계된 순위가 없습니다.</li>
       </ol>
@@ -324,14 +331,15 @@
       <div class="my-export" id="myExport" hidden>
         <p class="hint" id="myExportHint"></p>
         <div class="actions">
-          <button class="primary" type="button" id="myCopyAll">📋 내 기록 전체 복사</button>
-          <button type="button" id="mySaveAll">⬇ 텍스트 파일로 저장</button>
+          <button class="primary" type="button" id="mySaveAll">⬇ 전체 기록 한 번에 받기</button>
+          <button type="button" id="myCopyAll">📋 내 기록 전체 복사</button>
         </div>
         <div id="myExportMsg"></div>
       </div>
 
-      <details class="fold" id="myEntriesFold">
-        <summary>전체 인증 기록 보기</summary>
+      <!-- 지금까지의 기록은 처음부터 펼쳐 둔다(1일차부터 오늘까지, 빈 날 포함) -->
+      <details class="fold" id="myEntriesFold" open>
+        <summary>내 인증 기록</summary>
         <div id="myEntries" class="entry-list"></div>
       </details>
     </section>
@@ -370,6 +378,7 @@
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/post.js"></script>
+  <script src="js/phrase.js"></script>
   <script src="js/store-firebase.js"></script>
   <script src="js/store.js"></script>
   <script src="js/share-card.js"></script>

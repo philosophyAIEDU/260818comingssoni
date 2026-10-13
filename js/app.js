@@ -175,6 +175,23 @@
     fold.hidden = false;
   }
 
+  /* 오늘 읽을 분량은 처음부터 펼쳐 둔다(매일 여는 화면 맨 위에서 바로 보이게).
+   * 눌러서 가리면 그날 하루는 가린 채로 기억했다가, 다음 날에는 새 분량이니 다시 펼친다. */
+  const RANGE_HIDE_KEY = `${CONFIG.storagePrefix}.rangeHiddenOn`;
+  function initRangeFold() {
+    const fold = $('todayRangeFold');
+    if (!fold) return;
+    let hiddenOn = null;
+    try { hiddenOn = localStorage.getItem(RANGE_HIDE_KEY); } catch (e) { /* 저장소를 못 써도 펼친 채로 보여 준다 */ }
+    fold.open = hiddenOn !== U.today();
+    fold.addEventListener('toggle', () => {
+      try {
+        if (fold.open) localStorage.removeItem(RANGE_HIDE_KEY);
+        else localStorage.setItem(RANGE_HIDE_KEY, U.today());
+      } catch (e) { /* 기억은 못 해도 가리기·펼치기는 된다 */ }
+    });
+  }
+
   function shiftRangeDay(delta) {
     rangeDayIdx = (rangeDayIdx || 1) + delta;
     renderTodayRange();
@@ -676,13 +693,26 @@
         <span class="d">${Number(c.date.slice(8))}</span>
       </div>`).join('');
 
-    // 전체 기록 — 최근 몇 건만 자르지 않고 날짜 순서(1일차 → 최근)대로 모두 보여준다.
+    // 전체 기록 — 하루도 빠뜨리지 않고 1일차부터 오늘까지 날짜 순서대로.
+    // 낸 날은 글 전체를, 안 낸 날은 "미인증", 면제일은 "면제" 한 줄로 남겨 빈 날이 어디인지 바로 보이게 한다.
+    // 챌린지 날짜 밖(연습 기간 등)에 낸 글도 버리지 않고 맨 앞에 함께 둔다.
     const box = $('myEntries');
     const all = subs.slice().sort((a, b) => a.date.localeCompare(b.date));
-    box.innerHTML = all.length ? all.map(renderEntry).join('') :
+    const byDate = new Map(all.map((s) => [s.date, s]));
+    const inChallenge = new Set(stat.cells.map((c) => c.date));
+    const rows = all.filter((s) => !inChallenge.has(s.date)).map(renderEntry);
+    let missedRows = 0;
+    for (const c of stat.cells) {
+      const s = byDate.get(c.date);
+      if (s) rows.push(renderEntry(s));
+      else if (c.status === 'X') { rows.push(renderGap(c.date, 'X')); missedRows++; }
+      else if (c.status === 'P') rows.push(renderGap(c.date, 'P'));
+    }
+    box.innerHTML = rows.length ? rows.join('') :
       '<div class="empty">아직 제출한 인증이 없습니다.</div>';
-    $('myEntriesFold').querySelector('summary').textContent =
-      all.length ? `전체 인증 기록 ${all.length}건 보기` : '전체 인증 기록 보기';
+    $('myEntriesFold').querySelector('summary').textContent = all.length
+      ? `내 인증 기록 ${all.length}건${missedRows ? ` · 미인증 ${missedRows}일` : ''}`
+      : '내 인증 기록';
 
     // 내보내기: 기록이 하나라도 있으면 보인다. 회고 기간엔 "자산화" 문구로 더 크게 권한다.
     mineForExport = { p, subs: all };
@@ -690,11 +720,21 @@
     const inRetro = CONFIG.retroUntil && U.today() > CONFIG.endDate && U.today() <= CONFIG.retroUntil;
     $('myExportHint').innerHTML = inRetro
       ? `✍️ <strong>${all.length}개의 기록이 쌓였습니다.</strong> 한 번에 복사해서 블로그·스레드에 올려 보세요. 내가 쓴 글이 내 콘텐츠이자 자산이 됩니다.`
-      : `지금까지 쓴 <strong>${all.length}개</strong>의 기록을 한 번에 복사하거나 저장할 수 있습니다.`;
+      : `지금까지 쓴 <strong>${all.length}개</strong>의 기록을 한 번에 받거나 복사할 수 있습니다.`;
   }
 
   function labelOf(st) {
     return { O: '인증', X: '미인증', P: '면제', '-': '예정', '·': '집계 대상 아님' }[st] || st;
+  }
+
+  /** 글이 없는 날(미인증·면제) — 빈 날도 목록에서 빠지지 않게 한 줄로 */
+  function renderGap(date, status) {
+    const idx = U.dayIndex(date);
+    return `<div class="entry gap">
+      <h4>${idx ? `${idx}일차 · ` : ''}${esc(U.shortLabel(date))}
+        <span class="tag ${status === 'X' ? 'bad' : 'info'}">${status === 'X' ? '미인증' : '면제'}</span>
+      </h4>
+    </div>`;
   }
 
   function renderEntry(s) {
@@ -949,12 +989,46 @@
   // '5명'이 아니라 '5등까지'라, 동점으로 5등 안에 드는 사람은 인원수와 상관없이 모두 올린다.
   // 오늘 순위는 인증 피드에서 실시간으로 볼 수 있으므로, 여기서는 마감이 지나
   // 추천이 더는 늘지 않는 어제 것을 "확정된 명예"로 남긴다.
+  // 명예의 전당은 일자별로 넘겨 볼 수 있다 — 기본은 어제(마감이 지나 확정된 가장 최근 날),
+  // ◀로 챌린지 첫날까지 거슬러 갈 수 있다. 오늘은 아직 추천이 늘고 있으니 인증 피드에서 본다.
+  let fameDate = null;
+  function fameBounds() {
+    const hi = U.lastSettledDate();
+    return { lo: CONFIG.startDate, hi };
+  }
+  function shiftFameDate(delta) {
+    const { lo, hi } = fameBounds();
+    if (!hi) return;
+    const next = U.addDays(fameDate || hi, delta);
+    if (next < lo || next > hi) return;
+    fameDate = next;
+    fameOpenName = null;
+    calculateRanksAndFame();
+  }
+
   async function calculateRanksAndFame() {
-    const date = U.lastSettledDate(); // 어제 (챌린지 첫날이라 어제가 없으면 null)
+    const { lo, hi } = fameBounds();
+    if (!hi) fameDate = null;
+    else if (!fameDate || fameDate > hi || fameDate < lo) fameDate = hi;
+    const date = fameDate; // 기본은 어제 (챌린지 첫날이라 어제가 없으면 null)
     const daySubs = date ? await Store.listSubmissions({ date }) : [];
+    const isLatest = !!date && date === hi;
 
     $('fameDateLabel').textContent = date ? `${U.shortLabel(date)}에` : '어제';
-    fameEmptyMsg = date ? '전일 인증글 중 추천받은 글이 없습니다.' : '아직 집계할 전일 기록이 없습니다.';
+    const nav = $('fameDateNav');
+    if (nav) {
+      nav.hidden = !date;
+      $('fameNavLabel').textContent = date
+        ? `${U.dayIndex(date) ? `${U.dayIndex(date)}일차 · ` : ''}${U.shortLabel(date)}${isLatest ? ' · 어제' : ''}`
+        : '-';
+      $('famePrevDate').disabled = !date || date <= lo;
+      $('fameNextDate').disabled = !date || date >= hi;
+    }
+    const tag = $('fameTag');
+    if (tag) tag.textContent = isLatest || !date ? '전일 Top 5' : 'Top 5';
+    fameEmptyMsg = date
+      ? (isLatest ? '전일 인증글 중 추천받은 글이 없습니다.' : '이 날 인증글 중 추천받은 글이 없습니다.')
+      : '아직 집계할 전일 기록이 없습니다.';
 
     // 추천 많은 순 → 동점이면 먼저 올린 사람이 위로.
     // 추천이 없는 글과, 마감(24:00)을 넘겨 올린 지각 글은 순위에서 제외한다
@@ -1234,6 +1308,7 @@
     paintIntro();
     paintHeader();
     renderTodayRange();
+    initRangeFold();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));
     $('myCopyAll').addEventListener('click', copyMine);
     $('mySaveAll').addEventListener('click', saveMine);
@@ -1273,6 +1348,8 @@
 
     // 피드 날짜 넘기기 (버튼 + 좌우 스와이프)
     $('feedPrevDate').addEventListener('click', () => shiftFeedDate(-1));
+    $('famePrevDate').addEventListener('click', () => shiftFameDate(-1));
+    $('fameNextDate').addEventListener('click', () => shiftFameDate(1));
     $('feedNextDate').addEventListener('click', () => shiftFeedDate(1));
     $('feedLoadMoreBtn').addEventListener('click', () => {
       feedVisibleCount += FEED_PAGE_SIZE;
