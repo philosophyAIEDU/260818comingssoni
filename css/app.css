@@ -8,7 +8,8 @@
  *   선     1px rgba(0,0,0,.15) — 어두운 화면 rgba(243,245,247,.15)
  *   바탕   #fff — 어두운 화면 #101010, 회색 면 #f5f5f5
  *   버튼   검정 바탕 흰 글씨(주 버튼) / 테두리만(보조 버튼), 15px 600, 모서리 10px
- * 커밍쏜 색(남색 로고·노랑)은 머리의 로고에만 남긴다.
+ * 단, 브랜드 색은 커밍쏜 블루/네이비 그대로 — 주 버튼·고른 탭·링크·누른 엄지척·포커스 선은 남색(#102d84)·파랑(#173fa7).
+ * 어두운 화면에서는 같은 계열의 밝은 파랑으로 바꿔 글자가 묻히지 않게 한다.
  * 900px보다 좁으면 네 묶음(.pane)을 하단 탭으로 나눠 보여 주고(js/tabs.js), 넓으면 이어서 보여 준다. */
 
 body.app {
@@ -23,10 +24,11 @@ body.app {
   --text-faint: #999999;      /* 시간·출처 같은 곁가지 */
   --icon: #424242;            /* 반응 버튼 아이콘·숫자 */
   --nav-icon: #b8b8b8;        /* 하단 탭 — 고르지 않은 칸 */
-  --link: #0095f6;
-  --accent: #000000;
-  --navy: #000000;            /* 주 버튼·고른 상태 (이름은 예전 그대로 둔다) */
+  --link: #173fa7;            /* 커밍쏜 블루 */
+  --accent: #173fa7;
+  --navy: #102d84;            /* 커밍쏜 네이비 — 주 버튼·고른 상태 */
   --on-navy: #ffffff;
+  --brand-ink: #102d84;       /* 고른 탭 아이콘·누른 엄지척 같은 '선택됨' 글자색 */
   --yellow: #ffe600;
   --placeholder: #999999;
   --shadow: none;
@@ -48,10 +50,11 @@ body.app {
     --text-faint: #777777;
     --icon: #cccccc;
     --nav-icon: #4d4d4d;
-    --link: #18a3fe;
-    --accent: #f3f5f7;
-    --navy: #f3f5f7;
-    --on-navy: #101010;
+    --link: #8fa8ff;
+    --accent: #8fa8ff;
+    --navy: #2f5be0;          /* 어두운 바탕에서도 보이는 네이비 계열 파랑 */
+    --on-navy: #ffffff;
+    --brand-ink: #8fa8ff;
     --placeholder: #777777;
   }
 }
@@ -69,7 +72,7 @@ body.app {
   color: var(--text); background: transparent; border-color: var(--border); font-size: 13px; font-weight: 600;
   padding: 6px 14px; border-radius: 10px;
 }
-.app .navlinks a:hover { border-color: var(--text); }
+.app .navlinks a:hover { border-color: var(--accent); color: var(--accent); }
 .app .navlinks a[aria-current="page"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
 
 /* ── 카드 ── 넓은 화면에서는 선 하나짜리 둥근 상자, 휴대폰에서는 상자 없이 선으로만 나눈 면(아래 640px 규칙) */
@@ -106,7 +109,7 @@ body.app {
   font-size: 15px; font-weight: 600; padding: 11px 14px; border-radius: 10px;
   color: var(--text); background: transparent; border-color: var(--border);
 }
-.app .fold > summary:hover { border-color: var(--text); color: var(--text); }
+.app .fold > summary:hover { border-color: var(--accent); color: var(--accent); }
 
 /* 인증 폼 — 질문(라벨)은 또렷하게, 덧붙인 설명은 그 아래 한 줄로 */
 .app .field label { font-size: 15px; font-weight: 600; line-height: 1.4; }
@@ -169,12 +172,12 @@ body.app {
 .app input[type="text"], .app input[type="search"], .app select, .app textarea, .app .picker-btn {
   border-radius: 12px; border-color: var(--border); background-color: var(--surface); color: var(--text);
 }
-.app input:focus, .app select:focus, .app textarea:focus { outline: 1px solid var(--text); outline-offset: 0; border-color: var(--text); }
+.app input:focus, .app select:focus, .app textarea:focus { outline: 1px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
 .app button, .app .btn {
   border-radius: 10px; background: var(--surface); color: var(--text); border-color: var(--border);
   font-weight: 600; letter-spacing: normal;
 }
-.app .wrap button:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+.app .wrap button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .app button.primary { background: var(--navy); border-color: var(--navy); color: var(--on-navy); box-shadow: none; }
 .app button.primary:hover:not(:disabled) { background: var(--navy); color: var(--on-navy); opacity: .85; }
 .app .form-actions .btn-verify { border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: none; }
@@ -209,7 +212,7 @@ body.app {
   border-radius: 999px; border-color: var(--border); padding: 8px 16px;
   font-size: 14px; font-weight: 600; color: var(--text-dim);
 }
-.app .head-links a:hover { border-color: var(--text); color: var(--text); }
+.app .head-links a:hover { border-color: var(--accent); color: var(--accent); }
 .app .picker-btn { font-weight: 400; font-size: 16px; }
 
 /* 숫자 타일 */
@@ -237,8 +240,8 @@ body.app {
 /* 남의 글 맨 아래 버튼은 테두리 없는 아이콘 버튼(css/style.css의 .feed-acts) — 흰 바탕 버튼 규칙을 비켜 간다 */
 .app .feed-acts > button { background: transparent; border-color: transparent; color: var(--icon); font-weight: 400; }
 .app .feed-acts > button:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; color: var(--text); }
-/* 누른 엄지척은 스레드의 좋아요처럼 빨갛게 채운다 */
-.app .feed-acts .upvote-btn.voted { background: transparent; color: #ff3040; }
+/* 누른 엄지척은 커밍쏜 블루로 채운다 */
+.app .feed-acts .upvote-btn.voted { background: transparent; color: var(--brand-ink); }
 
 /* 인증 직후 바로가기(js/tabs.js) */
 .app .quick-go { display: flex; gap: 8px; margin-top: 10px; }
@@ -295,7 +298,7 @@ body.app {
     display: flex; align-items: center; justify-content: center;
     color: var(--nav-icon); -webkit-tap-highlight-color: transparent; position: relative;
   }
-  .tabbar button:focus-visible { outline: 2px solid var(--text); outline-offset: -6px; border-radius: 12px; }
+  .tabbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: 12px; }
   .tabbar .tab-ico {
     width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round;
@@ -303,7 +306,9 @@ body.app {
   .tabbar .tab-lbl {
     position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
-  .tabbar button[aria-current="page"] { color: var(--text); }
+  .tabbar button[aria-current="page"] { color: var(--brand-ink); }
+  /* 가운데 ＋(인증)를 고른 상태 — 네이비 네모에 흰 ＋ */
+  .tabbar button[aria-current="page"] .tab-plus { background: var(--navy); color: var(--on-navy); }
   .tabbar button[aria-current="page"] .tab-ico .f { fill: currentColor; }
   .tabbar .tab-plus {
     display: inline-flex; align-items: center; justify-content: center;
