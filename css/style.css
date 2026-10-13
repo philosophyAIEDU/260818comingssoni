@@ -83,6 +83,11 @@ body {
 
 a { color: var(--accent); }
 
+/* 뜻 덩어리 줄바꿈(js/phrase.js) — 이 안에서는 줄을 바꾸지 않는다 */
+.nb { white-space: nowrap; }
+/* 안내 문구: 마지막 줄에 한 단어만 덩그러니 남지 않게 */
+.hint, .form-note, .rule-key, #ruleList li, .note, .intro-body .desc { text-wrap: pretty; }
+
 .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px 72px; }
 .wrap.wide { max-width: 1200px; }
 
@@ -385,6 +390,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .entry dl { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 5px 12px; font-size: 15px; line-height: 1.72; }
 .entry dt { color: var(--text-dim); font-size: 12.5px; }
 .entry dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry.gap { padding-top: 10px; padding-bottom: 10px; }
+.entry.gap h4 { margin: 0; color: var(--text-dim); font-weight: 600; }
 .entry dd.quote { color: var(--text-dim); padding-left: 12px; border-left: 3px solid var(--border-strong); }
 /* 멤버가 쓴 글은 기울임을 쓰지 않는다 — 한글 기울임은 가짜 기울임(합성)이라
    획이 뭉개지고, 여기 올라오는 글은 대개 길어서 읽기가 더 힘들어진다.
@@ -674,9 +681,31 @@ button.ghost { background: transparent; }
 /* 날짜 넘기기 */
 /* 피드 툴바 — 날짜 이동을 맨 위 가운데, 그 아래 줄에 찾기·정렬을 가운데로 */
 .feed-toolbar {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 10px; margin: 4px 0 14px;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 8px; margin: 12px 0 6px;
 }
+/* 이름 검색 — 화면 폭 전체(스레드 검색창처럼) */
+.feed-toolbar .feed-filters { justify-content: stretch; }
+.feed-toolbar .feed-filters .field-icon { flex: 1 1 auto; width: 100%; }
+.feed-toolbar .feed-search { height: 40px; font-size: 15px; padding-left: 34px; }
+.feed-toolbar .field-icon > .ico { left: 12px; width: 15px; height: 15px; }
+.feed-toolbar .feed-datenav { align-self: center; }
+.fame-datenav { margin: 4px 0 8px; }
+.fame-datenav[hidden] { display: none; }
+.feed-card .feed-toolbar + .hint { margin: 0 0 4px; font-size: 13px; text-align: center; }
+/* 오른쪽 위 작은 정렬(추천순/최신순) — 테두리 없는 글자 + 작은 화살표 */
+.feed-head-actions { gap: 6px; }
+.feed-head select.sort-mini {
+  width: auto; min-width: 0; height: 30px; padding: 0 22px 0 8px; border: none; background-color: transparent;
+  background-position: right 4px center; background-size: 13px 13px;
+  font-size: 13.5px; font-weight: 600; color: var(--text); cursor: pointer;
+}
+.feed-head select.sort-mini:focus-visible { outline: 1px solid var(--border-strong); border-radius: 8px; }
+.feed-card > .feed-head { flex-wrap: nowrap; }
+.feed-card > .feed-head h2 { min-width: 0; white-space: nowrap; }
+.feed-card > .feed-head .feed-head-actions { flex-wrap: nowrap; flex: 0 0 auto; }
+.feed-head .feed-tabs a { height: 30px; padding: 0 9px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 1px; white-space: nowrap; }
+.feed-head .icon-btn { width: 30px; height: 30px; }
 .feed-filters { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .feed-filters select {
   width: auto; min-width: 8.4em; height: 34px; padding: 0 10px;

@@ -129,11 +129,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('브랜드명 반영', (await page.textContent('#brandTitle')).includes('퍼스널메이커스'));
 
   // ── 배너: "오늘의 범위" 접이식 (이 컨텍스트는 오늘이 9일차) ──
-  t('오늘의 범위는 기본적으로 접혀 있음', !(await page.locator('#todayRangeFold').evaluate((el) => el.open)));
-  t('접힌 상태에서는 오늘의 범위 안내가 화면에 노출되지 않음', !(await page.isVisible('#todayRangeText')));
+  t('오늘 읽을 분량은 처음부터 펼쳐져 있음(맨 위에서 바로 보임)',
+    (await page.locator('#todayRangeFold').evaluate((el) => el.open)) && await page.isVisible('#todayRangeText'));
   await page.click('#todayRangeFold summary');
   await page.waitForTimeout(150);
-  t('오늘의 범위를 펼치면 9일차 안내가 보임',
+  t('누르면 가려짐', !(await page.isVisible('#todayRangeText')));
+  await page.reload();
+  await page.waitForTimeout(500);
+  t('가린 상태는 그날 하루 기억됨(새로고침해도 가린 채)', !(await page.isVisible('#todayRangeText')));
+  await page.click('#todayRangeFold summary');
+  await page.waitForTimeout(150);
+  t('다시 누르면 9일차 안내가 보임',
     (await page.textContent('#todayRangeText')).includes('세컨드 크리에이터'),
     await page.textContent('#todayRangeText'));
   t('오늘 회차에는 "오늘" 표시가 붙음', (await page.textContent('#rangeDayLabel')).includes('9일차')
@@ -351,22 +357,27 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       && (await page.locator('#participantToggle svg.ico').count()) === 1);
   }
 
-  // ── 피드 툴바: 날짜 이동 / 찾기·정렬이 한 줄에, 버튼은 조용한 톤 ──
+  // ── 피드 머리: 오른쪽 위에 작은 정렬, 그 아래 화면 폭 전체 이름 검색 → 날짜 이동 ──
   {
     const stacked = await page.evaluate(() => {
       const bar = document.querySelector('.feed-toolbar').getBoundingClientRect();
       const nav = document.querySelector('.feed-datenav').getBoundingClientRect();
-      const fil = document.querySelector('.feed-filters').getBoundingClientRect();
+      const search = document.querySelector('#feedSearch').getBoundingClientRect();
+      const head = document.querySelector('.feed-head').getBoundingClientRect();
+      const sort = document.querySelector('#feedSortSelect').getBoundingClientRect();
+      const title = document.querySelector('.feed-head h2').getBoundingClientRect();
       const mid = (r) => r.left + r.width / 2;
       return {
-        navFirst: nav.bottom <= fil.top + 1,
+        searchFirst: search.bottom <= nav.top + 1,
+        searchFull: search.width >= bar.width * 0.95,
         navCentered: Math.abs(mid(nav) - mid(bar)) < 6,
-        filCentered: Math.abs(mid(fil) - mid(bar)) < 6,
+        sortTopRight: sort.top < search.top && sort.left > title.right && head.right - sort.right < 120,
+        sortSmall: sort.height <= 32,
       };
     });
-    t('날짜 이동이 맨 윗줄에 있음', stacked.navFirst, stacked);
+    t('이름 검색이 날짜 이동보다 위, 화면 폭 전체', stacked.searchFirst && stacked.searchFull, stacked);
     t('날짜 이동이 가운데 정렬', stacked.navCentered, stacked);
-    t('이름 검색·정렬 줄도 가운데 정렬', stacked.filCentered, stacked);
+    t('정렬(추천순/최신순)은 제목 줄 오른쪽 위에 작게', stacked.sortTopRight && stacked.sortSmall, stacked);
     t('새로고침은 글자 없이 아이콘만',
       (await page.locator('#feedRefresh').textContent()).trim() === ''
       && (await page.locator('#feedRefresh svg.ico').count()) === 1);
@@ -381,10 +392,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       }));
     t('검색창 안에 돋보기 아이콘이 붙음',
       (await page.locator('.field-icon > svg.ico').count()) === 1);
-    t('검색·정렬 높이가 서로 같음', await page.evaluate(() => {
-      const h = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().height);
-      return h('#feedSearch') === h('#feedSortSelect');
-    }));
   }
 
   // ── 인증 피드: 이름으로 찾기 ──
@@ -720,8 +727,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     (await beforePage.textContent('#phaseNote')).trim() === '');
   t('시작 전에도 오늘의 범위를 볼 수 있음(다른 날짜의 범위도 미리 볼 수 있도록)',
     await beforePage.isVisible('#todayRangeFold'));
-  await beforePage.click('#todayRangeFold summary');
-  await beforePage.waitForTimeout(150);
   t('시작 전 기본값은 1일차(다가올 첫 회차)', (await beforePage.textContent('#rangeDayLabel')).includes('1일차'));
   t('시작 전에는 이전 버튼이 비활성(1일차가 처음)', await beforePage.isDisabled('#rangePrevDay'));
   t('연습 기간 날짜는 "연습 (날짜)" 형식으로 일자가 먼저 오지 않음(연습 라벨이 앞에 옴)',
@@ -755,8 +760,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('종료 후: phaseNote 안내문 사라짐', (await afterPage.textContent('#phaseNote')).trim() === '');
   t('종료 후에도 오늘의 범위를 볼 수 있음(지난 회차를 돌아볼 수 있도록)',
     await afterPage.isVisible('#todayRangeFold'));
-  await afterPage.click('#todayRangeFold summary');
-  await afterPage.waitForTimeout(150);
   t('종료 후 기본값은 마지막 회차', (await afterPage.textContent('#rangeDayLabel')).includes('28일차'));
   t('종료 후에는 다음 버튼이 비활성(마지막 회차)', await afterPage.isDisabled('#rangeNextDay'));
   await afterCtx.close();
@@ -1546,6 +1549,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     subs.push({ id: 'sL', participantId: 'pL', nickname: '지각왕', date: yest,
       sentence: '지각 문장', reflection: '지각 느낀 점', upvotes: 99, upvotedBy: [],
       createdAt: tooLate, updatedAt: tooLate });
+    // 그저께 순위(일자별 보기 확인용) — 일번이 그날은 2표로 1등
+    subs.push({ id: 'sD2', participantId: 'p0', nickname: '일번', date: shift(-2),
+      sentence: '일번의 그저께 인상 깊은 내용', reflection: '일번의 그저께 느낀 점', upvotes: 2, upvotedBy: [],
+      createdAt: `${shift(-2)}T10:00:00.000Z`, updatedAt: `${shift(-2)}T10:00:00.000Z` });
     parts.push({ id: 'pT', nickname: '오늘왕', email: '', kakaoJoined: '', createdAt: shift(-5) + 'T00:00:00.000Z' });
     subs.push({ id: 'sT', participantId: 'pT', nickname: '오늘왕', date: today,
       sentence: '오늘 문장', reflection: '오늘 느낀 점', upvotes: 98, upvotedBy: [],
@@ -1604,6 +1611,25 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await famePage.click('#hallOfFameList [data-fame="삼번"]');
     await famePage.waitForTimeout(150);
     t('다시 누르면 접힘', (await famePage.locator('#fameDetail').count()) === 0);
+
+    // ── 명예의 전당: 일자별로 넘겨 보기 ──
+    t('명예의 전당 날짜 이동이 보이고 기본은 어제',
+      await famePage.isVisible('#fameDateNav') && (await famePage.textContent('#fameNavLabel')).includes('어제'),
+      await famePage.textContent('#fameNavLabel'));
+    t('어제가 가장 최근이라 다음(▶)은 비활성', await famePage.isDisabled('#fameNextDate'));
+    await famePage.click('#famePrevDate');
+    await famePage.waitForTimeout(250);
+    const prevNames = await famePage.locator('#hallOfFameList .who').allTextContents();
+    t('◀ 누르면 그저께 순위로 바뀜', JSON.stringify(prevNames) === JSON.stringify(['일번']), prevNames);
+    t('지난 날짜에서는 "전일" 대신 "Top 5"', (await famePage.textContent('#fameTag')).trim() === 'Top 5');
+    await famePage.click('#hallOfFameList [data-fame="일번"]');
+    await famePage.waitForSelector('#fameDetail');
+    t('지난 날짜 순위에서도 이름을 누르면 그날 쓴 글이 펼쳐짐',
+      (await famePage.textContent('#fameDetail')).includes('일번의 그저께 느낀 점'));
+    await famePage.click('#fameNextDate');
+    await famePage.waitForTimeout(250);
+    t('▶ 누르면 다시 어제 순위', (await famePage.locator('#hallOfFameList .who').count()) === 5
+      && (await famePage.textContent('#fameTag')).trim() === '전일 Top 5');
   }
   await fameCtx.close();
 
@@ -2064,8 +2090,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const saved = await namePromise;
     t('텍스트 파일로 저장 — 파일명', saved === '꿈과 돈_독서기록_연속둘.txt', saved);
     t('저장한 파일 내용도 같은 글', fs.readFileSync(await dl.path(), 'utf-8').includes('“문장”'));
-    await ap.click('#todayRangeFold summary');
-    await ap.waitForTimeout(200);
     t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
     t('발제문 첫 질문이 보임', (await ap.textContent('#todayRangeText .prompt-box')).includes('기능을 파니까'));
     await ap.click('#rangeNextDay');

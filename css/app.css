@@ -136,6 +136,10 @@ body.app {
 .app .banner .lbl { color: var(--text-faint); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .app .banner .sep { width: 1px; background: var(--border); }
 .app .banner .fold > summary { color: var(--text); border-color: var(--border); background: transparent; }
+/* 오늘 읽을 분량 — 기본은 펼침, 오른쪽 끝 작은 글씨로 "가리기 / 보기" */
+.app .banner .fold > summary { justify-content: space-between; }
+.app .banner .fold > summary::after { content: '보기 ▾'; font-size: 13px; font-weight: 500; color: var(--text-faint); margin-left: 8px; }
+.app .banner .fold[open] > summary::after { content: '가리기 ▴'; }
 .app .banner .fold > summary:hover { border-color: var(--text); color: var(--text); }
 .app .banner .today-range, .app .banner .today-range-day { color: var(--text); }
 .app .banner .today-range { font-size: 15px; line-height: 1.5; }
@@ -144,7 +148,7 @@ body.app {
 
 /* ── 입력·버튼 ── 스레드처럼 모서리 10px, 테두리는 15% 선 한 겹 */
 .app input[type="text"], .app input[type="search"], .app select, .app textarea, .app .picker-btn {
-  border-radius: 12px; border-color: var(--border); background: var(--surface); color: var(--text);
+  border-radius: 12px; border-color: var(--border); background-color: var(--surface); color: var(--text);
 }
 .app input:focus, .app select:focus, .app textarea:focus { outline: 1px solid var(--text); outline-offset: 0; border-color: var(--text); }
 .app button, .app .btn {
@@ -155,9 +159,10 @@ body.app {
 .app button.primary { background: var(--navy); border-color: var(--navy); color: var(--on-navy); box-shadow: none; }
 .app button.primary:hover:not(:disabled) { background: var(--navy); color: var(--on-navy); opacity: .85; }
 .app .form-actions .btn-verify { border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: none; }
-.app .feed-filters .feed-search, .app .feed-filters select {
-  background-color: var(--surface-2); border-color: transparent; border-radius: 10px; font-size: 14px; height: 36px;
+.app .feed-filters .feed-search {
+  background-color: var(--surface-2); border-color: transparent; border-radius: 12px; font-size: 15px; height: 40px;
 }
+.app .feed-head select.sort-mini { background-color: transparent; border-radius: 8px; }
 .app .feed-filters .feed-search:focus, .app .feed-filters select:focus { outline: 1px solid var(--border-strong); }
 .app .season-badge { font-size: 11.5px; font-weight: 700; }
 /* 안내 카드 맨 위 링크(OT·설명서) — 스레드 프로필의 주제 칩처럼 둥근 테두리 + 회색 굵은 글씨 */
