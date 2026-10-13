@@ -203,3 +203,9 @@ body.admin {
   .admin .stat .n { font-size: 18px; }
   .admin #entryList { grid-template-columns: 1fr; }
 }
+
+/* 면제 현황 — 이름 · 건수 · 날짜(등록 시각) */
+.admin .exempt-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.admin .exempt-table th, .admin .exempt-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.admin .exempt-table .num { text-align: right; white-space: nowrap; }
+.admin .exempt-table .chip { display: inline-block; margin: 2px 4px 2px 0; }

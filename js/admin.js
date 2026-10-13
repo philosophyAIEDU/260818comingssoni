@@ -28,6 +28,7 @@
         || a.participant.nickname.localeCompare(b.participant.nickname, 'ko'));
     paintKpis();
     paintMatrix();
+    paintExemptSummary();
     paintRoster();
     paintParticipantFilter();
     paintEntries();
@@ -63,6 +64,44 @@
   async function refreshLite() {
     participants = await Store.listParticipants();
     await repaint();
+  }
+
+  /** 면제일 목록 저장 + 언제 등록했는지(exemptLog: {날짜: 등록 시각}) 기록.
+   *  참여자 화면에는 면제가 '통과'로만 보이므로, 언제·몇 건 면제했는지는 여기(운영진)에서만 확인한다.
+   *  보안 규칙이 새 필드(exemptLog)를 막는 환경이면 면제일만이라도 저장한다. */
+  async function saveExemptDates(p, dates, date, adding) {
+    const list = Array.from(new Set(dates)).sort();
+    const log = Object.assign({}, p.exemptLog || {});
+    if (adding) log[date] = U.nowStamp(); else delete log[date];
+    try {
+      await Store.updateParticipant(p.id, { exemptDates: list, exemptLog: log });
+    } catch (e) {
+      await Store.updateParticipant(p.id, { exemptDates: list });
+    }
+  }
+
+  /** 일일현황 아래 "면제 현황" — 누가 · 몇 건 · 어느 날짜를 · 언제 등록했는지 */
+  function paintExemptSummary() {
+    const box = $('exemptSummary');
+    if (!box) return;
+    const rows = participants
+      .filter((p) => (p.exemptDates || []).length)
+      .sort((a, b) => b.exemptDates.length - a.exemptDates.length
+        || a.nickname.localeCompare(b.nickname, 'ko'));
+    const total = rows.reduce((n, p) => n + p.exemptDates.length, 0);
+    $('exemptTotal').textContent = `${rows.length}명 · ${total}건`;
+    box.innerHTML = rows.length
+      ? `<table class="exempt-table"><thead><tr><th>이름</th><th class="num">면제</th><th>면제한 날짜 (등록 시각)</th></tr></thead><tbody>${
+        rows.map((p) => `<tr>
+          <td>${esc(p.nickname)}</td>
+          <td class="num">${p.exemptDates.length}건</td>
+          <td>${p.exemptDates.slice().sort().map((d) => {
+            const at = p.exemptLog && p.exemptLog[d];
+            const idx = U.dayIndex(d);
+            return `<span class="chip">${idx ? `${idx}일차 · ` : ''}${esc(U.shortLabel(d))}${at ? ` <span class="muted">(${esc(U.stampLabel(at))} 등록)</span>` : ''}</span>`;
+          }).join(' ')}</td>
+        </tr>`).join('')}</tbody></table>`
+      : '<p class="muted">아직 면제 처리한 사람이 없습니다.</p>';
   }
 
   /* ── 상단 지표 ───────────────────────── */
@@ -178,7 +217,7 @@
       if (exempt) list.delete(date); else list.add(date);
       btn.disabled = true;
       try {
-        await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
+        await saveExemptDates(p, list, date, !exempt);
         await refreshLite();
         showCell(pid, date);
       } catch (err) {
@@ -394,7 +433,7 @@
         list.add(d);
         el.disabled = true;
         try {
-          await Store.updateParticipant(pid, { exemptDates: Array.from(list).sort() });
+          await saveExemptDates(p, list, d, true);
           msg($('rosterMsg'), `${p.nickname} 님의 ${U.shortLabel(d)}을(를) 면제일로 등록했습니다.`, 'ok');
           await refreshLite();
         } catch (e) {
@@ -412,7 +451,7 @@
         const list = (p.exemptDates || []).filter((d) => d !== el.dataset.date);
         el.disabled = true;
         try {
-          await Store.updateParticipant(pid, { exemptDates: list });
+          await saveExemptDates(p, list, el.dataset.date, false);
           await refreshLite();
         } catch (e) {
           el.disabled = false;

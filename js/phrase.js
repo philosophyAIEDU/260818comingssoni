@@ -74,7 +74,9 @@
         frag.appendChild(document.createTextNode(sep));
         // 문장 끝 + 뒤에 말이 더 있으면 다음 줄에서 시작 (띄어쓰기는 남겨 복사한 글이 그대로이게)
         // (이 조각의 마지막 문장 뒤에 굵은 글씨 같은 다른 조각이 이어져도 마찬가지)
-        const more = words[j + 1] || (j + 1 === words.length - 1 && node.nextSibling);
+        // 뒤에 오는 게 이모지뿐이면(…주세요! 💪) 같은 줄에 둔다
+        const nextWord = words[j + 1];
+        const more = (nextWord && /[가-힣A-Za-z0-9(]/.test(nextWord)) || (!nextWord && j + 1 === words.length - 1 && node.nextSibling);
         if (withSentences && SENT_END.test(words[j]) && more) {
           frag.appendChild(document.createElement('br'));
           changed = true;

@@ -129,17 +129,15 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('브랜드명 반영', (await page.textContent('#brandTitle')).includes('퍼스널메이커스'));
 
   // ── 배너: "오늘의 범위" 접이식 (이 컨텍스트는 오늘이 9일차) ──
-  t('오늘 읽을 분량은 처음부터 펼쳐져 있음(맨 위에서 바로 보임)',
-    (await page.locator('#todayRangeFold').evaluate((el) => el.open)) && await page.isVisible('#todayRangeText'));
+  // 오늘 띠는 평소 한 줄(일차 · 날짜 · 마감까지)만 보이고, 누르면 오늘 읽을 분량이 펼쳐진다(드롭다운)
+  t('오늘 띠는 기본으로 접혀 한 줄 요약만 보임',
+    !(await page.locator('#todayRangeFold').evaluate((el) => el.open)) && !(await page.isVisible('#todayRangeText'))
+    && await page.isVisible('#dayLabel') && await page.isVisible('#countdown'));
+  t('한 줄 요약에 일차·날짜·마감까지가 담김',
+    /\d+ \/ \d+일차/.test(await page.textContent('#dayLabel')) && /\d{2}:\d{2}:\d{2}/.test(await page.textContent('#countdown')));
   await page.click('#todayRangeFold summary');
   await page.waitForTimeout(150);
-  t('누르면 가려짐', !(await page.isVisible('#todayRangeText')));
-  await page.reload();
-  await page.waitForTimeout(500);
-  t('가린 상태는 그날 하루 기억됨(새로고침해도 가린 채)', !(await page.isVisible('#todayRangeText')));
-  await page.click('#todayRangeFold summary');
-  await page.waitForTimeout(150);
-  t('다시 누르면 9일차 안내가 보임',
+  t('누르면 오늘 읽을 분량(9일차)이 펼쳐짐',
     (await page.textContent('#todayRangeText')).includes('세컨드 크리에이터'),
     await page.textContent('#todayRangeText'));
   t('오늘 회차에는 "오늘" 표시가 붙음', (await page.textContent('#rangeDayLabel')).includes('9일차')
@@ -196,6 +194,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   // ── 참가자 화면: 삭제 버튼 제거 & 전체 진행현황 ──
   t('삭제 버튼 없음', (await page.locator('#resetBtn').count()) === 0);
   t('인증하기 버튼만 남음', (await page.textContent('#submitBtn')).includes('인증'));
+  // 전체 진행현황은 참여자 화면에서 숨겼다(요청) — 집계 로직은 그대로라, 숨김을 확인한 뒤 잠시 펼쳐 놓고 검증한다.
+  t('참여자 화면에서 전체 진행현황은 숨김', await page.isHidden('#overallCard'));
+  const showOverall = (pg) => pg.evaluate(() => { document.getElementById('overallCard').hidden = false; });
+  await showOverall(page);
   const overallRows = await page.locator('#overallTable tbody tr').count();
   t('전체 진행현황 행 4개', overallRows === 4, overallRows);
   t('전체 진행현황에 참가자 이름 노출', (await page.textContent('#overallTable')).includes('밤톨'));
@@ -240,11 +242,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.selectOption('#ovSortSelect', 'rate');
   await page.waitForTimeout(150);
 
-  // ── 인증 피드: "전체 보기"는 새 창(feed-all.html)으로 링크됨 ──
-  const feedAllLink = page.locator('#feedTabs a.on');
-  t('전체 보기 링크가 feed-all.html을 새 창으로 엶',
-    (await feedAllLink.getAttribute('href')) === 'feed-all.html'
-    && (await feedAllLink.getAttribute('target')) === '_blank');
+  // ── 인증 피드: 따로 [전체 보기]를 누를 필요 없이 피드 탭이 처음부터 전체 날짜를 보여 준다 ──
+  t('[전체 보기] 버튼은 없앰', (await page.locator('#feedTabs').count()) === 0);
+  t('피드는 기본이 전체 날짜', (await page.locator('#feedDateSelect').inputValue()) === '');
+  t('날짜 고르기에 오늘이 들어 있음',
+    (await page.locator('#feedDateSelect option').allTextContents()).some((x) => x.startsWith('오늘')));
   t('인증 피드(날짜별 보기)에 카톡방 공유 안내 문구 노출',
     (await page.locator('.feed-card .hint').allTextContents())
       .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
@@ -353,7 +355,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       acts.lineUp && acts.bodyRight <= 1, acts);
     t('새로고침·날짜 이동 버튼도 선 아이콘',
       (await page.locator('#feedRefresh svg.ico').count()) === 1
-      && (await page.locator('#feedPrevDate svg.ico').count()) === 1
+      && (await page.locator('#famePrevDate svg.ico').count()) === 1
       && (await page.locator('#participantToggle svg.ico').count()) === 1);
   }
 
@@ -381,15 +383,6 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('새로고침은 글자 없이 아이콘만',
       (await page.locator('#feedRefresh').textContent()).trim() === ''
       && (await page.locator('#feedRefresh svg.ico').count()) === 1);
-    t('전체 보기 버튼은 채운 색이 아니라 외곽선 톤',
-      await page.locator('#feedTabs a.on').evaluate((el) => {
-        const c = getComputedStyle(el);
-        // 자기가 놓인 카드와 같은 면 위에 테두리만 두른 버튼이어야 조용하다
-        const cardBg = getComputedStyle(el.closest('.card')).backgroundColor;
-        return c.backgroundColor === cardBg
-          && c.color !== 'rgb(255, 255, 255)'
-          && c.borderColor !== cardBg;
-      }));
     t('검색창 안에 돋보기 아이콘이 붙음',
       (await page.locator('.field-icon > svg.ico').count()) === 1);
   }
@@ -401,7 +394,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('이름을 검색하면 그 사람 글만 남음',
     searched.length === 1 && searched[0].includes('밤톨'), searched);
   t('검색 중에는 건수가 "N명 / 전체명"으로 표시됨',
-    /\d+명 \/ \d+명/.test(await page.textContent('#feedCount')), await page.textContent('#feedCount'));
+    /\d+[명건] \/ \d+[명건]/.test(await page.textContent('#feedCount')), await page.textContent('#feedCount'));
   await page.fill('#feedSearch', 'ㅋㅁ');
   await page.waitForTimeout(300);
   t('초성으로도 찾을 수 있음',
@@ -410,7 +403,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.fill('#feedSearch', 'zzzz');
   await page.waitForTimeout(300);
   t('맞는 이름이 없으면 안내 문구',
-    (await page.textContent('#socialFeedList')).includes('맞는 이름이 이 날짜에 없습니다'),
+    (await page.textContent('#socialFeedList')).includes('맞는 이름이'),
     await page.textContent('#socialFeedList'));
   await page.fill('#feedSearch', '');
   await page.waitForTimeout(300);
@@ -496,6 +489,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('면제 등록 시 해당 날짜가 면제(P)로 바뀜', (await exemptedCell.getAttribute('class')).includes('cell-p'));
   const missedAfter = Number(await xRow.locator('td.num').first().textContent());
   t('면제 등록 시 미인증 수가 1 줄어듦', missedAfter === missedBefore - 1, `${missedBefore} -> ${missedAfter}`);
+  // 참여자에게는 '통과'로만 보이니, 운영진 화면에서 누가 · 몇 건 · 어느 날짜를 · 언제 면제했는지 본다
+  const exemptBox = (await page.textContent('#exemptSummary')).replace(/\s+/g, ' ');
+  t('운영진: 면제 현황에 이름·건수·날짜가 잡힘',
+    /\d+명 · \d+건/.test(await page.textContent('#exemptTotal')) && exemptBox.includes('1건') && exemptBox.includes('등록'),
+    exemptBox);
 
   // 회귀 테스트: 면제 저장이 실패하면 반드시 눈에 띄는 오류가 떠야 함(성공한 줄 알고 넘어가
   // 실제로 반영이 안 됐던 사례가 있었음) — 저장을 실패시켜 그 경로를 검증한다.
@@ -1116,17 +1114,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await ep.press('#participantSearch', 'Enter');
     await ep.waitForTimeout(600);
 
-    t('나의 현황에 면제 타일이 있음', (await ep.locator('#stExempt').count()) === 1);
-    t('면제 2일이 면제 타일에 잡힘', (await ep.textContent('#stExempt')) === '2',
-      await ep.textContent('#stExempt'));
+    // 참여자 화면에서 면제는 따로 세지 않고 '통과'로 본다(요청) — 면제 칸·범례는 숨기고, 인증 칸에 합쳐 센다
+    t('면제 칸은 참여자 화면에서 숨김', await ep.isHidden('#stExempt'));
     t('면제는 미인증에 섞이지 않음(미인증 2)', (await ep.textContent('#stMissed')) === '2',
       await ep.textContent('#stMissed'));
-    t('인증은 그대로 1', (await ep.textContent('#stVerified')) === '1',
+    t('면제 2일은 통과로 인증 칸에 합쳐짐(1 + 2 = 3)', (await ep.textContent('#stVerified')) === '3',
       await ep.textContent('#stVerified'));
-    t('범례에 P 면제가 다시 표시됨',
-      (await ep.textContent('.legend')).includes('면제'), await ep.textContent('.legend'));
+    t('인증률도 통과 기준(3 / 5 = 60%)', (await ep.textContent('#stRate')) === '60%', await ep.textContent('#stRate'));
+    t('범례에 면제(P)는 없음', !(await ep.textContent('.legend')).includes('면제'), await ep.textContent('.legend'));
     const strip = await ep.locator('#myStrip .cell').allTextContents();
-    t('스트립에 면제일이 P로 찍힘', strip.filter((c) => c === 'P').length === 2, strip.slice(0, 6));
+    t('스트립에 P가 찍히지 않고 통과(O)로 보임', !strip.includes('P') && strip.filter((c) => c === 'O').length === 3, strip.slice(0, 6));
+    const entriesText = (await ep.textContent('#myEntries')).replace(/\s+/g, ' ');
+    t('내 기록 목록에서 면제일은 "통과"로', (entriesText.match(/통과/g) || []).length === 2 && !entriesText.includes('면제'), entriesText);
   }
   await exemptCtx.close();
 
@@ -1347,6 +1346,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const rp = await riskCtx.newPage();
     await rp.goto(BASE + '/index.html');
     await rp.waitForTimeout(600);
+    await showOverall(rp);
     await rp.click('#ovRiskTile');
     await rp.waitForSelector('#ovDetail:not([hidden])');
 
@@ -1507,6 +1507,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       (await prevPage.textContent('#ovPrevDateLabel')) === `${Number(yest.slice(5, 7))}/${Number(yest.slice(8, 10))}(${'일월화수목금토'[new Date(yest + 'T00:00:00Z').getUTCDay()]})`,
       await prevPage.textContent('#ovPrevDateLabel'));
 
+    await showOverall(prevPage);
     await prevPage.click('#ovPrevMissTile');
     await prevPage.waitForSelector('#ovDetail:not([hidden])');
     const prevNames = await prevPage.textContent('#ovDetail');
@@ -2064,6 +2065,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     // 연속 참여 배지: seasonStreak 2인 사람만 이름 옆에 🔥2
     const feedNicks = await ap.locator('#socialFeedList .feed-nick').allInnerTexts();
     t('피드 이름 옆에 연속 배지 🔥2', feedNicks.some((x) => x.includes('연속둘') && x.includes('🔥 2')), feedNicks);
+    await showOverall(ap);
     await ap.click('#overallTableFold summary');
     await ap.waitForTimeout(300);
     const statusCells = await ap.locator('#overallTable tbody td:first-child').allInnerTexts();
@@ -2090,6 +2092,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const saved = await namePromise;
     t('텍스트 파일로 저장 — 파일명', saved === '꿈과 돈_독서기록_연속둘.txt', saved);
     t('저장한 파일 내용도 같은 글', fs.readFileSync(await dl.path(), 'utf-8').includes('“문장”'));
+    await ap.click('#todayRangeFold summary');
+    await ap.waitForTimeout(200);
     t('라이브 날(7일차) 오늘의 범위에 발제문이 붙음', await ap.isVisible('#todayRangeText .prompt-box'));
     t('발제문 첫 질문이 보임', (await ap.textContent('#todayRangeText .prompt-box')).includes('기능을 파니까'));
     await ap.click('#rangeNextDay');
@@ -2181,17 +2185,32 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('휴대폰: [피드] 탭 — 피드가 보이고 인증 폼은 숨김', await vis('.feed-card') && !(await vis('#certifyCard')));
     t('휴대폰: 지금 탭이 주소(#feed)에 남음', (await m.evaluate(() => location.hash)) === '#feed');
     t('휴대폰: 누른 탭에 aria-current', (await m.getAttribute('#tabbar [data-go="feed"]', 'aria-current')) === 'page');
+    t('휴대폰: 하단 탭은 다섯 칸(공지·피드·＋인증·명예의 전당·내 현황), ＋가 가운데',
+      JSON.stringify(await m.$$eval('#tabbar [data-go]', (els) => els.map((e) => e.dataset.go)))
+        === JSON.stringify(['info', 'feed', 'certify', 'fame', 'me']));
+    await m.click('#tabbar [data-go="info"]');
+    await m.waitForTimeout(150);
+    t('휴대폰: [공지·안내] 탭 — 책 소개와 규칙이 보이고 인증 폼은 숨김',
+      await vis('section.intro') && await vis('#ruleList') === false && await vis('#ruleHeading') && !(await vis('#certifyCard')));
+    t('휴대폰: [공지·안내] 탭 주소는 #info', (await m.evaluate(() => location.hash)) === '#info');
     await m.click('#tabbar [data-go="fame"]');
     await m.waitForTimeout(150);
-    t('휴대폰: [명예의 전당] 탭 — 명예의 전당과 전체 진행현황이 보임',
-      await vis('.fame-card') && await vis('#overallStats') && !(await vis('.feed-card')));
+    t('휴대폰: [명예의 전당] 탭 — 명예의 전당만(전체 진행현황은 숨김)',
+      await vis('.fame-card') && !(await vis('#overallStats')) && !(await vis('.feed-card')));
     await m.click('#tabbar [data-go="me"]');
     await m.waitForTimeout(150);
-    t('휴대폰: [내 현황] — 이름을 안 골랐으면 안내 카드', await vis('#myEmpty') && !(await vis('#myCard')));
-    await m.click('#myEmptyGo');
-    await m.waitForTimeout(200);
-    t('휴대폰: 안내 카드의 버튼은 [인증] 탭의 이름 칸으로 데려감',
-      await vis('#certifyCard') && (await m.evaluate(() => document.activeElement && document.activeElement.id)) === 'participantSearch');
+    t('휴대폰: [내 현황] — 맨 위에 "본인 확인하기" 이름 드롭다운, 고르기 전엔 안내 한 줄',
+      await vis('#meWho') && await vis('#myEmpty') && !(await vis('#myCard')));
+    t('휴대폰: 이름 고르러 [인증] 탭으로 보내던 버튼은 없앰', (await m.locator('#myEmptyGo').count()) === 0);
+    await m.selectOption('#meWho', { label: '커밍쏜' });
+    await m.waitForTimeout(400);
+    t('휴대폰: 이름을 고르면 그 자리에서 내 기록이 열림', await vis('#myCard') && !(await vis('#myEmpty')));
+    t('휴대폰: 고른 이름이 인증 폼의 이름 칸에도 그대로 맞춰짐',
+      (await m.locator('#participant option:checked').textContent()).includes('커밍쏜'));
+    t('휴대폰: 숫자 칸은 인증·미인증·연속 인증·인증률 넷(면제 칸 숨김)',
+      (await m.locator('#myCard .stats .stat:not([hidden])').count()) === 4);
+    await m.click('#tabbar [data-go="certify"]');
+    await m.waitForTimeout(150);
     await m.selectOption('#participant', { label: '커밍쏜' });
     await m.waitForTimeout(300);
     await m.fill('#sentence', '휴대폰에서 남긴 문장');
