@@ -1,14 +1,14 @@
-/* 휴대폰 하단 탭 — 인증 / 피드 / 명예의 전당 / 내 현황
+/* 휴대폰 하단 탭 — 공지·안내 / 피드 / 인증(가운데 ＋) / 명예의 전당 / 내 현황
  *
  * 화면 내용과 동작은 전부 js/app.js가 그대로 맡고, 이 파일은 "지금 어느 묶음(pane)을 보여 줄지"만 정한다.
  * 넓은 화면(900px 이상)에서는 탭바를 숨기고 네 묶음을 위에서 아래로 이어서 보여 준다 —
  * 그래서 PC에서 쓰던 흐름과 기존 화면 테스트는 바뀌지 않는다.
  *
- * - 지금 탭은 주소의 #certify · #feed · #fame · #me 로 남는다(새로고침·뒤로 가기에도 그 탭).
+ * - 지금 탭은 주소의 #info · #feed · #fame · #me 로 남는다(인증 탭은 주소 없이)(새로고침·뒤로 가기에도 그 탭).
  * - 인증을 마치면(app.js의 'cs:submitted') 결과 문구 아래 "피드 보기 · 내 현황 보기" 바로가기를 띄운다.
- * - [내 현황]은 이름을 아직 고르지 않았으면 안내 카드(#myEmpty)를 대신 보여 준다. */
+ * - [내 현황]은 맨 위 "본인 확인하기"에서 이름을 고르고, 고르기 전에는 안내 한 줄(#myEmpty)만 보인다. */
 (function () {
-  const TABS = ['certify', 'feed', 'fame', 'me'];
+  const TABS = ['info', 'feed', 'certify', 'fame', 'me'];
   const mq = window.matchMedia('(max-width: 899px)');
   const $ = (id) => document.getElementById(id);
   let current = 'certify';
@@ -46,12 +46,6 @@
     empty.hidden = !card.hidden;
   }
 
-  function goPickName() {
-    activate('certify');
-    const input = $('participantSearch');
-    if (input) setTimeout(() => { input.scrollIntoView({ block: 'center' }); input.focus(); }, 60);
-  }
-
   function init() {
     if (!document.querySelector('.pane')) return;
     document.body.classList.add('has-tabs');
@@ -66,13 +60,6 @@
       new MutationObserver(syncMyEmpty).observe(card, { attributes: true, attributeFilter: ['hidden'] });
       syncMyEmpty();
     }
-    const go = $('myEmptyGo');
-    if (go) go.addEventListener('click', goPickName);
-
-    // 휴대폰에서 세 줄로 접혀 있는 책 소개는 누르면 펼친다
-    const desc = $('introDesc');
-    if (desc) desc.addEventListener('click', () => desc.classList.toggle('open'));
-
     // 인증 직후 바로가기 — 휴대폰에서는 아래 카드들이 다른 탭에 있으니 길을 열어 준다
     document.addEventListener('cs:submitted', () => {
       const box = $('formMsg');

@@ -9,7 +9,7 @@
   const FEED_PAGE_SIZE = 20;
 
   let participants = [];
-  let feedDate = U.today();
+  let feedDate = '';     // 피드에서 볼 날짜. 빈 값이면 전체 날짜(지금까지 올라온 모든 글, 최신 날짜부터)
   let feedVisibleCount = FEED_PAGE_SIZE;
   let feedSort = 'likes'; // 'likes' 추천 많은순(기본) | 'recent' 최신순
   let feedSearch = '';    // 피드에서 찾을 이름(초성도 됨). 빈 값이면 전체.
@@ -154,7 +154,7 @@
     if (!fold) return;
     const plan = CONFIG.readingPlan || [];
     if (!plan.length) {
-      fold.hidden = true;
+      $('todayRangeBody').hidden = true;
       return;
     }
     const todayIdx = U.dayIndex(U.today());
@@ -172,24 +172,7 @@
     $('todayRangeText').innerHTML = rangeHtml(plan[rangeDayIdx - 1]) + promptHtml(rangeDayIdx, date);
     $('rangePrevDay').disabled = rangeDayIdx <= 1;
     $('rangeNextDay').disabled = rangeDayIdx >= plan.length;
-    fold.hidden = false;
-  }
-
-  /* 오늘 읽을 분량은 처음부터 펼쳐 둔다(매일 여는 화면 맨 위에서 바로 보이게).
-   * 눌러서 가리면 그날 하루는 가린 채로 기억했다가, 다음 날에는 새 분량이니 다시 펼친다. */
-  const RANGE_HIDE_KEY = `${CONFIG.storagePrefix}.rangeHiddenOn`;
-  function initRangeFold() {
-    const fold = $('todayRangeFold');
-    if (!fold) return;
-    let hiddenOn = null;
-    try { hiddenOn = localStorage.getItem(RANGE_HIDE_KEY); } catch (e) { /* 저장소를 못 써도 펼친 채로 보여 준다 */ }
-    fold.open = hiddenOn !== U.today();
-    fold.addEventListener('toggle', () => {
-      try {
-        if (fold.open) localStorage.removeItem(RANGE_HIDE_KEY);
-        else localStorage.setItem(RANGE_HIDE_KEY, U.today());
-      } catch (e) { /* 기억은 못 해도 가리기·펼치기는 된다 */ }
-    });
+    $('todayRangeBody').hidden = false;
   }
 
   function shiftRangeDay(delta) {
@@ -292,6 +275,19 @@
       sel.appendChild(o);
     }
     sel.value = participants.some((p) => p.id === keepId) ? keepId : '';
+    syncMeWho();
+  }
+
+  /** [내 현황]의 "본인 확인하기" — 이름 드롭다운. 고르면 인증 폼의 이름 칸과 같은 사람으로 맞춘다. */
+  function syncMeWho() {
+    const who = $('meWho');
+    if (!who) return;
+    const byName = (a, b) => a.nickname.localeCompare(b.nickname, 'ko');
+    const active = participants.filter((p) => p.status !== 'out').sort(byName);
+    const out = participants.filter((p) => p.status === 'out').sort(byName);
+    who.innerHTML = '<option value="">내 이름을 골라 주세요</option>'
+      + active.concat(out).map((p) => `<option value="${esc(p.id)}">${esc(comboLabel(p))}</option>`).join('');
+    who.value = $('participant').value || '';
   }
 
   function comboLabel(p) { return `${p.nickname}${outSuffix(p)}`; }
@@ -535,6 +531,7 @@
   async function onSelect() {
     const pid = $('participant').value;
     currentPid = pid;
+    if ($('meWho')) $('meWho').value = pid || '';
     const card = $('myCard');
     if (!pid) {
       card.hidden = true; msg($('formMsg'), '');
@@ -662,12 +659,16 @@
     const subs = await Store.listSubmissions({ participantId: pid });
     const stat = U.buildStats([p], subs)[0];
 
+    // 참여자 화면에서 면제일은 따로 세지 않고 '통과'로 본다 — 인증 칸에 합쳐 세고, 인증률도 그 기준으로.
+    // (면제 건수·날짜는 운영진 화면에서 따로 확인한다)
+    const passed = stat.verified + stat.exempt;
+    const myRate = passed + stat.missed ? Math.round((passed / (passed + stat.missed)) * 100) : 0;
     $('myCard').hidden = false;
-    $('stVerified').textContent = stat.verified;
+    $('stVerified').textContent = passed;
     $('stMissed').textContent = stat.missed;
     $('stExempt').textContent = stat.exempt;
     $('stStreak').textContent = stat.streak;
-    $('stRate').textContent = `${stat.rate}%`;
+    $('stRate').textContent = `${myRate}%`;
 
     const tag = $('myStatusTag');
     const rt = U.riskTag(stat);
@@ -689,12 +690,12 @@
     const strip = $('myStrip');
     strip.innerHTML = stat.cells.map((c) => `
       <div class="strip-cell" title="${esc(U.shortLabel(c.date))} — ${esc(labelOf(c.status))}">
-        <span class="cell ${CELL_CLASS[c.status]}">${c.status === '-' ? '·' : c.status}</span>
+        <span class="cell ${CELL_CLASS[c.status === 'P' ? 'O' : c.status]}">${c.status === '-' ? '·' : (c.status === 'P' ? 'O' : c.status)}</span>
         <span class="d">${Number(c.date.slice(8))}</span>
       </div>`).join('');
 
     // 전체 기록 — 하루도 빠뜨리지 않고 1일차부터 오늘까지 날짜 순서대로.
-    // 낸 날은 글 전체를, 안 낸 날은 "미인증", 면제일은 "면제" 한 줄로 남겨 빈 날이 어디인지 바로 보이게 한다.
+    // 낸 날은 글 전체를, 안 낸 날은 "미인증", 면제일은 "통과" 한 줄로 남겨 빈 날이 어디인지 바로 보이게 한다.
     // 챌린지 날짜 밖(연습 기간 등)에 낸 글도 버리지 않고 맨 앞에 함께 둔다.
     const box = $('myEntries');
     const all = subs.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -724,15 +725,15 @@
   }
 
   function labelOf(st) {
-    return { O: '인증', X: '미인증', P: '면제', '-': '예정', '·': '집계 대상 아님' }[st] || st;
+    return { O: '인증', X: '미인증', P: '통과', '-': '예정', '·': '집계 대상 아님' }[st] || st;
   }
 
-  /** 글이 없는 날(미인증·면제) — 빈 날도 목록에서 빠지지 않게 한 줄로 */
+  /** 글이 없는 날(미인증·통과) — 빈 날도 목록에서 빠지지 않게 한 줄로. 면제일은 참여자에게 '통과'로 보인다. */
   function renderGap(date, status) {
     const idx = U.dayIndex(date);
     return `<div class="entry gap">
       <h4>${idx ? `${idx}일차 · ` : ''}${esc(U.shortLabel(date))}
-        <span class="tag ${status === 'X' ? 'bad' : 'info'}">${status === 'X' ? '미인증' : '면제'}</span>
+        <span class="tag ${status === 'X' ? 'bad' : 'ok'}">${status === 'X' ? '미인증' : '통과'}</span>
       </h4>
     </div>`;
   }
@@ -754,40 +755,39 @@
 
   /* ── 인증 피드 & 명예의 전당 ───────────────────── */
 
-  /** 피드에서 넘겨볼 수 있는 날짜 범위. 챌린지 시작 전(연습 기간)에는 오늘 하루만 보여준다. */
+  /** 피드에서 고를 수 있는 날짜 범위. 챌린지 시작 전(연습 기간)에는 오늘 하루만. */
   function feedDateBounds() {
     const t = U.today();
     return { lo: t < CONFIG.startDate ? t : CONFIG.startDate, hi: t };
   }
 
-  function shiftFeedDate(delta) {
+  /** 날짜 고르기 칸: [전체 날짜] + 오늘부터 첫날까지 */
+  function paintFeedDateSelect() {
+    const sel = $('feedDateSelect');
+    if (!sel) return;
     const { lo, hi } = feedDateBounds();
-    const next = U.addDays(feedDate, delta);
-    if (next < lo || next > hi) return;
-    feedDate = next;
-    feedVisibleCount = FEED_PAGE_SIZE;
-    refreshSocialFeed();
+    const today = U.today();
+    const dates = [];
+    for (let d = hi; d >= lo; d = U.addDays(d, -1)) dates.push(d);
+    const key = `${hi}|${lo}`;
+    if (sel.dataset.key !== key) {
+      sel.innerHTML = '<option value="">전체 날짜</option>' + dates.map((d) => {
+        const idx = U.dayIndex(d);
+        return `<option value="${d}">${d === today ? '오늘 · ' : ''}${esc(U.shortLabel(d))}${idx ? ` · ${idx}일차` : ''}</option>`;
+      }).join('');
+      sel.dataset.key = key;
+    }
+    sel.value = feedDate;
   }
 
-  /** 피드 카드에서 좌우로 밀면 이전/다음 날짜로 이동 (모바일 스와이프) */
-  function bindFeedSwipe(el) {
-    if (!el) return;
-    let sx = 0, sy = 0, tracking = false;
-    el.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
-    }, { passive: true });
-    el.addEventListener('touchend', (e) => {
-      if (!tracking) return;
-      tracking = false;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - sx;
-      const dy = t.clientY - sy;
-      // 세로 스크롤과 헷갈리지 않도록 충분히 수평에 가까운 스와이프만 인정
-      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        shiftFeedDate(dx < 0 ? 1 : -1);
-      }
-    }, { passive: true });
+  /** 피드에 올릴 글. 전체 날짜면 한 번 읽어 둔 전체 기록(캐시)에 오늘 글만 새로 읽어 얹는다
+   *  — 지난 날짜 글은 거의 바뀌지 않으니 2분마다 전체를 다시 읽지 않는다. */
+  async function feedSubs(date) {
+    if (date) return (await Store.listSubmissions({ date })).slice();
+    await loadAllSubs();
+    const fresh = await Store.listSubmissions({ date: U.today() });
+    fresh.forEach(upsertAllSubsCache);
+    return allSubsCache.slice();
   }
 
   /** 본인 글인지 (선택된 참여 아이디 기준). 여론 조작 방지를 위해 본인 글은 추천할 수 없다. */
@@ -817,6 +817,10 @@
             await Store.unvoteSubmission(btn.dataset.id, clientId);
           } else {
             await Store.upvoteSubmission(btn.dataset.id, clientId);
+          }
+          // 전체 날짜로 보는 중 지난 날짜 글을 추천했다면 그날 기록만 새로 읽어 캐시에 반영한다
+          if (btn.dataset.date && btn.dataset.date !== U.today() && allSubsCache) {
+            (await Store.listSubmissions({ date: btn.dataset.date })).forEach(upsertAllSubsCache);
           }
           await refreshSocialFeed();
           await calculateRanksAndFame();
@@ -849,7 +853,7 @@
         ${CS.Post.body(s, feedOpenIds.has(s.id))}
       </div>
       <div class="feed-acts">
-        <button type="button" class="${btnClass}" data-id="${esc(s.id)}"
+        <button type="button" class="${btnClass}" data-id="${esc(s.id)}" data-date="${esc(s.date)}"
           ${btnAttr} aria-label="엄지척 ${s.upvotes || 0}개, ${hasUpvoted ? '눌러서 취소' : '눌러서 추천'}">${U.icon('thumb')}${s.upvotes || 0}</button>
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
@@ -860,63 +864,77 @@
     </article>`;
   }
 
-  async function refreshSocialFeed() {
-    const date = feedDate;
-    const daySubs = (await Store.listSubmissions({ date })).slice();
-
+  function sortFeedDay(list) {
     // 정렬: 추천 많은순(기본) | 최신순. 동점·동시각이면 먼저 올린 사람이 위로.
     if (feedSort === 'recent') {
-      daySubs.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    } else {
-      daySubs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
-        String(a.createdAt).localeCompare(String(b.createdAt)));
+      return list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     }
+    return list.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
+      String(a.createdAt).localeCompare(String(b.createdAt)));
+  }
 
-    // 1등(가장 많이 추천된 사람) — 공동 1등 모두 인정. 정렬·검색과 무관하게 왕관을 달아 준다.
-    // (검색으로 걸러내기 전의 그날 전체를 기준으로 뽑아야 1등이 검색어에 따라 바뀌지 않는다)
-    const maxVotes = daySubs.reduce((m, s) => Math.max(m, s.upvotes || 0), 0);
-    const winners = maxVotes > 0
-      ? daySubs.filter((s) => (s.upvotes || 0) === maxVotes).map((s) => s.nickname)
-      : [];
+  async function refreshSocialFeed() {
+    const date = feedDate;
+    const subs = await feedSubs(date);
+    const today = U.today();
+    paintFeedDateSelect();
 
-    const shown = feedSearch
-      ? daySubs.filter((s) => nicknameMatches(s.nickname, feedSearch))
-      : daySubs;
-
-    $('feedCount').textContent = feedSearch
-      ? `${shown.length}명 / ${daySubs.length}명`
-      : `${daySubs.length}명`;
-
-    // 날짜 넘기기 컨트롤
-    const { lo, hi } = feedDateBounds();
-    const isToday = date === U.today();
-    $('feedPrevDate').disabled = date <= lo;
-    $('feedNextDate').disabled = date >= hi;
-    $('feedDateLabel').textContent = isToday ? `오늘 · ${U.shortLabel(date)}` : U.shortLabel(date);
+    // 날짜별로 묶어 최신 날짜부터. 그날 1등(가장 많이 추천된 사람, 공동 1등 모두)은 정렬·검색과
+    // 무관하게 왕관을 단다 — 검색으로 걸러내기 전의 그날 전체를 기준으로 뽑는다.
+    const byDate = new Map();
+    for (const x of subs) {
+      if (!byDate.has(x.date)) byDate.set(x.date, []);
+      byDate.get(x.date).push(x);
+    }
+    const winnerIds = new Set();
+    const groups = [...byDate.keys()].sort().reverse().map((d) => {
+      const day = sortFeedDay(byDate.get(d));
+      const maxVotes = day.reduce((m, x) => Math.max(m, x.upvotes || 0), 0);
+      if (maxVotes > 0) day.filter((x) => (x.upvotes || 0) === maxVotes).forEach((x) => winnerIds.add(x.id));
+      const shown = feedSearch ? day.filter((x) => nicknameMatches(x.nickname, feedSearch)) : day;
+      return { date: d, shown };
+    });
+    const total = subs.length;
+    const shownTotal = groups.reduce((n, g) => n + g.shown.length, 0);
+    const unit = date ? '명' : '건';
+    $('feedCount').textContent = feedSearch ? `${shownTotal}${unit} / ${total}${unit}` : `${total}${unit}`;
 
     const feedList = $('socialFeedList');
     const moreWrap = $('feedLoadMoreWrap');
-    if (!shown.length) {
-      feedList.innerHTML = daySubs.length
-        ? `<div class="empty">'${esc(feedSearch)}'와(과) 맞는 이름이 이 날짜에 없습니다.</div>`
-        : `<div class="empty">${isToday ? '오늘' : U.shortLabel(date) + '에'} 제출된 인증글이 없습니다.` +
-          `${isToday ? ' 첫 번째 글을 작성해 보세요!' : ''}</div>`;
+    if (!shownTotal) {
+      const isToday = date === today;
+      feedList.innerHTML = total
+        ? `<div class="empty">'${esc(feedSearch)}'와(과) 맞는 이름이 ${date ? '이 날짜에 ' : ''}없습니다.</div>`
+        : `<div class="empty">${date ? `${isToday ? '오늘' : U.shortLabel(date) + '에'} ` : '아직 '}제출된 인증글이 없습니다.` +
+          `${!date || isToday ? ' 첫 번째 글을 작성해 보세요!' : ''}</div>`;
       moreWrap.hidden = true;
       return;
     }
 
-    const winnerSet = new Set(winners);
-    const visible = shown.slice(0, feedVisibleCount);
-    feedList.innerHTML = visible.map((s) =>
-      renderFeedItem(s, winnerSet.has(s.nickname), (s.upvotedBy || []).includes(clientId))).join('');
+    // 정해진 개수만큼만 그리고 나머지는 [더 보기]. 전체 날짜일 때는 날짜마다 머리줄을 단다.
+    let left = feedVisibleCount;
+    const html = [];
+    for (const g of groups) {
+      if (left <= 0) break;
+      if (!g.shown.length) continue;
+      if (!date) {
+        const idx = U.dayIndex(g.date);
+        html.push(`<h3 class="feed-day">${g.date === today ? '오늘 · ' : ''}${esc(U.shortLabel(g.date))}${idx ? ` <span>${idx}일차</span>` : ''}</h3>`);
+      }
+      g.shown.slice(0, left).forEach((x) => {
+        html.push(renderFeedItem(x, winnerIds.has(x.id), (x.upvotedBy || []).includes(clientId)));
+      });
+      left -= g.shown.length;
+    }
+    feedList.innerHTML = html.join('');
     bindUpvoteButtons(feedList);
     CS.Post.fit(feedList, feedOpenIds);
-    CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: U.shortLabel(date) });
+    CS.ShareCard.bindButtons(feedList, { title: CONFIG.title, dateLabel: date ? U.shortLabel(date) : '' });
 
-    const remaining = shown.length - visible.length;
+    const remaining = shownTotal - Math.min(shownTotal, feedVisibleCount);
     if (remaining > 0) {
       moreWrap.hidden = false;
-      $('feedLoadMoreBtn').textContent = `더 보기 (${remaining}명 더 남음)`;
+      $('feedLoadMoreBtn').textContent = `더 보기 (${remaining}${unit} 더 남음)`;
     } else {
       moreWrap.hidden = true;
     }
@@ -1254,7 +1272,7 @@
       await paintMine(pid);
       upsertAllSubsCache(saved); // 방금 저장한 내 기록만 캐시에 반영 — 전체를 다시 읽지 않아도 된다
       await paintOverall();
-      feedDate = date;
+      if (feedDate && feedDate !== date) feedDate = date; // 날짜를 골라 보던 중이면 방금 낸 날짜로
       feedVisibleCount = FEED_PAGE_SIZE;
       await refreshSocialFeed();
       await calculateRanksAndFame();
@@ -1308,7 +1326,6 @@
     paintIntro();
     paintHeader();
     renderTodayRange();
-    initRangeFold();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));
     $('myCopyAll').addEventListener('click', copyMine);
     $('mySaveAll').addEventListener('click', saveMine);
@@ -1337,6 +1354,11 @@
     });
 
     $('participant').addEventListener('change', onSelect);
+    $('meWho').addEventListener('change', (e) => {
+      const p = participants.find((x) => x.id === e.target.value);
+      if (p) pickParticipant(p);
+      else { $('participant').value = ''; $('participantSearch').value = ''; $('participant').dispatchEvent(new Event('change')); }
+    });
     bindParticipantCombo();
     $('certifyDate').addEventListener('change', onCertifyDateChange);
     bindCertifyDatePicker();
@@ -1346,11 +1368,14 @@
     ['sentence', 'reflection'].forEach((k) =>
       $(k).addEventListener('input', () => autoGrow($(k))));
 
-    // 피드 날짜 넘기기 (버튼 + 좌우 스와이프)
-    $('feedPrevDate').addEventListener('click', () => shiftFeedDate(-1));
+    // 피드 날짜 고르기 (기본은 전체 날짜) · 명예의 전당 날짜 넘기기
+    $('feedDateSelect').addEventListener('change', (e) => {
+      feedDate = e.target.value;
+      feedVisibleCount = FEED_PAGE_SIZE;
+      refreshSocialFeed();
+    });
     $('famePrevDate').addEventListener('click', () => shiftFameDate(-1));
     $('fameNextDate').addEventListener('click', () => shiftFameDate(1));
-    $('feedNextDate').addEventListener('click', () => shiftFeedDate(1));
     $('feedLoadMoreBtn').addEventListener('click', () => {
       feedVisibleCount += FEED_PAGE_SIZE;
       refreshSocialFeed();
@@ -1365,7 +1390,6 @@
       feedVisibleCount = FEED_PAGE_SIZE; // 정렬이 바뀌면 처음부터 다시 보여준다
       refreshSocialFeed();
     });
-    bindFeedSwipe(document.querySelector('.feed-card'));
 
     // 피드 갱신: 수동 버튼(전체 재집계) + 화면이 보이는 동안 "오늘" 볼 때만 주기적 갱신
     // (명예의 전당도 하루치만 읽으므로 함께 갱신한다 — 추천이 들어오면 순위가 바로 따라간다)
@@ -1373,16 +1397,17 @@
       const btn = e.currentTarget;
       btn.disabled = true;
       try {
+        await loadAllSubs(true); // 수동 새로고침은 다른 사람의 새 기록까지 진짜로 다시 읽는다
         await refreshSocialFeed();
         await calculateRanksAndFame();
-        await paintOverall({ force: true }); // 수동 새로고침은 다른 사람의 새 기록까지 진짜로 다시 읽는다
+        await paintOverall();
       } finally { btn.disabled = false; }
     });
     const pollFeed = () => {
       if (document.visibilityState !== 'visible') return;
       // 피드는 '오늘'을 보고 있을 때만, 명예의 전당(전일 기준)은 어느 날짜를 보고 있든 갱신한다
       // — 지난 날짜 피드에서 추천을 누르면 전일 순위가 바뀔 수 있기 때문이다.
-      if (feedDate === U.today()) refreshSocialFeed().catch(console.error);
+      if (!feedDate || feedDate === U.today()) refreshSocialFeed().catch(console.error);
       calculateRanksAndFame().catch(console.error);
     };
     setInterval(pollFeed, 120000);
