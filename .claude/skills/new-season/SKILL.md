@@ -98,17 +98,18 @@ description: 퍼메스 독서 멤버십의 다음 시즌(새 책)을 준비한�
 
 ```
 node tools/new-season.mjs seasons/<id>.json          # 미리보기
-node tools/new-season.mjs seasons/<id>.json --write  # config.js + out/ 문서
+node tools/new-season.mjs seasons/<id>.json --write  # config.js + out/<id>/ 문서
 ```
 
-`out/상세페이지.md` · `out/설명서.md` · `out/일정표.md` · `out/카톡공지.txt` 와 `out/노션게시.json`이 나온다.
+`out/<id>/` 에 `상세페이지.md` · `설명서.md` · `일정표.md` · `카톡공지.txt` 와 `노션게시.json`이 나온다
+(시즌마다 폴더가 달라 앞 시즌 초안을 덮어쓰지 않는다).
 **상세페이지는 전체 구조가 고정이고 책 제목과 "왜 이 책인가"만 바뀐다** — 그 부분만 손본다.
 상세페이지 틀에는 9월 판에서 사람들이 빠져나가던 자리를 메운 단락이 다섯 군데 있다(`[보완]` 주석).
 그 단락은 책과 상관없는 부분이니 지우지 않는다.
 
 ### 3.5. 노션에 올린다 — 사람이 붙여 넣지도, 게시를 켜지도 않는다
 
-`out/노션게시.json`에 파일·제목·아이콘이 적혀 있다.
+`out/<id>/노션게시.json`에 파일·제목·아이콘이 적혀 있다.
 
 - **공개(웹 게시)는 부모에서 물려받는다.** 이미 웹에 게시된 페이지의 **하위 페이지로 만들면 그대로 공개**된다.
   「퍼메스 독서챌린지」 바로 아래는 공개가 아니니 거기에 만들지 않는다.
@@ -133,6 +134,22 @@ node tools/new-season.mjs seasons/<id>.json --write  # config.js + out/ 문서
 - 만든 뒤 `notion-fetch`로 다시 읽어 표(일정표)·번호·굵게가 살아 있는지, 지난 책 이름·날짜·요일이 남지 않았는지 본다.
 - 지난달 페이지 본문은 건드리지 않는다(부모로만 쓴다).
 - 신청 북마크(`vo.la/…` → 래피드 멤버십)는 매달 같은 상품이면 그대로다. 상품이 바뀌었는지만 사람에게 묻는다.
+
+### 3.6. 보관한다 — 이전 버전 문구는 지우지 않는다 (archive/README.md)
+
+시즌이 바뀌어도 지난 시즌 문구는 지우지 않는다. 노션에 게시가 끝나면 최종본을 시즌 폴더에 떠 둔다.
+
+```
+node tools/notion-snapshot.mjs <상세페이지 ID> archive/<id>-<책>/상세페이지.md
+node tools/notion-snapshot.mjs <설명서 ID>     archive/<id>-<책>/설명서.md
+node tools/notion-snapshot.mjs <일정표 ID>     archive/<id>-<책>/일정표.md
+```
+카톡 공지 최종 문구는 `archive/<id>-<책>/카톡공지.txt`로, `archive/README.md` 표에 시즌 한 줄을 더한다.
+
+- `js/config.js`의 지난 시즌 객체, `seasons/*.json`, 지난달 노션 페이지는 **지우지도 덮어쓰지도 않는다**.
+- 이미 게시한 문구를 나중에 고칠 때는 고치기 전에 한 번 떠 두고(같은 이름이면 날짜 붙은 파일로 따로 남는다),
+  그 시즌 폴더의 `변경기록.md`에 날짜 · 무엇을 · 왜 · 고치기 전/후 문구를 적는다.
+- 신청자 명단·라이브 대본은 보관함에 넣지 않는다(개인정보).
 
 ### 4. 앞 시즌 잠금을 확인한다
 
