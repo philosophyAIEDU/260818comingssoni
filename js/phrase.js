@@ -32,6 +32,17 @@
     const words = [];
     for (let i = 0; i < parts.length; i += 2) words.push(parts[i]);
     const join = []; // join[i] = i번째와 i+1번째 단어 사이를 붙일지
+    // 『책 제목』「소제목」은 통째로 한 줄에 — 제목 전체가 짧을 때만(긴 제목을 묶으면 화면 밖으로 넘친다)
+    const titleJoin = new Set();
+    for (let i = 0; i < words.length; i++) {
+      if (!/[『「]/.test(words[i]) || /[』」]/.test(words[i])) continue;
+      let k = i + 1;
+      while (k < words.length && !/[』」]/.test(words[k])) k++;
+      if (k < words.length && words.slice(i, k + 1).join(' ').length <= 16) {
+        for (let x = i; x < k; x++) titleJoin.add(x);
+      }
+      i = k;
+    }
     for (let i = 0; i < words.length - 1; i++) {
       const a = words[i], b = words[i + 1];
       if (!a || !b || /\n/.test(parts[2 * i + 1])) { join.push(false); continue; }
@@ -39,7 +50,7 @@
       const bPrev = HANGUL1.test(b) && GLUE_PREV.has(b);
       // "할 수 있다/없다"는 한 덩어리로
       const canDo = (a === '수' || a === '줄') && /^[있없]/.test(b);
-      join.push(aOne || bPrev || canDo);
+      join.push(aOne || bPrev || canDo || titleJoin.has(i));
     }
     return { parts, words, join };
   }
@@ -60,7 +71,8 @@
       while (j < join.length && join[j]) j++;
       const chunk = parts.slice(2 * i, 2 * j + 1).join('');
       // 괄호 바로 뒤에 토씨가 붙은 낱말(미인증(X)으로, 「…」는)은 괄호에서 갈라지지 않게 통째로
-      if (j > i || /[)\]」』][가-힣]/.test(chunk)) {
+      // 가운뎃점으로 이은 말(1인기업·크리에이터)도 가운뎃점에서 갈라지지 않게
+      if (j > i || /[)\]」』][가-힣]/.test(chunk) || /[가-힣A-Za-z0-9]·[가-힣A-Za-z0-9]/.test(chunk)) {
         const span = document.createElement('span');
         span.className = 'nb';
         span.textContent = chunk;
