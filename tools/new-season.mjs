@@ -15,8 +15,10 @@
  *
  * 만들어 주는 것
  *   1) js/config.js 의 CS.SEASONS 에 시즌 객체 추가 (+ 앞 시즌 lockAt 자동)
- *   2) out/상세페이지.md · out/설명서.md · out/일정표.md · out/카톡공지.txt  (모집·안내 문구 초안)
- *   3) out/노션게시.json — 위 문서를 노션 어디에 어떤 제목으로 올릴지 (스킬이 읽는다)
+ *   2) out/<시즌id>/상세페이지.md · 설명서.md · 일정표.md · 카톡공지.txt  (모집·안내 문구 초안)
+ *   3) out/<시즌id>/노션게시.json — 위 문서를 노션 어디에 어떤 제목으로 올릴지 (스킬이 읽는다)
+ *   초안은 시즌마다 따로 폴더에 남겨, 다음 시즌을 만들 때 앞 시즌 초안을 덮어쓰지 않는다.
+ *   게시까지 끝난 최종본은 archive/<시즌id>-<책>/ 에 보관한다(archive/README.md).
  *   4) 사람이 확인해야 하는 것 목록
  *
  * 시즌이 config에 들어가 있으면 전환은 저절로 된다 — 활성 시즌은 배포가 아니라
@@ -298,7 +300,7 @@ if (!WRITE) {
 const cfgPath = join(root, 'js/config.js');
 let cfg = readFileSync(cfgPath, 'utf8');
 if (cfg.includes(`id: '${spec.id}'`)) {
-  console.error(`\n이미 '${spec.id}' 시즌이 config.js에 있습니다. id를 바꾸거나 기존 것을 지워 주세요.`);
+  console.error(`\n이미 '${spec.id}' 시즌이 config.js에 있습니다. 새 시즌은 새 id(예: s4)로 만들어 주세요 — 지난 시즌은 지우지 않고 보관합니다.`);
   process.exit(1);
 }
 // CS.SEASONS는 '\n}];' 로 끝난다 — 여기서 '}'는 마지막 시즌 객체를 닫는 괄호이고
@@ -319,8 +321,10 @@ if (lockAtIdx >= 0) {
 }
 writeFileSync(cfgPath, head + '\n}' + seasonSrc + cfg.slice(at + marker.length));
 
-const outDir = join(root, 'out');
-if (!existsSync(outDir)) mkdirSync(outDir);
+// 시즌마다 out/<시즌id>/ 에 따로 — 앞 시즌 초안을 덮어쓰지 않는다
+const outRel = `out/${spec.id}`;
+const outDir = join(root, outRel);
+if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 for (const tpl of ['상세페이지.md', '설명서.md', '일정표.md', '카톡공지.txt']) {
   writeFileSync(join(outDir, tpl), fill(readFileSync(join(root, 'tools/templates', tpl), 'utf8')));
 }
@@ -331,18 +335,19 @@ const NOTION_PARENT = '3c2f15a6c51c80108cb1c88b5212be7d'; // 「퍼메스 독서
 writeFileSync(join(outDir, '노션게시.json'), JSON.stringify({
   parentPageId: NOTION_PARENT,
   pages: [
-    { file: 'out/설명서.md', title: `${monthLabel} 퍼메스 독서 멤버십 설명서 『${spec.book.name}』`, icon: '📖',
+    { file: `${outRel}/설명서.md`, title: `${monthLabel} 퍼메스 독서 멤버십 설명서 『${spec.book.name}』`, icon: '📖',
       note: '구매자에게 나가는 문서. 만든 뒤 노션에서 "웹에 게시"를 켜야 링크가 열린다 → 그 링크가 guideUrl.' },
-    { file: 'out/일정표.md', title: `${spec.book.name} ${days}일 독서 일정표`, icon: '🗓️',
+    { file: `${outRel}/일정표.md`, title: `${spec.book.name} ${days}일 독서 일정표`, icon: '🗓️',
       note: '설명서와 앱의 일정이 같은 원본(readingPlan)에서 나왔는지 여기서 한 번 더 본다.' },
-    { file: 'out/상세페이지.md', title: `퍼스널메이커스 독서 멤버십 ${monthLabel} 『${spec.book.name}』`, icon: '📘',
+    { file: `${outRel}/상세페이지.md`, title: `퍼스널메이커스 독서 멤버십 ${monthLabel} 『${spec.book.name}』`, icon: '📘',
       note: '모집용. 이미지(후기·저자 사진·표지)와 신청 북마크는 지난달 페이지에서 가져와 넣는다.' }
   ]
 }, null, 2));
 
 console.log('\n✓ js/config.js 에 시즌을 추가했습니다.' + (lockedPrev ? ` 앞 시즌 lockAt = ${lockPrevAt}` : ''));
-console.log('✓ out/상세페이지.md · out/설명서.md · out/일정표.md · out/카톡공지.txt 를 만들었습니다.');
-console.log('✓ out/노션게시.json — 노션에 올릴 제목·위치 목록 (new-season 스킬이 이걸 보고 페이지를 만든다)');
+console.log(`✓ ${outRel}/ 에 상세페이지.md · 설명서.md · 일정표.md · 카톡공지.txt 를 만들었습니다.`);
+console.log(`✓ ${outRel}/노션게시.json — 노션에 올릴 제목·위치 목록 (new-season 스킬이 이걸 보고 페이지를 만든다)`);
+console.log('  노션에 게시한 뒤에는 archive/ 에 최종본을 보관하세요(archive/README.md).');
 if (leftovers.size) {
   console.log(`\n⚠ 채우지 못한 자리표시자: ${[...leftovers].join(', ')} — 시즌 설명서에 값을 넣어 주세요.`);
 }

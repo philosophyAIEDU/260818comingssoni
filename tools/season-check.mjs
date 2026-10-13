@@ -8,7 +8,7 @@
  *
  * 실패가 하나라도 있으면 종료 코드 1 — CI나 자동화 파이프라인이 그대로 막을 수 있다.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
@@ -157,6 +157,18 @@ CS.SEASONS.forEach((s, i) => {
   check('전체', `${s.label} 잠금이 ${next.label} 시작보다 뒤다`, s.lockAt >= next.startsAt,
     `${s.label} 잠금 ${s.lockAt} / ${next.label} 시작 ${next.startsAt}`);
 });
+
+// 보관함(archive/<시즌id>-<책>/)이 있는 시즌은 config에서 지워지면 안 된다 — 지난 시즌은 지우지 않고 보관한다
+{
+  const archiveDir = join(root, 'archive');
+  const ids = new Set(CS.SEASONS.map((x) => x.id));
+  const kept = existsSync(archiveDir)
+    ? readdirSync(archiveDir).map((d) => (d.match(/^(s\d+)-/) || [])[1]).filter(Boolean)
+    : [];
+  const gone = kept.filter((id) => !ids.has(id));
+  check('전체', `보관함에 있는 시즌이 config에 그대로 남아 있다 (${kept.join(', ') || '없음'})`, gone.length === 0,
+    gone.length ? `config에서 사라짐: ${gone.join(', ')}` : '');
+}
 
 // ── 출력 ──
 let cur = null;
