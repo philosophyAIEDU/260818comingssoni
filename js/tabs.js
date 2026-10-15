@@ -68,9 +68,15 @@
       if (old) old.remove();
       const wrap = document.createElement('div');
       wrap.className = 'quick-go';
-      wrap.innerHTML = '<button type="button" data-go="feed">다른 분들 글 보기</button>'
+      wrap.innerHTML = '<button type="button" class="primary qg-card" data-card>📸 오늘 인증 카드 만들기</button>'
+        + '<button type="button" data-go="feed">다른 분들 글 보기</button>'
         + '<button type="button" data-go="me">내 현황 보기</button>';
       wrap.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => activate(b.dataset.go)));
+      // 인증 직후가 자랑하고 싶은 순간 — 내 현황으로 넘어가 바로 인증 카드를 띄운다
+      wrap.querySelector('[data-card]').addEventListener('click', () => {
+        activate('me');
+        setTimeout(() => { const b = $('myCardShare'); if (b) b.click(); }, 150);
+      });
       box.appendChild(wrap);
       box.scrollIntoView({ block: 'center' });
     });

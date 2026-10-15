@@ -670,6 +670,15 @@
     $('stStreak').textContent = stat.streak;
     $('stRate').textContent = `${myRate}%`;
 
+    // 성취감 — 완주율 링 · 연속 · 배지 · 다음 목표 · SNS용 인증 카드 (js/progress-card.js)
+    if (CS.Progress) {
+      CS.Progress.paint(stat, p, {
+        today: U.today(), dayIndex: U.dayIndex, giftMissLimit: CONFIG.giftMissLimit,
+        title: CONFIG.title, book: CONFIG.book.name, cover: CONFIG.book.cover,
+        tag: `#퍼메스독서멤버십 #${String(CONFIG.book.name).replace(/\s+/g, '')}`,
+      });
+    }
+
     const tag = $('myStatusTag');
     const rt = U.riskTag(stat);
     tag.className = `tag ${rt.cls}`;
