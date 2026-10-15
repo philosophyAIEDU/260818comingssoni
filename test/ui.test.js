@@ -2209,6 +2209,28 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       (await m.locator('#participant option:checked').textContent()).includes('커밍쏜'));
     t('휴대폰: 숫자 칸은 인증·미인증·연속 인증·인증률 넷(면제 칸 숨김)',
       (await m.locator('#myCard .stats .stat:not([hidden])').count()) === 4);
+    // 성취감 — 맨 위 완주율 링·연속·배지·다음 목표, 그리고 SNS용 인증 카드 이미지
+    t('휴대폰: [내 현황] 맨 위에 완주율(%)이 크게 보임',
+      await vis('#myHero .hero-ring') && /^\d+%$/.test((await m.textContent('#heroPct')).trim()),
+      await m.textContent('#heroPct'));
+    t('휴대폰: 배지 여섯 개(첫 인증·3일·7일 연속·절반·21일·완주)', (await m.locator('#myHero .hero-badges li').count()) === 6);
+    t('휴대폰: 다음 목표 한 줄이 보임', (await m.textContent('#myHero .hero-next')).trim().length > 5);
+    await m.click('#myCardShare');
+    await m.waitForSelector('#cardPreview img');
+    const cardSize = await m.evaluate(() => new Promise((res) => {
+      const im = new Image(); im.onload = () => res([im.naturalWidth, im.naturalHeight]);
+      im.src = document.querySelector('#cardPreview img').src;
+    }));
+    t('인증 카드: 1080×1350(인스타 4:5) 이미지로 만들어짐', cardSize[0] === 1080 && cardSize[1] === 1350, cardSize);
+    const cardName = m.evaluate(() => new Promise((resolve) => {
+      const orig = document.body.appendChild.bind(document.body);
+      document.body.appendChild = (el) => { if (el.tagName === 'A' && el.download) resolve(el.download); return orig(el); };
+    }));
+    const [cardDl] = await Promise.all([m.waitForEvent('download'), m.click('#cardPreview [data-cp="save"]')]);
+    t('인증 카드: [이미지 저장]으로 PNG가 내려받아짐', /인증카드_커밍쏜_\d{4}-\d{2}-\d{2}\.png$/.test(await cardName)
+      && fs.readFileSync(await cardDl.path()).slice(1, 4).toString() === 'PNG', await cardName);
+    await m.click('#cardPreview [data-cp="close"]');
+    t('인증 카드: [닫기]로 미리보기가 닫힘', (await m.locator('#cardPreview').count()) === 0);
     await m.click('#tabbar [data-go="certify"]');
     await m.waitForTimeout(150);
     await m.selectOption('#participant', { label: '커밍쏜' });
@@ -2218,6 +2240,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await m.click('#submitBtn');
     await m.waitForTimeout(500);
     t('휴대폰: 인증 직후 "다른 분들 글 보기 · 내 현황 보기" 바로가기', await vis('#formMsg .quick-go'));
+    t('휴대폰: 인증 직후 "오늘 인증 카드 만들기" 버튼도 바로 뜸', await vis('#formMsg .quick-go [data-card]'));
     await m.click('#formMsg .quick-go [data-go="me"]');
     await m.waitForTimeout(200);
     t('휴대폰: 바로가기로 [내 현황] — 이름을 골랐으니 내 기록 카드가 보임', await vis('#myCard') && !(await vis('#myEmpty')));
