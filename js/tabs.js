@@ -68,7 +68,7 @@
       if (old) old.remove();
       const wrap = document.createElement('div');
       wrap.className = 'quick-go';
-      wrap.innerHTML = '<button type="button" class="primary qg-card" data-card>📸 오늘 인증 카드 만들기</button>'
+      wrap.innerHTML = '<button type="button" class="primary qg-card" data-card>오늘 인증 카드 만들기</button>'
         + '<button type="button" data-go="feed">다른 분들 글 보기</button>'
         + '<button type="button" data-go="me">내 현황 보기</button>';
       wrap.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => activate(b.dataset.go)));
