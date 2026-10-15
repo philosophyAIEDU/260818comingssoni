@@ -370,43 +370,49 @@ body.app {
   .app .intro-body > .desc { margin-top: 6px; font-size: 15px; color: var(--text); }
 }
 
-/* ── [내 현황] 성취감: 완주율 링 · 연속 · 배지 · 다음 목표 · 인증 카드 (js/progress-card.js) ── */
-.app .my-hero { margin: 6px 0 18px; }
+/* ── [내 현황] 성취감: 완주율 링 · 연속 · 배지 · 다음 목표 · 인증 카드 (js/progress-card.js) ──
+   미니멀하게 — 색은 형광 주황(--hot) 하나만 포인트로, 나머지는 글자색·회색 선. */
+.app { --hot: #ff6a13; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .app { --hot: #ff7a2e; } }
+.app .my-hero { margin: 8px 0 22px; }
 .app .my-hero[hidden] { display: none; }
-.app .hero-top { display: flex; align-items: center; gap: 18px; }
-.app .hero-ring { position: relative; width: 120px; height: 120px; flex: 0 0 auto; }
+.app .hero-top { display: flex; align-items: center; gap: 22px; }
+.app .hero-ring { position: relative; width: 116px; height: 116px; flex: 0 0 auto; }
 .app .hero-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.app .ring-track { fill: none; stroke: var(--surface-2); stroke-width: 11; }
+.app .ring-track { fill: none; stroke: var(--border); stroke-width: 6; }
 .app .ring-bar {
-  fill: none; stroke: var(--navy); stroke-width: 11; stroke-linecap: round;
-  transition: stroke-dashoffset .8s cubic-bezier(.2, .8, .2, 1);
+  fill: none; stroke: var(--hot); stroke-width: 6; stroke-linecap: round;
+  transition: stroke-dashoffset .9s cubic-bezier(.2, .8, .2, 1);
 }
 .app .ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.app .ring-num b { font-size: 32px; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--brand-ink); }
-.app .ring-num b small { font-size: 16px; font-weight: 700; margin-left: 1px; }
-.app .ring-num span { margin-top: 4px; font-size: 12px; color: var(--text-dim); }
-.app .hero-side { min-width: 0; }
-.app .hero-side p { margin: 0; line-height: 1.45; }
-.app .hero-days { font-size: 15px; color: var(--text-dim); }
-.app .hero-days b { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
-.app .hero-streak { margin-top: 4px !important; font-size: 15px; }
-.app .hero-streak b { font-weight: 700; }
-.app .hero-gift { margin-top: 4px !important; font-size: 13.5px; color: var(--text-dim); }
-.app .hero-gift b { color: var(--text); }
+.app .ring-num b { font-size: 34px; font-weight: 700; letter-spacing: -.04em; line-height: 1; color: var(--text); }
+.app .ring-num b small { font-size: 15px; font-weight: 700; margin-left: 1px; color: var(--hot); }
+.app .ring-num span { margin-top: 6px; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--text-faint); }
+.app .hero-meta { margin: 0; display: grid; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.app .hero-meta > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.app .hero-meta > div:last-child { border-bottom: none; padding-bottom: 0; }
+.app .hero-meta dt { font-size: 13px; color: var(--text-faint); }
+.app .hero-meta dd { margin: 0; font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.app .hero-meta dd b { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+.app .hero-meta dd b.hot { color: var(--hot); }
 .app .hero-next {
-  margin: 14px 0 0; padding: 11px 14px; border-radius: 12px;
-  background: color-mix(in srgb, var(--navy) 8%, var(--surface)); color: var(--text); font-size: 14.5px; font-weight: 600;
+  margin: 18px 0 0; font-size: 14.5px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
 }
-.app .hero-badges { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.app .hero-next::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--hot); flex: 0 0 auto; }
+.app .hero-badges { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .app .hero-badges li {
-  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 6px;
-  border-radius: 12px; background: var(--surface-2); opacity: .45; filter: grayscale(1);
+  padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  color: var(--text-faint); border: 1px solid var(--border);
 }
-.app .hero-badges li.on { opacity: 1; filter: none; background: color-mix(in srgb, var(--navy) 10%, var(--surface)); }
-.app .hero-badges .b-e { font-size: 22px; line-height: 1; }
-.app .hero-badges .b-l { font-size: 10.5px; font-weight: 600; color: var(--text-dim); white-space: nowrap; letter-spacing: -.02em; }
-.app .hero-badges li.on .b-l { color: var(--text); }
-.app .hero-share { width: 100%; margin-top: 14px; min-height: 48px; font-size: 15.5px; }
+.app .hero-badges li.on { color: var(--hot); border-color: color-mix(in srgb, var(--hot) 55%, transparent); background: color-mix(in srgb, var(--hot) 8%, transparent); }
+.app .hero-share {
+  width: 100%; margin-top: 18px; min-height: 46px; font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; color: var(--text); border: 1px solid var(--text); border-radius: 12px;
+}
+.app .wrap .hero-share:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+.app .hero-share .ico { width: 18px; height: 18px; }
 
 /* 인증 카드 미리보기 — 화면 가운데 시트, 이미지는 길게 눌러 저장할 수도 있다 */
 .card-preview {
@@ -415,10 +421,15 @@ body.app {
 }
 @keyframes cp-in { from { opacity: 0; } to { opacity: 1; } }
 .card-preview .cp-sheet {
-  width: min(420px, 100%); max-height: 100%; overflow: auto; background: var(--surface, #fff); border-radius: 18px; padding: 14px;
+  width: min(400px, 100%); max-height: 100%; overflow: auto; background: var(--surface, #fff); border-radius: 20px; padding: 12px;
   display: flex; flex-direction: column; gap: 10px;
 }
 .card-preview img { width: 100%; height: auto; border-radius: 12px; display: block; }
 .card-preview .cp-tip { margin: 0; font-size: 12.5px; color: var(--text-faint, #999); text-align: center; }
 .card-preview .cp-acts { display: flex; flex-direction: column; gap: 8px; }
 .card-preview .cp-acts button { min-height: 46px; font-size: 15px; }
+
+/* 내 현황 숫자 칸 — 초록·빨강·노랑 대신 글자색 하나로(포인트 색은 위 완주율의 주황만) */
+.app #myCard .stat .n { color: var(--text); }
+.app #myCard .stat.bad .n { color: var(--text-dim); }
+.app #myCard .stat.warn .n { color: var(--hot); }

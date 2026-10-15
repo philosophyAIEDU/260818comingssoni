@@ -56,23 +56,19 @@
     };
   }
 
-  /** 링 위의 큰 숫자 아래 한 줄 응원 */
-  function cheer(d) {
-    if (d.done >= d.total) return '완주';
-    if (d.pct >= 75) return '거의 다 왔어요';
-    if (d.pct >= 50) return '절반 넘었어요';
-    if (d.pct >= 25) return '순항 중';
-    return '완주까지';
+  /** 다음 목표 한 줄 — 이모지 없이 짧게 */
+  function nextText(d) {
+    if (d.done >= d.total) return '28일 완주. 끝까지 해냈어요.';
+    if (d.todayOpen && !d.todayDone) {
+      return d.streak >= 1 ? `오늘 인증하면 ${d.streak + 1}일 연속이에요` : '오늘 인증으로 연속 기록을 시작해 보세요';
+    }
+    if (d.next) return `${d.next.need === 1 ? '하루' : `${d.next.need}일`}만 더 하면 ‘${d.next.label}’`;
+    return '오늘도 잘하고 있어요';
   }
 
   function heroHtml(d, giftLeft) {
-    const R = 52, C = 2 * Math.PI * R;
+    const R = 54, C = 2 * Math.PI * R;
     const off = C * (1 - Math.min(1, d.pct / 100));
-    const nl = d.done >= d.total ? '🏆 28일 완주! 끝까지 해낸 나를 자랑해 주세요.'
-      : (d.todayOpen && !d.todayDone)
-        ? (d.streak >= 1 ? `오늘 인증하면 🔥 ${d.streak + 1}일 연속이에요.` : '오늘 인증하고 다시 불을 붙여 보세요 🔥')
-        : d.next ? `${d.next.need === 1 ? '하루' : `${d.next.need}일`}만 더 하면 ${d.next.e} ${d.next.label}`
-          : '오늘도 한 페이지씩, 잘하고 있어요 👏';
     return `
       <div class="hero-top">
         <div class="hero-ring" role="img" aria-label="완주율 ${d.pct}%">
@@ -80,19 +76,19 @@
             <circle class="ring-track" cx="60" cy="60" r="${R}"/>
             <circle class="ring-bar" cx="60" cy="60" r="${R}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
           </svg>
-          <div class="ring-num"><b id="heroPct">${d.pct}<small>%</small></b><span>${esc(cheer(d))}</span></div>
+          <div class="ring-num"><b id="heroPct">${d.pct}<small>%</small></b><span>완주율</span></div>
         </div>
-        <div class="hero-side">
-          <p class="hero-days"><b>${d.done}</b> / ${d.total}일 인증</p>
-          <p class="hero-streak">${d.streak ? `🔥 <b>${d.streak}일</b> 연속` : '🔥 연속 기록을 시작해 보세요'}</p>
-          ${giftLeft != null ? `<p class="hero-gift">${giftLeft >= 0 ? `🎁 정리본까지 누락 여유 <b>${giftLeft}회</b>` : '🎁 이번 시즌 정리본 기준은 지났어요'}</p>` : ''}
-        </div>
+        <dl class="hero-meta">
+          <div><dt>인증</dt><dd><b>${d.done}</b><span> / ${d.total}일</span></dd></div>
+          <div><dt>연속</dt><dd><b class="hot">${d.streak}</b><span>일</span></dd></div>
+          ${giftLeft != null ? `<div><dt>정리본까지 여유</dt><dd>${giftLeft >= 0 ? `<b>${giftLeft}</b><span>회</span>` : '<span>기준 지남</span>'}</dd></div>` : ''}
+        </dl>
       </div>
-      <p class="hero-next">${esc(nl)}</p>
+      <p class="hero-next">${esc(nextText(d))}</p>
       <ul class="hero-badges" aria-label="배지">
-        ${d.badges.map((b) => `<li class="${b.earned ? 'on' : ''}" title="${esc(b.label)}${b.earned ? ' — 획득' : ''}"><span class="b-e">${b.e}</span><span class="b-l">${esc(b.label)}</span></li>`).join('')}
+        ${d.badges.map((b) => `<li class="${b.earned ? 'on' : ''}" title="${esc(b.label)}${b.earned ? ' — 획득' : ''}">${esc(b.label)}</li>`).join('')}
       </ul>
-      <button type="button" class="primary hero-share" id="myCardShare">📸 인증 카드 만들기 · SNS 공유</button>`;
+      <button type="button" class="hero-share" id="myCardShare"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.6 5.6a1.4 1.4 0 0 1 1.4-1.4h1.3l1-1.4h3.4l1 1.4H12a1.4 1.4 0 0 1 1.4 1.4v5.8A1.4 1.4 0 0 1 12 12.8H4a1.4 1.4 0 0 1-1.4-1.4z"/><circle cx="8" cy="8.3" r="2.3"/></svg>인증 카드로 공유하기</button>`;
   }
 
   /* ── 인증 카드 이미지 (canvas) ── */
@@ -115,89 +111,132 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
+  const HOT = '#ff6a13';      // 형광 주황 — 카드에서 눈에 띄는 색은 이것 하나
+  const INK = '#0b1538';      // 바탕 — 커밍쏜 네이비를 더 깊게
+
   async function drawCard(d, info) {
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
-    // 바탕 — 커밍쏜 네이비 → 블루
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, '#0b1f63'); g.addColorStop(1, '#173fa7');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    // 은은한 원 장식
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath(); ctx.arc(W - 80, 120, 260, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(60, H - 60, 200, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+    // 링 뒤로 아주 옅은 주황 빛 하나만
+    const glow = ctx.createRadialGradient(W / 2, 600, 40, W / 2, 600, 520);
+    glow.addColorStop(0, 'rgba(255,106,19,0.16)'); glow.addColorStop(1, 'rgba(255,106,19,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
 
-    const pad = 80;
+    const pad = 88;
+    const white = (a) => `rgba(255,255,255,${a})`;
     ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
-    ctx.font = `600 34px ${FONT}`;
-    ctx.fillText(info.title, pad, 120);
+    ctx.textAlign = 'left';
+    // 머리 — 작은 영문 라벨 · 책 제목 · 이름
+    ctx.fillStyle = white(0.5);
+    ctx.font = `600 24px ${FONT}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
+    ctx.fillText('PERSONAL MAKERS  READING', pad, 128);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
     ctx.fillStyle = '#ffffff';
-    ctx.font = `800 64px ${FONT}`;
-    ctx.fillText(`『${info.book}』`, pad - 14, 210);
-    ctx.font = `500 40px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillText(`${info.name}님의 ${d.total}일 독서 기록`, pad, 274);
+    ctx.font = `700 58px ${FONT}`;
+    ctx.fillText(`『${info.book}』`, pad - 12, 206);
+    ctx.fillStyle = white(0.68);
+    ctx.font = `500 32px ${FONT}`;
+    ctx.fillText(`${info.name}  ·  ${d.total}일 독서 기록`, pad, 258);
 
-    // 표지
     const cover = await loadImg(info.cover);
     if (cover) {
-      const cw = 150, ch = Math.round(cw * (cover.height / cover.width || 1.45));
-      ctx.save(); roundRect(ctx, W - pad - cw, 70, cw, ch, 10); ctx.clip();
-      ctx.drawImage(cover, W - pad - cw, 70, cw, ch); ctx.restore();
+      const cw = 112, ch = Math.round(cw * (cover.height / cover.width || 1.45));
+      ctx.save(); roundRect(ctx, W - pad - cw, 92, cw, ch, 6); ctx.clip();
+      ctx.drawImage(cover, W - pad - cw, 92, cw, ch); ctx.restore();
     }
 
-    // 완주율 링
-    const cx = W / 2, cy = 545, R = 195;
-    ctx.lineWidth = 34; ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    // 완주율 링 — 가는 선, 끝에 점 하나
+    const cx = W / 2, cy = 610, R = 205;
+    const end = -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.pct / 100);
+    ctx.lineWidth = 14; ctx.lineCap = 'round';
+    ctx.strokeStyle = white(0.1);
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#ffe600';
-    ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.pct / 100)); ctx.stroke();
+    if (d.pct > 0) {
+      ctx.strokeStyle = HOT;
+      ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, end); ctx.stroke();
+      ctx.fillStyle = HOT;
+      ctx.beginPath(); ctx.arc(cx + R * Math.cos(end), cy + R * Math.sin(end), 15, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = `800 150px ${FONT}`;
-    ctx.fillText(`${d.pct}%`, cx, cy + 40);
-    ctx.font = `600 40px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText(d.done >= d.total ? '완주!' : '완주율', cx, cy + 100);
-
-    ctx.font = `700 46px ${FONT}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${d.done} / ${d.total}일 인증${d.streak ? `  ·  🔥 ${d.streak}일 연속` : ''}`, cx, 835);
-
-    // 28일 도장판 — 4줄 × 7칸
-    const cols = 7, cell = 64, gap = 22;
-    const gw = cols * cell + (cols - 1) * gap;
-    const gx = (W - gw) / 2, gy = 880;
-    info.cells.forEach((c, i) => {
-      const x = gx + (i % cols) * (cell + gap) + cell / 2;
-      const y = gy + Math.floor(i / cols) * (cell + 12) + cell / 2;
-      const isDone = c.status === 'O' || c.status === 'P';
-      ctx.beginPath(); ctx.arc(x, y, cell / 2 - 4, 0, Math.PI * 2);
-      if (isDone) { ctx.fillStyle = '#ffe600'; ctx.fill(); }
-      else { ctx.lineWidth = 4; ctx.strokeStyle = c.date === info.today ? '#ffffff' : 'rgba(255,255,255,0.28)'; ctx.stroke(); }
-      if (isDone) {
-        ctx.strokeStyle = '#0b1f63'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(x - 13, y + 1); ctx.lineTo(x - 3, y + 11); ctx.lineTo(x + 15, y - 10); ctx.stroke();
-      }
-    });
-
-    // 배지(얻은 것만)
-    const got = d.badges.filter((b) => b.earned);
-    if (got.length) {
-      ctx.font = `600 32px ${FONT}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.fillText(got.map((b) => `${b.e} ${b.label}`).join('   '), cx, 1240);
-    }
-    // 바닥줄
-    ctx.font = `500 28px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `700 168px ${FONT}`;
+    const num = String(d.pct);
+    const nw = ctx.measureText(num).width;
+    ctx.font = `700 64px ${FONT}`;
+    const pw = ctx.measureText('%').width;
+    const left = cx - (nw + pw + 6) / 2;
     ctx.textAlign = 'left';
-    ctx.fillText(info.dateLabel, pad, H - 40);
+    ctx.font = `700 168px ${FONT}`;
+    ctx.fillText(num, left, cy + 52);
+    ctx.fillStyle = HOT;
+    ctx.font = `700 64px ${FONT}`;
+    ctx.fillText('%', left + nw + 6, cy + 52);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = white(0.55);
+    ctx.font = `600 28px ${FONT}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+    ctx.fillText(d.done >= d.total ? '완 주' : '완 주 율', cx, cy + 112);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+    // 숫자 세 칸 — 인증 · 연속 · 배지
+    const got = d.badges.filter((b) => b.earned);
+    const cols = [
+      [`${d.done}`, ` / ${d.total}`, '인증한 날'],
+      [`${d.streak}`, '일', '연속'],
+      [`${got.length}`, ` / ${d.badges.length}`, '배지'],
+    ];
+    const colW = (W - pad * 2) / 3;
+    cols.forEach(([big, small, label], i) => {
+      const x = pad + colW * i + colW / 2;
+      ctx.font = `700 60px ${FONT}`;
+      const bw = ctx.measureText(big).width;
+      ctx.font = `500 32px ${FONT}`;
+      const sw = ctx.measureText(small).width;
+      const sx = x - (bw + sw) / 2;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = i === 1 && d.streak ? HOT : '#ffffff';
+      ctx.font = `700 60px ${FONT}`;
+      ctx.fillText(big, sx, 960);
+      ctx.fillStyle = white(0.5);
+      ctx.font = `500 32px ${FONT}`;
+      ctx.fillText(small, sx + bw, 960);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = white(0.5);
+      ctx.font = `500 26px ${FONT}`;
+      ctx.fillText(label, x, 1004);
+    });
+    // 칸 사이 가는 세로선
+    ctx.strokeStyle = white(0.12); ctx.lineWidth = 2;
+    [1, 2].forEach((i) => { const x = pad + colW * i; ctx.beginPath(); ctx.moveTo(x, 912); ctx.lineTo(x, 1010); ctx.stroke(); });
+
+    // 28일 점 한 줄 — 한 날이 점 하나
+    const n = info.cells.length;
+    const span = W - pad * 2;
+    const step = span / n;
+    info.cells.forEach((c, i) => {
+      const x = pad + step * i + step / 2, y = 1110;
+      const isDone = c.status === 'O' || c.status === 'P';
+      ctx.beginPath(); ctx.arc(x, y, isDone ? 9 : 7, 0, Math.PI * 2);
+      if (isDone) { ctx.fillStyle = HOT; ctx.fill(); }
+      else { ctx.lineWidth = 2.5; ctx.strokeStyle = c.date === info.today ? white(0.9) : white(0.25); ctx.stroke(); }
+    });
+    ctx.textAlign = 'left'; ctx.fillStyle = white(0.4); ctx.font = `500 22px ${FONT}`;
+    ctx.fillText('DAY 1', pad, 1156);
     ctx.textAlign = 'right';
-    ctx.fillText(info.tag, W - pad, H - 40);
+    ctx.fillText(`DAY ${n}`, W - pad, 1156);
+
+    // 바닥줄 — 가는 선 위에 날짜 · 해시태그
+    ctx.strokeStyle = white(0.12); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad, 1222); ctx.lineTo(W - pad, 1222); ctx.stroke();
+    ctx.font = `500 26px ${FONT}`;
+    ctx.fillStyle = white(0.5);
+    ctx.textAlign = 'left';
+    ctx.fillText(info.dateLabel, pad, 1272);
+    ctx.textAlign = 'right';
+    ctx.fillText(info.tag, W - pad, 1272);
 
     return new Promise((resolve) => cv.toBlob((b) => resolve({ blob: b, url: cv.toDataURL('image/png') }), 'image/png'));
   }
