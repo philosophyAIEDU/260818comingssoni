@@ -13,8 +13,8 @@
   --yellow-banner: #ffe600;     /* 따뜻하고 편안한 옐로우 */
   --yellow-banner-text: #081d58;
 
-  --ok: #058852;
-  --ok-soft: #e3f7ec;
+  --ok: #173fa7;               /* '잘됨'(인증·참여중)도 초록 대신 브랜드 블루 */
+  --ok-soft: #eaf0fd;
   --bad: #d92626;
   --bad-soft: #fde8e8;
   --warn: #c28800;
@@ -47,8 +47,8 @@
     --accent-soft: #172d6b;
     --yellow-banner: #ffea00;
     --yellow-banner-text: #00166d;
-    --ok: #4cd995;
-    --ok-soft: #0d3824;
+    --ok: #8fa8ff;
+    --ok-soft: #16245a;
     --bad: #ff6b6b;
     --bad-soft: #421616;
     --warn: #ffd24c;
