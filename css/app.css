@@ -185,6 +185,11 @@ body.app {
   background-color: var(--surface-2); border-color: transparent; border-radius: 12px; font-size: 15px; height: 40px;
 }
 .app .feed-head select.sort-mini { background-color: transparent; border-radius: 8px; }
+/* 오른쪽 위 날짜 고르기 — 정렬처럼 작게. 긴 날짜 이름은 말줄임 */
+.app .feed-head select.feed-date-mini { max-width: 7.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.app .feed-toolbar { margin-bottom: 4px; }
+.app #feedCount[hidden] { display: none; }
+.app .feed-share-hint { margin: 18px 0 0; text-align: center; font-size: 13px; color: var(--text-faint); }
 .app .feed-date-select {
   align-self: center; width: auto; min-width: 10em; height: 34px; padding: 0 34px 0 14px;
   font-size: 14px; font-weight: 600; border-radius: 999px; text-align: center;

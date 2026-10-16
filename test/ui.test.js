@@ -249,7 +249,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     (await page.locator('#feedDateSelect option').allTextContents()).some((x) => x.startsWith('오늘')));
   t('인증 피드(날짜별 보기)에 카톡방 공유 안내 문구 노출',
     (await page.locator('.feed-card .hint').allTextContents())
-      .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
+      .some((t2) => t2.includes('퍼메스 독서 멤버십 단톡방')));
   const feedAllPage = await ctx.newPage();
   await feedAllPage.goto(BASE + '/feed-all.html');
   await feedAllPage.waitForTimeout(400);
@@ -257,7 +257,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('전체 보기 페이지 건수 표시', /\d+건/.test(await feedAllPage.textContent('#feedCount')));
   t('전체 보기 페이지에도 카톡방 공유 안내 문구 노출',
     (await feedAllPage.locator('.feed-card .hint').allTextContents())
-      .some((t2) => t2.includes('독서 챌린지 카톡방에서 공유해보세요')));
+      .some((t2) => t2.includes('퍼메스 독서 멤버십 단톡방')));
   t('날짜별 그룹 헤더 노출', (await feedAllPage.locator('.all-feed-date-heading').count()) >= 1);
   // 한 줄에 4장이 들어가면 카드가 좁아 본문이 열 글자씩 끊긴다 — 넓은 화면에서도 최대 3장.
   await feedAllPage.setViewportSize({ width: 1440, height: 900 });
@@ -359,27 +359,27 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       && (await page.locator('#participantToggle svg.ico').count()) === 1);
   }
 
-  // ── 피드 머리: 오른쪽 위에 작은 정렬, 그 아래 화면 폭 전체 이름 검색 → 날짜 이동 ──
+  // ── 피드 머리: 제목 줄 오른쪽 위에 새로고침·날짜·정렬, 그 아래 화면 폭 전체 이름 검색 → 바로 글 ──
   {
     const stacked = await page.evaluate(() => {
       const bar = document.querySelector('.feed-toolbar').getBoundingClientRect();
-      const nav = document.querySelector('.feed-datenav').getBoundingClientRect();
       const search = document.querySelector('#feedSearch').getBoundingClientRect();
       const head = document.querySelector('.feed-head').getBoundingClientRect();
-      const sort = document.querySelector('#feedSortSelect').getBoundingClientRect();
       const title = document.querySelector('.feed-head h2').getBoundingClientRect();
-      const mid = (r) => r.left + r.width / 2;
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const inHead = (x) => x.top < search.top && x.left > title.right && x.right <= head.right + 1;
+      const list = r('#socialFeedList');
       return {
-        searchFirst: search.bottom <= nav.top + 1,
+        refreshTop: inHead(r('#feedRefresh')), dateTop: inHead(r('#feedDateSelect')), sortTop: inHead(r('#feedSortSelect')),
+        sortSmall: r('#feedSortSelect').height <= 32,
         searchFull: search.width >= bar.width * 0.95,
-        navCentered: Math.abs(mid(nav) - mid(bar)) < 6,
-        sortTopRight: sort.top < search.top && sort.left > title.right && head.right - sort.right < 120,
-        sortSmall: sort.height <= 32,
+        listRightBelow: list.top - search.bottom < 24,
+        countHidden: !document.querySelector('#feedCount').getClientRects().length,
       };
     });
-    t('이름 검색이 날짜 이동보다 위, 화면 폭 전체', stacked.searchFirst && stacked.searchFull, stacked);
-    t('날짜 이동이 가운데 정렬', stacked.navCentered, stacked);
-    t('정렬(추천순/최신순)은 제목 줄 오른쪽 위에 작게', stacked.sortTopRight && stacked.sortSmall, stacked);
+    t('새로고침·날짜·정렬이 모두 제목 줄 오른쪽 위', stacked.refreshTop && stacked.dateTop && stacked.sortTop && stacked.sortSmall, stacked);
+    t('이름 검색은 화면 폭 전체, 그 바로 아래에 글', stacked.searchFull && stacked.listRightBelow, stacked);
+    t('제목 옆 건수 표시는 숨김', stacked.countHidden, stacked);
     t('새로고침은 글자 없이 아이콘만',
       (await page.locator('#feedRefresh').textContent()).trim() === ''
       && (await page.locator('#feedRefresh svg.ico').count()) === 1);

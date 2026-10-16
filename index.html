@@ -179,11 +179,15 @@
 
     <!-- 인증 피드 -->
     <section class="card feed-card">
-      <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 새로고침과 작은 정렬(추천순/최신순) -->
+      <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 새로고침 · 날짜(기본 전체 날짜) · 정렬(추천순/최신순) -->
       <div class="feed-head">
-        <h2>인증 피드 <span class="tag" id="feedCount">0명</span></h2>
+        <h2>인증 피드 <span class="tag" id="feedCount" hidden>0명</span></h2>
         <div class="feed-head-actions">
           <button type="button" id="feedRefresh" class="icon-btn" title="새로고침" aria-label="피드 새로고침"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.85"/><path d="M13.7 2.7v3h-3"/></svg></button>
+          <!-- 날짜 고르기 — 기본은 전체 날짜(지금까지 올라온 모든 글), 고르면 그날 글만 -->
+          <select id="feedDateSelect" class="sort-mini feed-date-mini" aria-label="날짜 고르기">
+            <option value="">전체 날짜</option>
+          </select>
           <select id="feedSortSelect" class="sort-mini" aria-label="정렬 기준">
             <option value="likes">추천순</option>
             <option value="recent">최신순</option>
@@ -192,7 +196,7 @@
       </div>
 
       <div id="feedDateView">
-        <!-- 그 아래: 이름 검색(화면 폭 전체) → 날짜 고르기 -->
+        <!-- 그 아래: 이름 검색(화면 폭 전체) → 바로 글 -->
         <div class="feed-toolbar">
           <div class="feed-filters">
             <span class="field-icon">
@@ -201,12 +205,7 @@
                 placeholder="이름 검색" autocomplete="off" aria-label="인증 피드에서 이름으로 찾기">
             </span>
           </div>
-          <!-- 날짜 고르기 — 기본은 전체 날짜(지금까지 올라온 모든 글), 고르면 그날 글만 -->
-          <select id="feedDateSelect" class="feed-date-select" aria-label="날짜 고르기">
-            <option value="">전체 날짜</option>
-          </select>
         </div>
-        <p class="hint">모든 인증글을 최신 날짜부터 보여 드려요. 인상 깊은 인사이트는 독서 챌린지 카톡방에서 공유해보세요.</p>
 
         <div id="socialFeedList" class="feed-scroll">
           <div class="empty">제출된 인증글이 없습니다.</div>
@@ -214,6 +213,8 @@
         <div class="feed-more-wrap" id="feedLoadMoreWrap" hidden>
           <button type="button" id="feedLoadMoreBtn" class="small"></button>
         </div>
+        <!-- 글을 다 본 자리에 한 줄만 — 맨 위에 두면 글이 밀려 내려간다 -->
+        <p class="hint feed-share-hint">인상 깊은 인사이트는 퍼메스 독서 멤버십 단톡방에도 공유해 보세요.</p>
       </div>
     </section>
 

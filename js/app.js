@@ -1342,9 +1342,6 @@
     populateCertifyDateOptions(null);
     paintCertifyDateWarn($('certifyDate').value);
     await loadParticipants();
-    await refreshSocialFeed();
-    await calculateRanksAndFame();
-    await paintOverall();
 
     // 전체 진행현황: "인증 완료 인원" · "킥아웃 위험 인원" 타일을 클릭하면 명단이 펼쳐짐
     [['ovPrevMissTile', 'miss'], ['ovRiskTile', 'risk']].forEach(([id, key]) => {
@@ -1418,6 +1415,13 @@
     };
     setInterval(pollFeed, 120000);
     document.addEventListener('visibilitychange', pollFeed);
+
+    // 피드(전체 날짜·글 천여 건)·명예의 전당·진행현황은 손을 바로 쓸 수 있게 한 다음에 그린다.
+    // (예전엔 이걸 다 그린 뒤에야 이름 고르기·검색 같은 손길에 반응해서, 느린 폰·카톡 브라우저에서
+    //  이름을 골라도 아무 일이 안 일어났다)
+    await refreshSocialFeed();
+    await calculateRanksAndFame();
+    await paintOverall();
 
     // 실시간 동기화
     window.addEventListener('storage', async (e) => {
