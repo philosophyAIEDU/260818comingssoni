@@ -2207,14 +2207,18 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('휴대폰: 이름을 고르면 그 자리에서 내 기록이 열림', await vis('#myCard') && !(await vis('#myEmpty')));
     t('휴대폰: 고른 이름이 인증 폼의 이름 칸에도 그대로 맞춰짐',
       (await m.locator('#participant option:checked').textContent()).includes('커밍쏜'));
-    t('휴대폰: 숫자 칸은 인증·미인증·연속 인증·인증률 넷(면제 칸 숨김)',
-      (await m.locator('#myCard .stats .stat:not([hidden])').count()) === 4);
-    // 성취감 — 맨 위 완주율 링·연속·배지·다음 목표, 그리고 SNS용 인증 카드 이미지
+    t('휴대폰: 링과 겹치는 숫자 칸 줄은 숨김(글을 줄여 간단하게)', !(await vis('#myCard .stats')));
+    // 성취감 — 맨 위 완주율 링 · 인증 수 · 연속 · 다음 목표 한 줄, 그리고 SNS용 인증 카드 이미지
     t('휴대폰: [내 현황] 맨 위에 완주율(%)이 크게 보임',
       await vis('#myHero .hero-ring') && /^\d+%$/.test((await m.textContent('#heroPct')).trim()),
       await m.textContent('#heroPct'));
-    t('휴대폰: 배지 여섯 개(첫 인증·3일·7일 연속·절반·21일·완주)', (await m.locator('#myHero .hero-badges li').count()) === 6);
-    t('휴대폰: 다음 목표 한 줄이 보임', (await m.textContent('#myHero .hero-next')).trim().length > 5);
+    t('휴대폰: 링 옆 숫자는 인증 수·연속 둘뿐', (await m.locator('#myHero .hero-nums p').count()) === 2
+      && /\/\d+일 인증/.test(await m.textContent('#myHero .hero-nums')));
+    const nextLine = (await m.textContent('#myHero .hero-next')).trim();
+    t('휴대폰: 다음 목표는 짧은 한 줄', nextLine.length > 3 && nextLine.length <= 20, nextLine);
+    const hintTxt = (await m.textContent('#myHint')).trim();
+    t('휴대폰: 배지 글자 목록 없음 · 아래 안내는 없거나(킥아웃 시즌만) 짧은 한 줄',
+      (await m.locator('#myHero .hero-badges').count()) === 0 && (!(await vis('#myHint')) || hintTxt.length <= 24), hintTxt);
     await m.click('#myCardShare');
     await m.waitForSelector('#cardPreview img');
     const cardSize = await m.evaluate(() => new Promise((res) => {
@@ -2227,7 +2231,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       document.body.appendChild = (el) => { if (el.tagName === 'A' && el.download) resolve(el.download); return orig(el); };
     }));
     const [cardDl] = await Promise.all([m.waitForEvent('download'), m.click('#cardPreview [data-cp="save"]')]);
-    t('인증 카드: [이미지 저장]으로 PNG가 내려받아짐', /인증카드_커밍쏜_\d{4}-\d{2}-\d{2}\.png$/.test(await cardName)
+    t('인증 카드: [저장]으로 PNG가 내려받아짐', /인증카드_커밍쏜_\d{4}-\d{2}-\d{2}\.png$/.test(await cardName)
       && fs.readFileSync(await cardDl.path()).slice(1, 4).toString() === 'PNG', await cardName);
     await m.click('#cardPreview [data-cp="close"]');
     t('인증 카드: [닫기]로 미리보기가 닫힘', (await m.locator('#cardPreview').count()) === 0);

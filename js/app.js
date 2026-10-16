@@ -684,16 +684,13 @@
     tag.className = `tag ${rt.cls}`;
     tag.textContent = rt.label;
 
+    // 한 줄만 — 킥아웃이 있는 시즌에서만 미인증 횟수를 알린다(나머지는 아래 O/X 칸으로 보인다)
     const left = CONFIG.kickoutThreshold - stat.missed;
-    // 킥아웃이 있는 시즌에서만 "몇 회 남았는지"를 덧붙인다.
-    const missLine = CONFIG.kickoutEnabled
-      ? `누적 미인증 <strong>${stat.missed}회</strong> — 킥아웃까지 <strong>${Math.max(0, left)}회</strong> 남았습니다.`
-      : `누적 미인증 <strong>${stat.missed}회</strong>입니다. 남은 날에 다시 채워 가세요.`;
     $('myHint').innerHTML = p.status === 'out'
       ? '참여가 종료된 상태입니다. 문의는 운영진에게 남겨 주세요.'
-      : (stat.missed === 0
-        ? '아직 미인증이 없습니다. 이 페이스를 지켜 주세요! 💪'
-        : missLine);
+      : (CONFIG.kickoutEnabled && stat.missed
+        ? `미인증 <strong>${stat.missed}회</strong> · 킥아웃까지 <strong>${Math.max(0, left)}회</strong>`
+        : '');
 
     // 날짜 스트립 (화면 폭에 맞춰 자동 줄바꿈)
     const strip = $('myStrip');
@@ -730,7 +727,7 @@
     const inRetro = CONFIG.retroUntil && U.today() > CONFIG.endDate && U.today() <= CONFIG.retroUntil;
     $('myExportHint').innerHTML = inRetro
       ? `✍️ <strong>${all.length}개의 기록이 쌓였습니다.</strong> 한 번에 복사해서 블로그·스레드에 올려 보세요. 내가 쓴 글이 내 콘텐츠이자 자산이 됩니다.`
-      : `지금까지 쓴 <strong>${all.length}개</strong>의 기록을 한 번에 받거나 복사할 수 있습니다.`;
+      : '';
   }
 
   function labelOf(st) {

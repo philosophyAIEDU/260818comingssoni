@@ -295,11 +295,12 @@
     <!-- 나의 진행 현황 -->
     <section class="card" id="myCard" hidden>
       <h2>나의 진행 현황 <span class="tag" id="myStatusTag"></span></h2>
-      <!-- 완주율 링 · 연속 · 배지 · 다음 목표 · 인증 카드(SNS 공유) — js/progress-card.js -->
+      <!-- 완주율 링 · 인증 수 · 연속 · 다음 목표 · 인증 카드(SNS 공유) — js/progress-card.js -->
       <div class="my-hero" id="myHero" hidden></div>
       <p class="hint" id="myHint"></p>
 
-      <div class="stats">
+      <!-- 숫자 칸은 위 링과 같은 내용이라 숨긴다(글을 줄이려고). 값은 app.js가 계속 채운다. -->
+      <div class="stats" hidden>
         <div class="stat ok">
           <div class="n" id="stVerified">0</div>
           <div class="k">인증</div>
