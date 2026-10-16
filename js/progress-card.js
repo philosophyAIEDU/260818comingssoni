@@ -141,23 +141,16 @@
       ctx.fillStyle = fade; ctx.fillRect(x0 - 2, y0 - 2, cw + 4, ch + 4);
     }
 
-    // 머리 — 멤버십 이름 · 책 제목 · 이름, 오른쪽 위에 퍼스널메이커스 로고
-    ctx.fillStyle = white(0.6);
-    ctx.font = `600 30px ${FONT}`;
-    ctx.fillText(info.title || '퍼스널메이커스 독서 멤버십', pad, 130);
+    // 머리 — 멤버십 이름 · 책 제목을 같은 크기로 두 줄, 그 아래 이름
+    ctx.fillStyle = white(0.7);
+    ctx.font = `600 44px ${FONT}`;
+    ctx.fillText(info.title || '퍼스널메이커스 독서 멤버십', pad, 150);
     ctx.fillStyle = '#ffffff';
-    ctx.font = `700 58px ${FONT}`;
-    ctx.fillText(`『${info.book}』`, pad - 12, 206);
-    ctx.fillStyle = white(0.6);
-    ctx.font = `500 34px ${FONT}`;
-    ctx.fillText(info.name, pad, 260);
-
-    const logo = await loadImg(info.logo);
-    if (logo) {
-      const lw = 170, lh = Math.round(lw * (logo.height / logo.width || 0.41));
-      ctx.save(); roundRect(ctx, W - pad - lw, 98, lw, lh, 10); ctx.clip();
-      ctx.drawImage(logo, W - pad - lw, 98, lw, lh); ctx.restore();
-    }
+    ctx.font = `700 44px ${FONT}`;
+    ctx.fillText(`『${info.book}』`, pad - 10, 210);
+    ctx.fillStyle = white(0.55);
+    ctx.font = `500 32px ${FONT}`;
+    ctx.fillText(info.name, pad, 264);
 
     // 완주율 링 — 가는 선, 끝에 점 하나. 가운데엔 숫자만
     const end = -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.pct / 100);
@@ -209,13 +202,11 @@
       else { ctx.lineWidth = 2.5; ctx.strokeStyle = c.date === info.today ? white(0.9) : white(0.25); ctx.stroke(); }
     });
 
-    // 바닥 — 날짜 · 해시태그 한 줄
+    // 바닥 — DAY n 하나만
     ctx.font = `500 26px ${FONT}`;
     ctx.fillStyle = white(0.45);
     ctx.textAlign = 'left';
     ctx.fillText(info.dateLabel, pad, 1262);
-    ctx.textAlign = 'right';
-    ctx.fillText(info.tag, W - pad, 1262);
 
     return new Promise((resolve) => cv.toBlob((b) => resolve({ blob: b, url: cv.toDataURL('image/png') }), 'image/png'));
   }
@@ -273,7 +264,7 @@
       try {
         const idx = ctx.dayIndex(today);
         const img = await drawCard(d, {
-          title: ctx.title, book: ctx.book, cover: ctx.cover, logo: ctx.logo || 'logo.png', name: p.nickname, cells: stat.cells, today,
+          title: ctx.title, book: ctx.book, cover: ctx.cover, name: p.nickname, cells: stat.cells, today,
           dateLabel: idx ? `DAY ${idx}` : today.replace(/-/g, '.'),
           tag: ctx.tag,
         });
