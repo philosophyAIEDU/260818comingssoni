@@ -125,23 +125,41 @@
     const white = (a) => `rgba(255,255,255,${a})`;
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    // 머리 — 책 제목 · 이름 두 줄만
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `700 58px ${FONT}`;
-    ctx.fillText(`『${info.book}』`, pad - 12, 176);
-    ctx.fillStyle = white(0.6);
-    ctx.font = `500 34px ${FONT}`;
-    ctx.fillText(info.name, pad, 232);
-
+    // 책 표지 — 가운데 크게, 링 뒤에서 살짝 비치게(옅게 깔고 가장자리는 바탕색으로 녹인다)
+    const cx = W / 2, cy = 660, R = 230;
     const cover = await loadImg(info.cover);
     if (cover) {
-      const cw = 112, ch = Math.round(cw * (cover.height / cover.width || 1.45));
-      ctx.save(); roundRect(ctx, W - pad - cw, 92, cw, ch, 6); ctx.clip();
-      ctx.drawImage(cover, W - pad - cw, 92, cw, ch); ctx.restore();
+      const cw = 480, ch = Math.round(cw * (cover.height / cover.width || 1.45));
+      const x0 = cx - cw / 2, y0 = cy - ch / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.1;
+      roundRect(ctx, x0, y0, cw, ch, 14); ctx.clip();
+      ctx.drawImage(cover, x0, y0, cw, ch);
+      ctx.restore();
+      const fade = ctx.createRadialGradient(cx, cy, cw * 0.3, cx, cy, ch * 0.6);
+      fade.addColorStop(0, 'rgba(11,21,56,0)'); fade.addColorStop(1, 'rgba(11,21,56,1)');
+      ctx.fillStyle = fade; ctx.fillRect(x0 - 2, y0 - 2, cw + 4, ch + 4);
+    }
+
+    // 머리 — 멤버십 이름 · 책 제목 · 이름, 오른쪽 위에 퍼스널메이커스 로고
+    ctx.fillStyle = white(0.6);
+    ctx.font = `600 30px ${FONT}`;
+    ctx.fillText(info.title || '퍼스널메이커스 독서 멤버십', pad, 130);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `700 58px ${FONT}`;
+    ctx.fillText(`『${info.book}』`, pad - 12, 206);
+    ctx.fillStyle = white(0.6);
+    ctx.font = `500 34px ${FONT}`;
+    ctx.fillText(info.name, pad, 260);
+
+    const logo = await loadImg(info.logo);
+    if (logo) {
+      const lw = 170, lh = Math.round(lw * (logo.height / logo.width || 0.41));
+      ctx.save(); roundRect(ctx, W - pad - lw, 98, lw, lh, 10); ctx.clip();
+      ctx.drawImage(logo, W - pad - lw, 98, lw, lh); ctx.restore();
     }
 
     // 완주율 링 — 가는 선, 끝에 점 하나. 가운데엔 숫자만
-    const cx = W / 2, cy = 640, R = 230;
     const end = -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.pct / 100);
     ctx.lineWidth = 14; ctx.lineCap = 'round';
     ctx.strokeStyle = white(0.1);
@@ -176,7 +194,7 @@
     const tw = segs.reduce((sum, [t, , w]) => { ctx.font = fontOf(w); return sum + ctx.measureText(t).width; }, 0);
     let x = cx - tw / 2;
     segs.forEach(([t, color, w]) => {
-      ctx.font = fontOf(w); ctx.fillStyle = color; ctx.fillText(t, x, 1010); x += ctx.measureText(t).width;
+      ctx.font = fontOf(w); ctx.fillStyle = color; ctx.fillText(t, x, 1036); x += ctx.measureText(t).width;
     });
 
     // 28일 점 한 줄 — 한 날이 점 하나
@@ -184,7 +202,7 @@
     const span = W - pad * 2;
     const step = span / n;
     info.cells.forEach((c, i) => {
-      const x = pad + step * i + step / 2, y = 1120;
+      const x = pad + step * i + step / 2, y = 1136;
       const isDone = c.status === 'O' || c.status === 'P';
       ctx.beginPath(); ctx.arc(x, y, isDone ? 9 : 7, 0, Math.PI * 2);
       if (isDone) { ctx.fillStyle = HOT; ctx.fill(); }
@@ -255,7 +273,7 @@
       try {
         const idx = ctx.dayIndex(today);
         const img = await drawCard(d, {
-          title: ctx.title, book: ctx.book, cover: ctx.cover, name: p.nickname, cells: stat.cells, today,
+          title: ctx.title, book: ctx.book, cover: ctx.cover, logo: ctx.logo || 'logo.png', name: p.nickname, cells: stat.cells, today,
           dateLabel: idx ? `DAY ${idx}` : today.replace(/-/g, '.'),
           tag: ctx.tag,
         });
