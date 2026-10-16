@@ -14,9 +14,9 @@
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 
-  // 머리글자 동그라미 색 — 이름마다 늘 같은 색(눈으로 사람을 빨리 찾게)
-  const AVA = ['#e8eefc', '#fdf0e3', '#e6f6ee', '#f6e9f6', '#eef2e3', '#e7f3f8', '#fbe9ea', '#efeaf9'];
-  const AVA_INK = ['#173fa7', '#b25a00', '#137a46', '#8a2f8a', '#56661a', '#0f6a8a', '#b4232f', '#5a3fb0'];
+  // 머리글자 동그라미 색 — 이름마다 늘 같은 색(눈으로 사람을 빨리 찾게). 초록 계열은 빼고 브랜드 블루와 어울리는 톤만
+  const AVA = ['#e8eefc', '#fdf0e3', '#e6ecf5', '#f6e9f6', '#eceef2', '#e7f3f8', '#fbe9ea', '#efeaf9'];
+  const AVA_INK = ['#173fa7', '#b25a00', '#2c4a7a', '#8a2f8a', '#4a5568', '#0f6a8a', '#b4232f', '#5a3fb0'];
   function hue(name) {
     let h = 0;
     for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
