@@ -92,6 +92,9 @@
   const W = 1080, H = 1350;
   const FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
 
+  // 숫자 글꼴 — 애플 기기는 SF Pro, 그 밖에선 Inter(얇은 굵기, css/app.css의 PMNum)
+  const NUM = `-apple-system, BlinkMacSystemFont, "SF Pro Display", PMNum, ${FONT}`;
+
   function loadImg(src) {
     return new Promise((resolve) => {
       if (!src) return resolve(null);
@@ -112,6 +115,7 @@
   const INK = '#0b1538';      // 바탕 — 커밍쏜 네이비를 더 깊게
 
   async function drawCard(d, info) {
+    try { await Promise.all([document.fonts.load('200 100px PMNum', '0123456789%'), document.fonts.load('300 40px PMNum', '0123456789/')]); } catch (e) { /* 글꼴을 못 받아도 그린다 */ }
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
@@ -163,31 +167,36 @@
       ctx.fillStyle = HOT;
       ctx.beginPath(); ctx.arc(cx + R * Math.cos(end), cy + R * Math.sin(end), 15, 0, Math.PI * 2); ctx.fill();
     }
+    const ls = (v) => { if ('letterSpacing' in ctx) ctx.letterSpacing = v; };
     ctx.fillStyle = '#ffffff';
-    ctx.font = `700 180px ${FONT}`;
+    ls('-6px');
+    ctx.font = `200 210px ${NUM}`;
     const num = String(d.pct);
     const nw = ctx.measureText(num).width;
-    ctx.font = `700 68px ${FONT}`;
+    ls('0px');
+    ctx.font = `200 80px ${NUM}`;
     const pw = ctx.measureText('%').width;
-    const left = cx - (nw + pw + 6) / 2;
+    const left = cx - (nw + pw + 8) / 2;
     ctx.textAlign = 'left';
-    ctx.font = `700 180px ${FONT}`;
-    ctx.fillText(num, left, cy + 62);
+    ls('-6px');
+    ctx.font = `200 210px ${NUM}`;
+    ctx.fillText(num, left, cy + 74);
+    ls('0px');
     ctx.fillStyle = HOT;
-    ctx.font = `700 68px ${FONT}`;
-    ctx.fillText('%', left + nw + 6, cy + 62);
+    ctx.font = `200 80px ${NUM}`;
+    ctx.fillText('%', left + nw + 8, cy + 74);
 
     // 숫자 한 줄 — 7/28일 인증 · 3일 연속
     const segs = [
-      [`${d.done}`, '#ffffff', 700], [`/${d.total}일 인증`, white(0.55), 500],
-      ['   ·   ', white(0.3), 500],
-      [`${d.streak}`, d.streak ? HOT : '#ffffff', 700], ['일 연속', white(0.55), 500],
+      [`${d.done}`, '#ffffff', 300, NUM], [`/${d.total}`, white(0.55), 300, NUM], ['일 인증', white(0.55), 400, FONT],
+      ['   ·   ', white(0.3), 400, FONT],
+      [`${d.streak}`, d.streak ? HOT : '#ffffff', 300, NUM], ['일 연속', white(0.55), 400, FONT],
     ];
-    const fontOf = (w) => `${w} 46px ${FONT}`;
-    const tw = segs.reduce((sum, [t, , w]) => { ctx.font = fontOf(w); return sum + ctx.measureText(t).width; }, 0);
+    const fontOf = (w, f) => `${w} 46px ${f}`;
+    const tw = segs.reduce((sum, [t, , w, f]) => { ctx.font = fontOf(w, f); return sum + ctx.measureText(t).width; }, 0);
     let x = cx - tw / 2;
-    segs.forEach(([t, color, w]) => {
-      ctx.font = fontOf(w); ctx.fillStyle = color; ctx.fillText(t, x, 1036); x += ctx.measureText(t).width;
+    segs.forEach(([t, color, w, f]) => {
+      ctx.font = fontOf(w, f); ctx.fillStyle = color; ctx.fillText(t, x, 1036); x += ctx.measureText(t).width;
     });
 
     // 28일 점 한 줄 — 한 날이 점 하나

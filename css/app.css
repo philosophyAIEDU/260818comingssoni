@@ -372,7 +372,10 @@ body.app {
 
 /* ── [내 현황] 성취감: 완주율 링 · 인증 수 · 연속 · 다음 목표 · 인증 카드 (js/progress-card.js) ──
    미니멀하게 — 색은 형광 주황(--hot) 하나만 포인트로, 나머지는 글자색·회색 선. */
-.app { --hot: #ff6a13; }
+/* 숫자 글꼴 — 애플 기기는 SF Pro(시스템 글꼴)를 얇게, 그 밖에선 SF와 가장 닮은 Inter를 얇게(숫자·%만 받는다) */
+@font-face { font-family: 'PMNum'; src: url('../fonts/inter-200.woff2') format('woff2'); font-weight: 200; font-display: swap; unicode-range: U+0030-0039, U+0025, U+002F; }
+@font-face { font-family: 'PMNum'; src: url('../fonts/inter-300.woff2') format('woff2'); font-weight: 300; font-display: swap; unicode-range: U+0030-0039, U+0025, U+002F; }
+.app { --hot: #ff6a13; --num: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PMNum', system-ui, sans-serif; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .app { --hot: #ff7a2e; } }
 .app .my-hero { margin: 8px 0 22px; }
 .app .my-hero[hidden] { display: none; }
@@ -385,12 +388,12 @@ body.app {
   transition: stroke-dashoffset .9s cubic-bezier(.2, .8, .2, 1);
 }
 .app .ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.app .ring-num b { font-size: 34px; font-weight: 700; letter-spacing: -.04em; line-height: 1; color: var(--text); }
-.app .ring-num b small { font-size: 15px; font-weight: 700; margin-left: 1px; color: var(--hot); }
+.app .ring-num b { font-family: var(--num); font-size: 40px; font-weight: 200; letter-spacing: -.03em; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.app .ring-num b small { font-size: 17px; font-weight: 300; margin-left: 1px; color: var(--hot); }
 .app .ring-num span { margin-top: 6px; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--text-faint); }
 .app .hero-nums { display: grid; gap: 6px; min-width: 0; }
 .app .hero-nums p { margin: 0; color: var(--text-dim); font-size: 14px; white-space: nowrap; }
-.app .hero-nums b { font-size: 28px; font-weight: 700; letter-spacing: -.03em; color: var(--text); margin-right: 2px; }
+.app .hero-nums b { font-family: var(--num); font-size: 32px; font-weight: 300; letter-spacing: -.02em; color: var(--text); margin-right: 3px; font-variant-numeric: tabular-nums; }
 .app .hero-nums b.hot { color: var(--hot); }
 .app .hero-next {
   margin: 18px 0 0; font-size: 14.5px; font-weight: 600; color: var(--text);
