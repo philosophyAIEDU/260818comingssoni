@@ -370,7 +370,7 @@ body.app {
   .app .intro-body > .desc { margin-top: 6px; font-size: 15px; color: var(--text); }
 }
 
-/* ── [내 현황] 성취감: 완주율 링 · 연속 · 배지 · 다음 목표 · 인증 카드 (js/progress-card.js) ──
+/* ── [내 현황] 성취감: 완주율 링 · 인증 수 · 연속 · 다음 목표 · 인증 카드 (js/progress-card.js) ──
    미니멀하게 — 색은 형광 주황(--hot) 하나만 포인트로, 나머지는 글자색·회색 선. */
 .app { --hot: #ff6a13; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .app { --hot: #ff7a2e; } }
@@ -388,24 +388,15 @@ body.app {
 .app .ring-num b { font-size: 34px; font-weight: 700; letter-spacing: -.04em; line-height: 1; color: var(--text); }
 .app .ring-num b small { font-size: 15px; font-weight: 700; margin-left: 1px; color: var(--hot); }
 .app .ring-num span { margin-top: 6px; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--text-faint); }
-.app .hero-meta { margin: 0; display: grid; gap: 10px; min-width: 0; flex: 1 1 auto; }
-.app .hero-meta > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.app .hero-meta > div:last-child { border-bottom: none; padding-bottom: 0; }
-.app .hero-meta dt { font-size: 13px; color: var(--text-faint); }
-.app .hero-meta dd { margin: 0; font-size: 13px; color: var(--text-dim); white-space: nowrap; }
-.app .hero-meta dd b { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
-.app .hero-meta dd b.hot { color: var(--hot); }
+.app .hero-nums { display: grid; gap: 6px; min-width: 0; }
+.app .hero-nums p { margin: 0; color: var(--text-dim); font-size: 14px; white-space: nowrap; }
+.app .hero-nums b { font-size: 28px; font-weight: 700; letter-spacing: -.03em; color: var(--text); margin-right: 2px; }
+.app .hero-nums b.hot { color: var(--hot); }
 .app .hero-next {
   margin: 18px 0 0; font-size: 14.5px; font-weight: 600; color: var(--text);
   display: flex; align-items: center; gap: 8px;
 }
 .app .hero-next::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--hot); flex: 0 0 auto; }
-.app .hero-badges { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.app .hero-badges li {
-  padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-  color: var(--text-faint); border: 1px solid var(--border);
-}
-.app .hero-badges li.on { color: var(--hot); border-color: color-mix(in srgb, var(--hot) 55%, transparent); background: color-mix(in srgb, var(--hot) 8%, transparent); }
 .app .hero-share {
   width: 100%; margin-top: 18px; min-height: 46px; font-size: 15px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -414,7 +405,7 @@ body.app {
 .app .wrap .hero-share:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
 .app .hero-share .ico { width: 18px; height: 18px; }
 
-/* 인증 카드 미리보기 — 화면 가운데 시트, 이미지는 길게 눌러 저장할 수도 있다 */
+/* 인증 카드 미리보기 — 화면 가운데 시트(이미지는 길게 눌러 저장할 수도 있다) */
 .card-preview {
   position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, .6); padding: 16px; animation: cp-in .18s ease-out;
@@ -425,11 +416,13 @@ body.app {
   display: flex; flex-direction: column; gap: 10px;
 }
 .card-preview img { width: 100%; height: auto; border-radius: 12px; display: block; }
-.card-preview .cp-tip { margin: 0; font-size: 12.5px; color: var(--text-faint, #999); text-align: center; }
 .card-preview .cp-acts { display: flex; flex-direction: column; gap: 8px; }
 .card-preview .cp-acts button { min-height: 46px; font-size: 15px; }
 
-/* 내 현황 숫자 칸 — 초록·빨강·노랑 대신 글자색 하나로(포인트 색은 위 완주율의 주황만) */
+/* 내 현황 숫자 칸 — 위 링과 겹쳐 지금은 숨겨 둔다(값은 계속 채워 둔다).
+   다시 보이게 할 때를 위해 색은 남긴다 — 초록·빨강·노랑 대신 글자색 하나로(포인트 색은 위 완주율의 주황만) */
+.app #myCard .stats[hidden], .app #myHint:empty, .app #myExportHint:empty { display: none; }
+.app #myExport { margin-top: 22px; }
 .app #myCard .stat .n { color: var(--text); }
 .app #myCard .stat.bad .n { color: var(--text-dim); }
 .app #myCard .stat.warn .n { color: var(--hot); }
