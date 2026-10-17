@@ -352,7 +352,10 @@
     <h3 style="margin-top:18px">정리본 메일 보내기</h3>
     <details class="help"><summary>설명 보기</summary>
     <p class="hint">
-      정리본 노션 링크를 넣고 누르면 <strong>위 명단 전원</strong>에게 서버가 메일을 보냅니다(운영진 로그인 필요).
+      정리본 노션 링크를 넣고 <strong>[이 시각에 예약하기]</strong>를 누르면, 정해 둔 시각(기본: 시즌이 끝난 뒤
+      <strong>월요일 오전 9시</strong>)에 서버가 <strong>위 명단 전원</strong>에게 알아서 메일을 보냅니다.
+      그 시각의 최종 누락 횟수로 대상을 다시 계산하고, 보낸 사람 이름은 <strong>커밍쏜</strong>, 답장은 comingssoni@gmail.com으로 옵니다.
+      [지금 바로 보내기]는 예약 없이 즉시 보냅니다(운영진 로그인 필요).
       한 번 받은 사람에게는 다시 가지 않습니다 — 링크를 고쳐 다시 보내려면 아래 체크를 켜세요.
       <strong>{{이름}}</strong>·<strong>{{누락횟수}}</strong>·<strong>{{책이름}}</strong>·<strong>{{정리본링크}}</strong>·
       <strong>{{일수}}</strong>·<strong>{{라이브횟수}}</strong>가 실제 값으로 치환됩니다.
@@ -370,9 +373,21 @@
       <label for="giftMailBody">본문</label>
       <textarea id="giftMailBody" rows="10"></textarea>
     </div>
-    <p class="muted" id="giftLastRun"></p>
+    <!-- 예약 발송 — 링크만 넣어 두면 정해 둔 시각(기본: 시즌이 끝난 뒤 월요일 09:00)에 서버가 알아서 보낸다 -->
+    <div class="field">
+      <label for="giftScheduleAt">예약 발송 시각 (한국 시간)</label>
+      <input type="datetime-local" id="giftScheduleAt" step="3600">
+    </div>
+    <p class="hint" id="giftScheduleState"></p>
     <div class="actions">
-      <button class="primary" id="giftSendBtn" type="button">정리본 메일 보내기</button>
+      <button class="primary" id="giftScheduleBtn" type="button">이 시각에 예약하기</button>
+      <button class="secondary" id="giftScheduleCancel" type="button" hidden>예약 취소</button>
+    </div>
+    <div id="giftScheduleMsg"></div>
+
+    <p class="muted" id="giftLastRun" style="margin-top:14px"></p>
+    <div class="actions">
+      <button class="secondary" id="giftSendBtn" type="button">지금 바로 보내기</button>
       <label class="muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="giftResend"> 이미 받은 사람에게도 다시 보내기</label>
     </div>
     <div id="giftSendMsg"></div>
