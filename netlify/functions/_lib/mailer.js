@@ -29,11 +29,13 @@ function textToHtml(text) {
   return text.split('\n').map((line) => `<p>${line || '&nbsp;'}</p>`).join('\n');
 }
 
-/** 제목·본문(text) 그대로 한 통 보낸다. fromName은 발신자 표시 이름(제목 앞 [챌린지명] 등). */
-async function sendMail({ fromName, to, subject, text }) {
+/** 제목·본문(text) 그대로 한 통 보낸다. fromName은 발신자 표시 이름(제목 앞 [챌린지명] 등).
+ *  replyTo를 주면 받은 사람이 [답장]을 눌렀을 때 그 주소로 간다. */
+async function sendMail({ fromName, to, subject, text, replyTo }) {
   const user = process.env.GMAIL_USER;
   await getTransporter().sendMail({
     from: `"${fromName}" <${user}>`,
+    ...(replyTo ? { replyTo } : {}),
     to,
     subject,
     text,

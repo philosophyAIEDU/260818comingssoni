@@ -1276,6 +1276,7 @@
   async function refreshGiftLastRun() {
     if (!CONFIG.giftMissLimit) return;
     const meta = await Store.getMeta();
+    paintGiftSchedule(meta);
     const r = meta.giftLastRun;
     $('giftLastRun').textContent = r
       ? `최근 발송: ${U.stampLabel(r.at)} · 대상 ${r.eligible}명 중 ${r.sent}건 발송` +
@@ -1283,6 +1284,68 @@
         (r.skippedNoEmail ? ` · 이메일 없음 ${r.skippedNoEmail}명` : '') +
         (r.failed ? ` · 실패 ${r.failed}건` : '')
       : '아직 정리본을 보낸 적 없습니다.';
+  }
+
+  /* ── 정리본 예약 발송 ──
+   * meta/app.giftSchedule 에 링크·문구·시각을 저장해 두면, 서버 예약 함수(send-gift-scheduled)가
+   * 매시 정각에 확인해서 시각이 지났고 시즌 인증 기간이 끝났으면 대상자 전원에게 한 번 보낸다. */
+  const KST_OFFSET = '+09:00';
+
+  /** 기본 예약 시각 — 시즌이 끝난 다음 날(또는 오늘) 이후 첫 월요일 09:00 (KST, 'YYYY-MM-DDTHH:mm') */
+  function defaultGiftScheduleAt() {
+    const today = U.today();
+    const afterEnd = U.addDays(CONFIG.endDate, 1);
+    let d = afterEnd > today ? afterEnd : today;
+    while (U.weekday(d) !== '월') d = U.addDays(d, 1);
+    let at = `${d}T09:00`;
+    if (Date.parse(at + ':00' + KST_OFFSET) <= Date.now()) at = `${U.addDays(d, 7)}T09:00`;
+    return at;
+  }
+  function kstLabel(isoUtc) {
+    const d = new Date(isoUtc);
+    return d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function paintGiftSchedule(meta) {
+    const sch = meta && meta.giftSchedule;
+    const st = $('giftScheduleState');
+    const cancel = $('giftScheduleCancel');
+    if (!$('giftScheduleAt').value) $('giftScheduleAt').value = defaultGiftScheduleAt();
+    cancel.hidden = !(sch && sch.status === 'scheduled');
+    if (!sch) { st.textContent = '예약된 발송이 없습니다. 링크를 넣고 예약하면 그 시각에 자동으로 보냅니다.'; return; }
+    if (sch.link && !$('giftLink').value) $('giftLink').value = sch.link;
+    const when = kstLabel(sch.at);
+    st.innerHTML = {
+      scheduled: `⏰ <strong>${esc(when)}</strong>에 자동 발송 예약됨 · ${esc(sch.link)}`,
+      sending: `📤 ${esc(when)} 예약분을 보내는 중입니다.`,
+      sent: `✅ ${esc(when)} 예약분 발송 완료 — 대상 ${sch.eligible}명 중 ${sch.sent}건${sch.failed ? ` · 실패 ${sch.failed}건` : ''}`,
+      failed: `⚠️ ${esc(when)} 예약 발송 실패: ${esc(sch.error || '')} — 다시 예약하거나 [지금 바로 보내기]를 눌러 주세요.`,
+    }[sch.status] || '';
+  }
+
+  async function scheduleGiftMail() {
+    const link = $('giftLink').value.trim();
+    if (!/^https?:\/\//.test(link)) { msg($('giftScheduleMsg'), '정리본 링크(https://…)를 먼저 넣어 주세요.', 'bad'); return; }
+    const local = $('giftScheduleAt').value;
+    if (!local) { msg($('giftScheduleMsg'), '보낼 시각을 골라 주세요.', 'bad'); return; }
+    const atMs = Date.parse(local.slice(0, 16) + ':00' + KST_OFFSET);
+    if (!(atMs > Date.now())) { msg($('giftScheduleMsg'), '지난 시각입니다. 앞으로의 시각을 골라 주세요.', 'bad'); return; }
+    const at = new Date(atMs).toISOString();
+    const { eligible } = giftCandidates();
+    if (!confirm(`${kstLabel(at)}에 정리본 메일을 자동으로 보낼까요?\n지금 기준 대상 ${eligible.length}명(보내는 시각의 최종 누락 기준으로 다시 계산)\n${link}`)) return;
+    await Store.setMeta({ giftSchedule: {
+      link, at, seasonId: CONFIG.seasonId, status: 'scheduled', createdAt: U.nowStamp(),
+      subject: $('giftMailSubject').value.trim(), body: $('giftMailBody').value.trim(),
+    } });
+    msg($('giftScheduleMsg'), `${kstLabel(at)} 자동 발송으로 예약했습니다.`, 'ok');
+    paintGiftSchedule(await Store.getMeta());
+  }
+
+  async function cancelGiftSchedule() {
+    if (!confirm('정리본 예약 발송을 취소할까요?')) return;
+    await Store.setMeta({ giftSchedule: null });
+    msg($('giftScheduleMsg'), '예약을 취소했습니다.', 'ok');
+    paintGiftSchedule(await Store.getMeta());
   }
 
   /** 서버 함수(send-gift-mail)가 대상자를 다시 계산해서 보낸다 — 여기서는 링크·문구만 넘긴다. */
@@ -1915,6 +1978,8 @@
     $('giftCopy').addEventListener('click', copyGiftList);
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
+    $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);
+    $('giftScheduleCancel').addEventListener('click', cancelGiftSchedule);
     $('importJson').addEventListener('click', importJson);
     $('wipe').addEventListener('click', async () => {
       if (!confirm('모든 참가자와 인증 기록을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?')) return;
