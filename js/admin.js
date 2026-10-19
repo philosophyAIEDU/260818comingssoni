@@ -1358,6 +1358,31 @@
     paintGiftSchedule(await Store.getMeta());
   }
 
+  /* ── 래피드 멤버십 자동 문자 현황 (latpeed-status 함수, 운영진 로그인 필요) ── */
+  const LATPEED_KIND = { cancelD2: '해지 D-2', cancelD1: '해지 D-1', failNow: '결제 실패 즉시', failFinal: '결제 실패 마지막' };
+  const LATPEED_STATUS = { PROGRESS: '이용 중', CANCEL: '해지 예약', FAILED: '결제 실패', FINISHED: '종료' };
+  const LATPEED_R = { pending: '예정', sending: '보내는 중', sent: '보냄', cancelled: '취소됨', failed: '실패' };
+  async function refreshLatpeed() {
+    const box = $('latpeedTable');
+    if (!Store.getIdToken) { msg($('latpeedMsg'), 'Firebase 배포본에서만 볼 수 있습니다.', 'warn'); return; }
+    msg($('latpeedMsg'), '불러오는 중…');
+    try {
+      const token = await Store.getIdToken();
+      const res = await fetch('/.netlify/functions/latpeed-status', { headers: { Authorization: `Bearer ${token || ''}` } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const when = (iso) => (iso ? new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-');
+      box.innerHTML = data.subs.length ? `<thead><tr><th>이름</th><th>전화</th><th>상태</th><th>결제일·종료일</th><th>문자</th></tr></thead><tbody>${
+        data.subs.map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(s.phone)}</td><td>${esc(LATPEED_STATUS[s.status] || s.status)}</td>
+          <td>${esc(when(s.finishedAt))}</td>
+          <td>${s.reminders.map((r) => `${esc(LATPEED_KIND[r.kind] || r.kind)} · ${esc(LATPEED_R[r.status] || r.status)} ${esc(when(r.sentAt || r.dueAt))}${r.error ? ` (${esc(r.error)})` : ''}`).join('<br>') || '<span class="muted">-</span>'}</td></tr>`).join('')
+      }</tbody>` : '';
+      msg($('latpeedMsg'), data.subs.length ? `최근 ${data.subs.length}명` : '아직 래피드에서 받은 멤버십 알림이 없습니다.');
+    } catch (e) {
+      msg($('latpeedMsg'), `불러오기 실패: ${esc(e.message)}`, 'bad');
+    }
+  }
+
   /** 서버 함수(send-gift-mail)가 대상자를 다시 계산해서 보낸다 — 여기서는 링크·문구만 넘긴다. */
   async function sendGiftMail() {
     const link = $('giftLink').value.trim();
@@ -1988,6 +2013,7 @@
     $('giftCopy').addEventListener('click', copyGiftList);
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
+    $('latpeedRefresh').addEventListener('click', refreshLatpeed);
     $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);
     $('giftScheduleCancel').addEventListener('click', cancelGiftSchedule);
     $('importJson').addEventListener('click', importJson);

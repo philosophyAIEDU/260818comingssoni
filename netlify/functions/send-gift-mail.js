@@ -14,29 +14,9 @@
  * 요청(JSON): { link, subject?, body?, resend? }   — subject/body를 비우면 기본 문구
  * 응답(JSON): { sent, skippedAlready, skippedNoEmail, failed, failures, eligible }
  */
-const admin = require('firebase-admin');
-const { getDb } = require('./_lib/firebaseAdmin');
 const { CONFIG, withSeason } = require('./_lib/appLogic');
 const { runGiftMail } = require('./_lib/giftMail');
-
-const json = (statusCode, body) => ({ statusCode, body: JSON.stringify(body) });
-
-async function requireAdmin(event) {
-  const header = event.headers.authorization || event.headers.Authorization || '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return { error: json(401, { error: '로그인 정보가 없습니다. 운영진 화면에서 다시 로그인해 주세요.' }) };
-  getDb(); // Admin SDK 초기화(서비스 계정)
-  let decoded;
-  try {
-    decoded = await admin.auth().verifyIdToken(token);
-  } catch (err) {
-    return { error: json(401, { error: '로그인 정보를 확인할 수 없습니다: ' + err.message }) };
-  }
-  const email = (decoded.email || '').toLowerCase();
-  const allowed = (CONFIG.adminEmails || []).map((e) => e.toLowerCase());
-  if (!allowed.includes(email)) return { error: json(403, { error: '운영진 계정만 보낼 수 있습니다.' }) };
-  return { email };
-}
+const { requireAdmin, json } = require('./_lib/adminAuth');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
