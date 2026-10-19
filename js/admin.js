@@ -1269,8 +1269,9 @@
     bindSortHead(t, 'gift', paintGift);
 
     // 발송 문구는 기본값으로 한 번만 채운다(운영진이 고친 내용을 새로고침이 덮지 않게).
-    if (!$('giftMailSubject').value) $('giftMailSubject').value = MailTemplates.defaultGiftSubject();
-    if (!$('giftMailBody').value) $('giftMailBody').value = MailTemplates.defaultGiftBody();
+    const gm = CONFIG.giftMail || {};
+    if (!$('giftMailSubject').value) $('giftMailSubject').value = gm.subject || MailTemplates.defaultGiftSubject();
+    if (!$('giftMailBody').value) $('giftMailBody').value = gm.body || MailTemplates.defaultGiftBody();
   }
 
   async function refreshGiftLastRun() {
@@ -1291,8 +1292,10 @@
    * 매시 정각에 확인해서 시각이 지났고 시즌 인증 기간이 끝났으면 대상자 전원에게 한 번 보낸다. */
   const KST_OFFSET = '+09:00';
 
-  /** 기본 예약 시각 — 시즌이 끝난 다음 날(또는 오늘) 이후 첫 월요일 09:00 (KST, 'YYYY-MM-DDTHH:mm') */
+  /** 기본 예약 시각 — 시즌 설정 giftMail.sendAt, 없으면 시즌이 끝난 다음 날(또는 오늘) 이후 첫 월요일 09:00 (KST) */
   function defaultGiftScheduleAt() {
+    const preset = CONFIG.giftMail && CONFIG.giftMail.sendAt;
+    if (preset && Date.parse(preset + ':00' + KST_OFFSET) > Date.now()) return preset;
     const today = U.today();
     const afterEnd = U.addDays(CONFIG.endDate, 1);
     let d = afterEnd > today ? afterEnd : today;
@@ -1311,8 +1314,15 @@
     const st = $('giftScheduleState');
     const cancel = $('giftScheduleCancel');
     if (!$('giftScheduleAt').value) $('giftScheduleAt').value = defaultGiftScheduleAt();
-    cancel.hidden = !(sch && sch.status === 'scheduled');
-    if (!sch) { st.textContent = '예약된 발송이 없습니다. 링크를 넣고 예약하면 그 시각에 자동으로 보냅니다.'; return; }
+    const g = CONFIG.giftMail;
+    const preset = !sch && g && /^https?:\/\//.test(g.link || '') && g.sendAt;
+    cancel.hidden = !((sch && sch.status === 'scheduled') || preset);
+    if (preset) {
+      if (!$('giftLink').value) $('giftLink').value = g.link;
+      st.innerHTML = `⏰ <strong>${esc(kstLabel(new Date(g.sendAt + ':00' + KST_OFFSET).toISOString()))}</strong>에 자동 발송 예정(시즌 설정) · ${esc(g.link)}`;
+      return;
+    }
+    if (!sch || sch.status === 'cancelled') { st.textContent = sch ? '예약이 취소되었습니다. 다시 예약하려면 링크를 넣고 예약하세요.' : '예약된 발송이 없습니다. 링크를 넣고 예약하면 그 시각에 자동으로 보냅니다.'; return; }
     if (sch.link && !$('giftLink').value) $('giftLink').value = sch.link;
     const when = kstLabel(sch.at);
     st.innerHTML = {
@@ -1343,7 +1353,7 @@
 
   async function cancelGiftSchedule() {
     if (!confirm('정리본 예약 발송을 취소할까요?')) return;
-    await Store.setMeta({ giftSchedule: null });
+    await Store.setMeta({ giftSchedule: { status: 'cancelled', at: new Date().toISOString(), seasonId: CONFIG.seasonId } });
     msg($('giftScheduleMsg'), '예약을 취소했습니다.', 'ok');
     paintGiftSchedule(await Store.getMeta());
   }
@@ -1368,7 +1378,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
         body: JSON.stringify({
-          link, resend,
+          link, resend, seasonId: CONFIG.seasonId,
           subject: $('giftMailSubject').value.trim(),
           body: $('giftMailBody').value.trim()
         })

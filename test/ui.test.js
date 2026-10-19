@@ -2123,7 +2123,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('킥아웃 통보 섹션은 숨겨짐', !(await adp.isVisible('#kickoutMailSection')));
     t('누락 5회 안내 기본 문구가 정리본 문구', /정리본/.test(await adp.inputValue('#missed5TemplateBody')));
     t('선물 대상자 섹션에 정리본 발송 버튼이 있음', await adp.isVisible('#giftSendBtn'));
-    t('정리본 발송 제목이 기본값으로 채워짐', /정리본/.test(await adp.inputValue('#giftMailSubject')));
+    t('정리본 발송 제목이 기본값(시즌 설정 문구)으로 채워짐', /정리본|요약본/.test(await adp.inputValue('#giftMailSubject')));
     // 킥아웃 없는 시즌에서는 "1/Infinity"처럼 기준이 붙지 않고 "1회"로만 보여야 한다.
     const warnText = await adp.textContent('#missedWarnTable');
     t('킥아웃 없는 시즌의 미인증 안내 표에 Infinity가 보이지 않음', !/Infinity/.test(warnText), warnText);

@@ -16,7 +16,7 @@
  */
 const admin = require('firebase-admin');
 const { getDb } = require('./_lib/firebaseAdmin');
-const { CONFIG } = require('./_lib/appLogic');
+const { CONFIG, withSeason } = require('./_lib/appLogic');
 const { runGiftMail } = require('./_lib/giftMail');
 
 const json = (statusCode, body) => ({ statusCode, body: JSON.stringify(body) });
@@ -40,18 +40,21 @@ async function requireAdmin(event) {
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-  if (!CONFIG.giftMissLimit) return json(400, { error: '이 시즌에는 정리본 선물 기준(giftMissLimit)이 없습니다.' });
 
   const auth = await requireAdmin(event);
   if (auth.error) return auth.error;
 
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: '요청 형식이 올바르지 않습니다.' }); }
+  const target = global.CS.configFor(payload.seasonId) || CONFIG;
+  if (!target.giftMissLimit) return json(400, { error: '이 시즌에는 정리본 선물 기준(giftMissLimit)이 없습니다.' });
   const link = String(payload.link || '').trim();
   if (!/^https?:\/\//.test(link)) return json(400, { error: '정리본 링크(https://…)를 입력해 주세요.' });
 
-  const result = await runGiftMail({
+  // 운영진 화면이 보고 있던 시즌으로 계산한다(다음 시즌이 켜진 뒤 ?season=s2로 지난 시즌을 보낼 때도 맞게)
+  const seasonId = global.CS.seasonById(payload.seasonId) ? payload.seasonId : CONFIG.seasonId;
+  const result = await withSeason(seasonId, () => runGiftMail({
     link, subject: payload.subject, body: payload.body, resend: !!payload.resend, by: auth.email
-  });
+  }));
   return json(200, result);
 };
