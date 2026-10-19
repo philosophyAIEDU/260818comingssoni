@@ -393,24 +393,6 @@
     <div id="giftSendMsg"></div>
     </div><!-- /#giftSection -->
 
-    <!-- 래피드(Latpeed) 멤버십 자동 문자 현황 — 커밍쏜 계정으로 로그인했을 때만 보인다(admin.js, 서버도 같은 확인) -->
-    <div id="latpeedSection" hidden>
-    <h2 style="margin-top:26px">📱 래피드 멤버십 자동 문자</h2>
-    <details class="help"><summary>설명 보기</summary>
-    <p class="hint">
-      래피드에서 <strong>구독 해지</strong>한 분께는 결제일 <strong>2일 전·1일 전 오전 10시</strong>에,
-      <strong>정기 결제가 실패</strong>한 분께는 <strong>바로</strong>(밤이면 아침 9시) 그리고 <strong>다음 날 오전 10시 마지막 안내</strong>를
-      문자로 자동으로 보냅니다. 그 사이 해지를 철회하거나 재결제하면 남은 문자는 저절로 취소됩니다.
-      문구는 <code>netlify/functions/_lib/latpeedConfig.js</code>에 있습니다.
-    </p>
-    </details>
-    <div class="actions" style="margin-bottom:10px">
-      <button class="secondary" id="latpeedRefresh" type="button">현황 불러오기</button>
-      <span class="muted" id="latpeedMsg"></span>
-    </div>
-    <div class="scroll"><table id="latpeedTable"></table></div>
-    </div><!-- /#latpeedSection -->
-
     <!-- 킥아웃이 있는 시즌에서만 보이는 영역(admin.js가 감춘다) -->
     <div id="kickoutMailSection">
     <h2 style="margin-top:26px">킥아웃 통보 메일</h2>

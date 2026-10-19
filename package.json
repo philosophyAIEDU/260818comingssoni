@@ -4,14 +4,13 @@
   "version": "1.0.0",
   "description": "퍼스널메이커스 독서 챌린지 인증 시스템 (정적 사이트 + Netlify Functions)",
   "scripts": {
-    "test": "node test/logic.test.js && node test/latpeed.test.js",
+    "test": "node test/logic.test.js",
     "test:ui": "node test/ui.test.js",
     "check:season": "node tools/season-check.mjs",
     "season:new": "node tools/new-season.mjs",
     "roster:diff": "node tools/roster-diff.mjs",
     "roster:upload": "node tools/roster-upload.mjs",
-    "streak:sync": "node tools/streak-sync.mjs",
-    "test:latpeed": "node test/latpeed.test.js"
+    "streak:sync": "node tools/streak-sync.mjs"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",
