@@ -18,8 +18,3 @@
 # 기본 예약 시각은 시즌이 끝난 뒤 월요일 09:00(KST) = 월요일 00:00(UTC).
 [functions."send-gift-scheduled"]
   schedule = "0 * * * *"
-
-# 매시 정각(UTC)에 래피드 멤버십 안내 문자 중 때가 된 것을 보낸다(해지 D-2·D-1 10:00 KST,
-# 결제 실패 다음 날 10:00 마지막 안내, 즉시 발송 재시도). 웹훅 수신은 latpeed-webhook 함수.
-[functions."latpeed-reminders"]
-  schedule = "0 * * * *"
