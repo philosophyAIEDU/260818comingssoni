@@ -8,6 +8,7 @@
     "test:ui": "node test/ui.test.js",
     "check:season": "node tools/season-check.mjs",
     "season:new": "node tools/new-season.mjs",
+    "season:render": "node tools/season-render.mjs",
     "roster:diff": "node tools/roster-diff.mjs",
     "roster:upload": "node tools/roster-upload.mjs",
     "streak:sync": "node tools/streak-sync.mjs"

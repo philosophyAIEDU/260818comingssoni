@@ -12,6 +12,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { renderSeason, compareWith } from './season-render.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -168,6 +169,35 @@ CS.SEASONS.forEach((s, i) => {
   const gone = kept.filter((id) => !ids.has(id));
   check('전체', `보관함에 있는 시즌이 config에 그대로 남아 있다 (${kept.join(', ') || '없음'})`, gone.length === 0,
     gone.length ? `config에서 사라짐: ${gone.join(', ')}` : '');
+}
+
+// 시즌 설명서(seasons/<id>.json) = 변수, tools/templates = 상수.
+// ① 설명서의 일정·발제문이 앱(config.js)과 같아야 하고 ② 보관함에 노션 최종본 사본이 있으면
+// 상수+변수로 렌더한 문서가 그 사본과 한 줄도 달라선 안 된다 — 그래야 다음 시즌도 변수만 바꾸면 된다.
+{
+  const specDir = join(root, 'seasons');
+  const archiveDir = join(root, 'archive');
+  const specs = existsSync(specDir) ? readdirSync(specDir).filter((f) => /^s\d+\.json$/.test(f)) : [];
+  for (const f of specs) {
+    const spec = JSON.parse(readFileSync(join(specDir, f), 'utf8'));
+    const s = CS.SEASONS.find((x) => x.id === spec.id);
+    const L = `seasons/${f}`;
+    if (!s) continue; // 아직 config에 넣기 전
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    check(L, '일자별 분량(readingPlan)이 config.js와 같다', !spec.readingPlan || same(spec.readingPlan, s.readingPlan),
+      '앱을 고쳤으면 시즌 설명서에도 옮겨 주세요');
+    check(L, '발제문(weeklyPrompts)이 config.js와 같다', !spec.weeklyPrompts || same(spec.weeklyPrompts, s.weeklyPrompts));
+    const arch = existsSync(archiveDir) && readdirSync(archiveDir).find((d) => d.startsWith(spec.id + '-'));
+    if (!arch || !spec.pages) continue; // 템플릿 이전 시즌(s1·s2)은 대조하지 않는다
+    const { docs, leftovers } = renderSeason(spec);
+    check(L, '채우지 못한 자리표시자가 없다', leftovers.size === 0, [...leftovers].join(', '));
+    for (const r of compareWith(docs, join(archiveDir, arch))) {
+      if (r.skipped) continue;
+      const d = r.diffs[0];
+      check(L, `${r.tpl} 렌더 = 노션 최종본 사본(${r.snap})`, r.diffs.length === 0,
+        d && `${r.diffs.length}줄 다름 — ${d.line}행 렌더 「${d.render ?? ''}」 / 사본 「${d.snapshot ?? ''}」`);
+    }
+  }
 }
 
 // ── 출력 ──
