@@ -20,4 +20,16 @@ require('../../../js/mailTemplates.js');
 
 const { CONFIG, U, MailTemplates, collectionName } = global.CS;
 
-module.exports = { CONFIG, U, MailTemplates, collectionName };
+/** 잠시 다른 시즌을 활성 시즌으로 두고 fn을 돌린다(끝나면 되돌린다).
+ *  U·collectionName은 매번 CS.CONFIG를 읽으므로, 그 안에서는 날짜·집계·컬렉션 이름이 모두 그 시즌 기준이 된다.
+ *  fn 안에서는 CONFIG 대신 currentConfig()를 읽을 것. */
+async function withSeason(id, fn) {
+  const cfg = global.CS.configFor(id);
+  if (!cfg) throw new Error('알 수 없는 시즌: ' + id);
+  const prev = global.CS.CONFIG;
+  global.CS.CONFIG = cfg;
+  try { return await fn(cfg); } finally { global.CS.CONFIG = prev; }
+}
+const currentConfig = () => global.CS.CONFIG;
+
+module.exports = { CONFIG, U, MailTemplates, collectionName, withSeason, currentConfig };

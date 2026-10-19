@@ -6,7 +6,7 @@
  * 보낸 사람 이름은 '커밍쏜', 답장은 커밍쏜 메일(GIFT_REPLY_TO)로 오게 한다. */
 const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
-const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+const { U, MailTemplates, collectionName, currentConfig } = require('./appLogic');
 
 const GIFT_FROM_NAME = '커밍쏜';
 const GIFT_REPLY_TO = 'comingssoni@gmail.com';
@@ -23,6 +23,7 @@ function resolveEmailFor(participant, notifyEmails) {
 
 /** 정리본 메일을 대상자 전원에게 보낸다. by: 누가/무엇이 보냈는지(기록용) */
 async function runGiftMail({ link, subject, body, resend, by }) {
+  const CONFIG = currentConfig(); // withSeason 안에서 부르면 그 시즌 설정
   const subjectTpl = String(subject || '').trim() || MailTemplates.defaultGiftSubject();
   const bodyTpl = String(body || '').trim() || MailTemplates.defaultGiftBody();
 
