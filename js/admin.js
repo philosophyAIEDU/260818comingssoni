@@ -2051,6 +2051,8 @@
             $('adminDashboard').style.display = 'block';
             $('adminAuthHeader').style.display = 'flex';
             $('adminEmailLabel').textContent = `${email} (운영진)`;
+            // 래피드 현황은 커밍쏜 계정에서만 보인다(서버 latpeed-status도 같은 계정만 허용)
+            $('latpeedSection').hidden = email.toLowerCase() !== 'comingssoni@gmail.com';
             await refresh();
           } else {
             $('adminAuthGate').style.display = 'block';

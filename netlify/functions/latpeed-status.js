@@ -1,4 +1,5 @@
-/* 운영진 화면 [알림 메일 › 래피드 멤버십 자동 문자]가 부른다 — 최근 구독 상태와 예정·발송 문자 목록(운영진 로그인 필요). */
+/* 운영진 화면 [알림 메일 › 래피드 멤버십 자동 문자]가 부른다 — 최근 구독 상태와 예정·발송 문자 목록.
+ * 운영진 로그인에 더해 latpeedConfig.viewerEmails(커밍쏜)에 있는 계정만 볼 수 있다. */
 const { getDb } = require('./_lib/firebaseAdmin');
 const { requireAdmin, json } = require('./_lib/adminAuth');
 const L = require('./_lib/latpeed');
@@ -6,6 +7,9 @@ const L = require('./_lib/latpeed');
 exports.handler = async (event) => {
   const auth = await requireAdmin(event);
   if (auth.error) return auth.error;
+  if (!(L.CFG.viewerEmails || []).map((e) => e.toLowerCase()).includes(auth.email)) {
+    return json(403, { error: '래피드 현황은 커밍쏜 계정에서만 볼 수 있습니다.' });
+  }
   const snap = await getDb().collection(L.SUBS).orderBy('updatedAt', 'desc').limit(100).get();
   const subs = snap.docs.map((d) => {
     const s = d.data();
