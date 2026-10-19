@@ -15,6 +15,9 @@ module.exports = {
   // 래피드 [외부 툴 연동 → 웹훅]에 넣는 주소의 ?token= 값의 SHA-256. 토큰 자체는 저장소에 두지 않는다.
   webhookTokenSha256: '8d58866f90d25cc643cc93565d68171b6196535e5e4ff36ff547403a594f66c3',
 
+  // 운영진 화면의 래피드 현황(이름·전화·해지/실패 내역)을 볼 수 있는 계정 — 다른 운영진에게는 숨긴다
+  viewerEmails: ['comingssoni@gmail.com'],
+
   // 이 멤버십들의 이벤트만 처리한다(래피드 membership.membershipId). 비워 두면 연결된 멤버십 전부.
   membershipIds: [],
 
