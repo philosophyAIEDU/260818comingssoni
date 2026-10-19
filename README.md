@@ -438,3 +438,22 @@ UI 테스트는 실행일이 챌린지 기간 한가운데가 되도록 `js/conf
 - 명단 시트의 **엑셀(.xlsx/.xls) 업로드**는 [SheetJS](https://sheetjs.com)를 CDN에서 그때그때 불러와
   파싱합니다(버전 고정: xlsx@0.18.5). 인터넷 연결이 없거나 CDN이 막힌 환경에서는 안내 메시지가 뜨며,
   이 경우 CSV로 저장해서 올리면 별도 라이브러리 없이 바로 등록됩니다.
+
+## 래피드(Latpeed) 멤버십 자동 문자
+
+래피드에 없는 두 가지 안내 문자를 래피드 웹훅을 받아 솔라피로 자동으로 보낸다
+(근거: 래피드 공식 [웹훅 가이드](https://mavrks.notion.site/webhook-guide)·FAQ "멤버십 결제 실패하면 어떻게 되나요?").
+
+| 상황 | 래피드 이벤트(`subtype`) | 문자 |
+| --- | --- | --- |
+| 구독 해지(이번 달까지만) | `SUBSCRIPTION_CANCELED` | 결제일(`subscription.finishedAt`) **2일 전·1일 전 10:00** |
+| 정기 결제 실패 | `SUBSCRIPTION_RENEWAL_FAILED` | **바로**(21시~9시면 아침 9시) + **다음 날 10:00 마지막 안내** — 기한은 래피드 규칙대로 실패 다음 날 자정 |
+| 해지 철회 · 실패 복구 · 갱신 · 종료 | `SUBSCRIPTION_RESUMED` · `RECOVERED` · `RENEWED` · `FINISHED` | 남은 문자 자동 취소 |
+
+- 수신: `netlify/functions/latpeed-webhook.js` — 래피드 [멤버십 관리 → 외부 툴 연동 → 웹훅]에
+  `https://personalmakersbook.netlify.app/.netlify/functions/latpeed-webhook?token=…` 를 넣는다(토큰은 커밍쏜에게 따로 전달,
+  저장소에는 SHA-256만 `latpeedConfig.js`에). 래피드 "웹훅 시크릿"을 쓰려면 같은 값을 Netlify 환경 변수 `LATPEED_WEBHOOK_SECRET`에.
+- 발송: `latpeed-reminders.js`(매시 정각) — 보내기 직전에 상태를 다시 확인한다. 같은 알림(eventId)은 한 번만 처리.
+- 문구·시각: `netlify/functions/_lib/latpeedConfig.js`. 현황: 운영진 화면 [알림 메일 › 📱 래피드 멤버십 자동 문자].
+- 저장: Firestore `latpeed_events/{eventId}`, `latpeed_subscriptions/{subscriptionId}`(서버 전용, 시즌과 무관).
+- 테스트: `npm run test:latpeed`(가짜 DB·문자로 시나리오 28개).
