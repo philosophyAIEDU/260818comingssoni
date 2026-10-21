@@ -1209,6 +1209,67 @@
     });
   }
 
+  /* ── 🔥 연속 참여 다시 계산 ──
+   * 규칙은 tools/lib/streak.mjs(명단 업로드 도구)와 같다: 이번 시즌 포함 연속 시즌 수, 앞 시즌에 없거나 아웃이면 끊김.
+   * 같은 사람 = 이메일이 같거나, 이메일이 안 맞으면 이름(공백·괄호 뗀 글자)이 같은 사람. 앞 시즌 동명이인 이름으로는 잇지 않는다.
+   * 세기 시작 시즌은 CS.COMMON.streakFromSeason(꿈과 돈). */
+  const streakNameKey = (s) => String(s || '').normalize('NFC').replace(/[^가-힣A-Za-z0-9]/g, '');
+  const streakEmailKey = (s) => String(s || '').trim().toLowerCase();
+  function streakIndex(rows) {
+    const byEmail = new Map(), byName = new Map(), count = new Map();
+    rows.forEach((r) => {
+      const em = streakEmailKey(r.email), nm = streakNameKey(r.nickname || r.name);
+      if (em && !byEmail.has(em)) byEmail.set(em, r);
+      if (nm) { count.set(nm, (count.get(nm) || 0) + 1); if (!byName.has(nm)) byName.set(nm, r); }
+    });
+    count.forEach((n, nm) => { if (n > 1) byName.delete(nm); });
+    return { byEmail, byName };
+  }
+
+  async function recalcStreaks() {
+    const at = CS.SEASONS.findIndex((x) => x.id === CONFIG.seasonId);
+    const fromId = CS.COMMON.streakFromSeason;
+    const from = fromId ? CS.SEASONS.findIndex((x) => x.id === fromId) : 0;
+    const prior = CS.SEASONS.slice(Math.max(0, from), at).reverse(); // 가까운 시즌부터
+    if (!prior.length) { msg($('streakMsg'), '이 시즌 앞에 이어서 셀 시즌이 없습니다.', 'warn'); return; }
+    const btn = $('streakRecalc');
+    btn.disabled = true;
+    try {
+      const idxs = [];
+      for (const s of prior) idxs.push(streakIndex(await Store.listParticipantsOf(s)));
+      const all = participants.map((p) => {
+        let streak = 1;
+        for (const idx of idxs) {
+          const hit = idx.byEmail.get(streakEmailKey(p.email)) || idx.byName.get(streakNameKey(p.nickname));
+          if (!hit || hit.status === 'out') break;
+          streak++;
+        }
+        return { p, streak };
+      });
+      const changes = all.filter((c) => (c.p.seasonStreak || 1) !== c.streak);
+      const cont = all.filter((c) => c.streak > 1).length;
+      if (!changes.length) { msg($('streakMsg'), `이미 맞습니다 — 연속 참여 ${cont}명.`, 'ok'); return; }
+      const up = changes.filter((c) => c.streak > 1);
+      if (!confirm(`앞 시즌(${prior.map((s) => s.book.name).join(' · ')}) 명단과 맞춰 ${changes.length}명의 연속 참여 수를 바꿀까요?\n`
+        + `🔥 붙는 분 ${up.length}명${changes.length - up.length ? ` · 배지 빠지는 분 ${changes.length - up.length}명` : ''}`)) return;
+      let done = 0;
+      for (const c of changes) {
+        await Store.updateParticipant(c.p.id, { seasonStreak: c.streak });
+        c.p.seasonStreak = c.streak;
+        done++;
+        btn.textContent = `🔥 저장 중… ${done}/${changes.length}`;
+      }
+      const list = up.map((c) => `${esc(c.p.nickname)} 🔥${c.streak}`).join(', ');
+      msg($('streakMsg'), `${done}명 바꿨습니다.${list ? ` ${list}` : ''}`, 'ok');
+      await refreshLite();
+    } catch (e) {
+      msg($('streakMsg'), `계산하지 못했습니다: ${esc(e.message)}`, 'bad');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔥 연속 참여 다시 계산';
+    }
+  }
+
   /* ── 🎁 선물 대상자 ─────────────────────
    *  누락이 CONFIG.giftMissLimit 회 "미만"(6 → 5회 이하)인 참여자에게 인사이트 정리본을 보낸다.
    *  아웃 처리된 사람은 제외한다. 기간이 끝나기 전에는 "오늘까지 기준"의 명단이므로, 화면에
@@ -2112,6 +2173,7 @@
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
     $('giftExtraAdd').addEventListener('click', addGiftExtras);
+    $('streakRecalc').addEventListener('click', recalcStreaks);
     $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);
     $('giftScheduleCancel').addEventListener('click', cancelGiftSchedule);
     $('importJson').addEventListener('click', importJson);

@@ -80,6 +80,12 @@ CS.LocalStore = (function () {
     return read(P, []).slice().sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
   }
 
+  /** 다른 시즌의 명단(읽기만) — 연속 참여 배지 계산용 */
+  async function listParticipantsOf(season) {
+    try { return JSON.parse(localStorage.getItem(`${season.storagePrefix}.participants`) || '[]'); }
+    catch (e) { return []; }
+  }
+
   function makeParticipant(nickname, patch) {
     return Object.assign({
       id: CS.U.uid('p'),
@@ -345,7 +351,7 @@ CS.LocalStore = (function () {
 
   return {
     name: 'local',
-    init, listParticipants, addParticipant, addParticipants, updateParticipant,
+    init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
