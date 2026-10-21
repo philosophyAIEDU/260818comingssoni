@@ -11,7 +11,7 @@
  * 이미 보낸 사람은 giftSentAt/sentAt으로 건너뛰니, 같은 호출을 남은 인원이 0이 될 때까지 되풀이하면 된다.
  * 보낸 사람 이름은 '커밍쏜', 답장은 커밍쏜 메일(GIFT_REPLY_TO)로 오게 한다. */
 const { getDb } = require('./firebaseAdmin');
-const { sendMail, sleep } = require('./mailer');
+const { sendMail, sleep, closePool } = require('./mailer');
 const { U, MailTemplates, collectionName, currentConfig } = require('./appLogic');
 
 const GIFT_FROM_NAME = '커밍쏜';
@@ -66,7 +66,7 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
     };
     try {
       await sendMail({
-        fromName: GIFT_FROM_NAME, replyTo: GIFT_REPLY_TO, to: email,
+        fromName: GIFT_FROM_NAME, replyTo: GIFT_REPLY_TO, to: email, pool: true,
         subject: MailTemplates.fill(subjectTpl, vars), text: MailTemplates.fill(bodyTpl, vars)
       });
       sent++;
@@ -76,7 +76,7 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
       failures.push({ id: p.id, nickname: p.nickname, error: err.message });
       await col('participants').doc(p.id).update({ giftError: String(err.message).slice(0, 200) }).catch(() => {});
     }
-    await sleep(300);
+    await sleep(100);
   }
 
   // 운영진이 추가한 받는 사람 — 대상자와 겹치지 않는 사람에게만
@@ -93,7 +93,7 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
     };
     try {
       await sendMail({
-        fromName: GIFT_FROM_NAME, replyTo: GIFT_REPLY_TO, to: email,
+        fromName: GIFT_FROM_NAME, replyTo: GIFT_REPLY_TO, to: email, pool: true,
         subject: MailTemplates.fill(subjectTpl, vars), text: MailTemplates.fill(bodyTpl, vars)
       });
       sent++; extrasSent++; extrasChanged = true;
@@ -102,8 +102,9 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
       failures.push({ id: email, nickname: x.name || email, error: err.message });
       extrasOut.push(x);
     }
-    await sleep(300);
+    await sleep(100);
   }
+  closePool();
   if (extrasChanged) {
     // 발송 중 운영진이 목록을 고쳤을 수 있으니 최신 목록에 sentAt만 옮겨 적는다
     const latest = ((await metaDoc().get()).data() || {}).giftExtras || [];
