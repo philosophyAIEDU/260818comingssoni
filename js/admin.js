@@ -1368,13 +1368,14 @@
     giftExtras = Array.isArray(meta.giftExtras) ? meta.giftExtras.filter((x) => x && x.email) : [];
     paintGiftExtras();
     paintGiftSchedule(meta);
+    // 받은 사람 수는 명단의 발송 기록(giftSentAt)으로 센다 — 발송이 중간에 끊겨 giftLastRun이 안 남아도 맞게
+    const { eligible } = giftCandidates();
+    const got = eligible.filter((x) => x.stat.participant.giftSentAt).length + giftExtras.filter((x) => x.sentAt).length;
     const r = meta.giftLastRun;
-    $('giftLastRun').textContent = r
-      ? `최근 발송: ${U.stampLabel(r.at)} · 대상 ${r.eligible}명${r.extrasSent ? ` + 추가 ${r.extrasSent}명` : ''} 중 ${r.sent}건 발송` +
-        (r.skippedAlready ? ` · 이미 받은 사람 ${r.skippedAlready}명 건너뜀` : '') +
-        (r.skippedNoEmail ? ` · 이메일 없음 ${r.skippedNoEmail}명` : '') +
-        (r.failed ? ` · 실패 ${r.failed}건` : '')
-      : '아직 정리본을 보낸 적 없습니다.';
+    $('giftLastRun').textContent = !got && !r
+      ? '아직 정리본을 보낸 적 없습니다.'
+      : `지금까지 ${got}명에게 보냈습니다 (대상 ${eligible.length}명${giftExtras.length ? ` + 추가 ${giftExtras.length}명` : ''}).`
+        + (r ? ` 마지막 발송 ${U.stampLabel(r.at)}${r.remaining ? ` · 남은 ${r.remaining}명` : ''}${r.failed ? ` · 실패 ${r.failed}건` : ''}` : '');
   }
 
   /* ── 정리본 예약 발송 ──
@@ -1470,19 +1471,34 @@
     let sent = 0, failed = 0, noEmail = 0, already = 0, left = 0, first = true;
     const total = fresh.length + extra.length;
     try {
-      for (let round = 0; round < 30; round++) {
+      let retries = 0;
+      for (let round = 0; round < 60; round++) {
         const token = await Store.getIdToken();
-        const res = await fetch('/.netlify/functions/send-gift-mail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
-          body: JSON.stringify({
-            link, resend: resend && first, seasonId: CONFIG.seasonId,
-            subject: $('giftMailSubject').value.trim(),
-            body: $('giftMailBody').value.trim()
-          })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        let res, data;
+        try {
+          res = await fetch('/.netlify/functions/send-gift-mail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+            body: JSON.stringify({
+              link, resend: resend && first, seasonId: CONFIG.seasonId,
+              subject: $('giftMailSubject').value.trim(),
+              body: $('giftMailBody').value.trim()
+            })
+          });
+          data = await res.json().catch(() => ({}));
+        } catch (e) { res = { ok: false, status: 0 }; data = { error: e.message }; }
+        if (!res.ok) {
+          // 함수가 시간 제한에 끊기면(502/504 등) 받은 사람은 기록돼 있으니 잠깐 쉬고 이어서 다시 부른다
+          if (res.status !== 400 && res.status !== 401 && res.status !== 403 && retries < 5) {
+            retries++;
+            msg($('giftSendMsg'), `보내는 중 — ${sent}명 보냄 · 연결이 끊겨 다시 이어 보냅니다(${retries}/5)…`, 'warn');
+            await new Promise((r) => setTimeout(r, 3000));
+            first = false;
+            continue;
+          }
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        retries = 0;
         sent += data.sent || 0; failed += data.failed || 0; noEmail = data.skippedNoEmail || 0; left = data.remaining || 0;
         if (first) already = data.skippedAlready || 0;
         first = false;
