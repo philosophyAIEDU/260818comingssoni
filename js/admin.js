@@ -1239,7 +1239,14 @@
     const ended = today > CONFIG.endDate;
     const left = ended ? 0 : U.challengeDates().filter((d) => d > today).length;
     const noMail = eligible.filter((r) => !r.email).length;
+    const sentN = eligible.filter((r) => r.stat.participant.giftSentAt).length;
     $('giftCount').textContent = `${eligible.length}명`;
+    // 발송 현황 — 다 보냈는지 한눈에(✅ 보냄 / ⏳ 아직)
+    $('giftProgress').innerHTML = eligible.length
+      ? (sentN === eligible.length
+        ? `<strong class="ok-text">✅ ${eligible.length}명 전원 발송 완료</strong>`
+        : `<strong>발송 ${sentN} / ${eligible.length}명</strong> · <span class="warn-text">⏳ 아직 ${eligible.length - sentN}명</span>`)
+      : '';
     $('giftHint').innerHTML = (ended
       ? `멤버십이 끝났습니다. 누락 <strong>${limit}회 미만(${limit - 1}회 이하)</strong>인 <strong>${eligible.length}명</strong>이 `
         + `『${esc(CONFIG.book.name)}』 인사이트 정리본을 받습니다.`
@@ -1253,7 +1260,7 @@
       { key: 'missed', label: '누락', cls: 'num', get: (r) => r.stat.missed },
       { key: 'verified', label: '인증', cls: 'num', get: (r) => r.stat.verified },
       { key: 'email', label: '이메일', get: (r) => r.email || '' },
-      { key: 'sent', label: '정리본', get: (r) => r.stat.participant.giftSentAt || '' }
+      { key: 'sent', label: '발송', get: (r) => (r.stat.participant.giftSentStamp || r.stat.participant.giftSentAt || '') }
     ];
     const t = $('giftTable');
     t.innerHTML = eligible.length
@@ -1263,7 +1270,9 @@
           <td class="num">${s.missed}</td>
           <td class="num">${s.verified}</td>
           <td>${email ? esc(email) : '<span class="muted">이메일 없음</span>'}</td>
-          <td>${s.participant.giftSentAt ? `보냄 ${esc(U.shortLabel(s.participant.giftSentAt))}` : '<span class="muted">-</span>'}</td>
+          <td>${s.participant.giftSentAt
+            ? `✅ <span class="muted">${esc(s.participant.giftSentStamp ? U.stampLabel(s.participant.giftSentStamp) : U.shortLabel(s.participant.giftSentAt))}</span>`
+            : (s.participant.giftError ? `⚠️ <span class="muted" title="${esc(s.participant.giftError)}">실패</span>` : '⏳ <span class="muted">아직</span>')}</td>
         </tr>`).join('')}</tbody>`
       : '<tbody><tr><td class="empty">지금 기준 대상자가 없습니다.</td></tr></tbody>';
     bindSortHead(t, 'gift', paintGift);

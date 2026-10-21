@@ -209,3 +209,7 @@ body.admin {
 .admin .exempt-table th, .admin .exempt-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .admin .exempt-table .num { text-align: right; white-space: nowrap; }
 .admin .exempt-table .chip { display: inline-block; margin: 2px 4px 2px 0; }
+
+/* 정리본 발송 현황 한 줄 (✅ 전원 완료 / ⏳ 남은 인원) */
+.ok-text { color: #15803d; }
+.warn-text { color: #b45309; font-weight: 600; }
