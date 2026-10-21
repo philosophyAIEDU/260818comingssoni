@@ -1521,6 +1521,15 @@
     paintGiftSchedule(await Store.getMeta());
   }
 
+  /** 지금 보내기가 끝까지 못 갔을 때 — 남은 사람은 서버 예약 발송(send-gift-scheduled)이 이어서 보낸다 */
+  async function handOffToSchedule(link) {
+    await Store.setMeta({ giftSchedule: {
+      link, at: new Date().toISOString(), seasonId: CONFIG.seasonId, status: 'scheduled', createdAt: U.nowStamp(),
+      subject: $('giftMailSubject').value.trim(), body: $('giftMailBody').value.trim(), source: 'handoff'
+    } });
+    return true;
+  }
+
   /** 서버 함수(send-gift-mail)가 대상자를 다시 계산해서 보낸다 — 여기서는 링크·문구만 넘긴다. */
   async function sendGiftMail() {
     const link = $('giftLink').value.trim();
@@ -1576,16 +1585,20 @@
         msg($('giftSendMsg'), `보내는 중 — ${sent}/${total}명 보냄${data.remaining ? `, ${data.remaining}명 남음` : ''}`, 'ok');
         if (!data.remaining || !data.sent) break; // 다 보냈거나, 이번에 한 명도 못 보냈으면(전부 실패 등) 멈춘다
       }
+      // 그래도 남았으면 서버 예약 발송에 넘겨 끝까지 보내게 한다(받은 사람은 건너뜀)
+      if (left) await handOffToSchedule(link);
       msg($('giftSendMsg'),
         `${sent}명에게 보냈습니다.` +
         (already ? ` 이미 받은 ${already}명은 건너뛰었습니다.` : '') +
         (noEmail ? ` 이메일이 없는 ${noEmail}명은 못 보냈습니다.` : '') +
         (failed ? ` 실패 ${failed}건.` : '') +
-        (left ? ` 아직 ${left}명 남았습니다 — [지금 바로 보내기]를 한 번 더 눌러 주세요(받은 분은 건너뜁니다).` : ''),
+        (left ? ` 남은 ${left}명은 서버가 이어서 보냅니다(예약 발송으로 넘김).` : ''),
         failed ? 'warn' : 'ok');
       await refresh();
     } catch (e) {
-      msg($('giftSendMsg'), `발송 실패: ${esc(e.message)}`, 'bad');
+      const handed = await handOffToSchedule(link).catch(() => false);
+      msg($('giftSendMsg'), `${sent}명 보낸 뒤 멈췄습니다: ${esc(e.message)}`
+        + (handed ? ' — 남은 분은 서버 예약 발송으로 넘겨 이어서 보냅니다.' : ''), handed ? 'warn' : 'bad');
     } finally {
       btn.disabled = false;
       btn.textContent = old;
