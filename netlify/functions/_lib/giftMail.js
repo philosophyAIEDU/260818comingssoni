@@ -5,6 +5,10 @@
  * 같은 사람에게 두 번 가지 않도록 participants/{id}.giftSentAt 에 보낸 날짜를 남긴다(resend면 다시 보냄).
  * 운영진이 [받는 사람 추가]로 넣은 사람(meta/app.giftExtras [{ name, email }])에게도 같은 메일을 보낸다 —
  * 대상자와 이메일이 겹치면 건너뛰고, 보낸 날짜는 그 항목의 sentAt에 남긴다.
+ *
+ * 함수 실행 시간 제한(지금 보내기 약 10초 · 예약 30초) 때문에 한 번에 다 못 보낸다(2026-10-21: 40명 중 14명에서 끊김).
+ * budgetMs가 지나면 새 메일을 더 시작하지 않고 멈춘 뒤 remaining(남은 인원)을 돌려준다 —
+ * 이미 보낸 사람은 giftSentAt/sentAt으로 건너뛰니, 같은 호출을 남은 인원이 0이 될 때까지 되풀이하면 된다.
  * 보낸 사람 이름은 '커밍쏜', 답장은 커밍쏜 메일(GIFT_REPLY_TO)로 오게 한다. */
 const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
@@ -24,7 +28,9 @@ function resolveEmailFor(participant, notifyEmails) {
 }
 
 /** 정리본 메일을 대상자 전원에게 보낸다. by: 누가/무엇이 보냈는지(기록용) */
-async function runGiftMail({ link, subject, body, resend, by }) {
+async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinity }) {
+  const startedAt = Date.now();
+  const outOfTime = () => Date.now() - startedAt > budgetMs;
   const CONFIG = currentConfig(); // withSeason 안에서 부르면 그 시즌 설정
   const subjectTpl = String(subject || '').trim() || MailTemplates.defaultGiftSubject();
   const bodyTpl = String(body || '').trim() || MailTemplates.defaultGiftBody();
@@ -44,7 +50,7 @@ async function runGiftMail({ link, subject, body, resend, by }) {
   const liveCount = (CONFIG.weeklyPrompts || []).length || 4;
   const days = U.challengeDates().length;
 
-  let sent = 0, skippedAlready = 0, skippedNoEmail = 0, extrasSent = 0;
+  let sent = 0, skippedAlready = 0, skippedNoEmail = 0, extrasSent = 0, remaining = 0;
   const failures = [];
   const eligibleEmails = new Set();
   for (const s of eligible) {
@@ -53,6 +59,7 @@ async function runGiftMail({ link, subject, body, resend, by }) {
     if (email) eligibleEmails.add(email.toLowerCase());
     if (p.giftSentAt && !resend) { skippedAlready++; continue; }
     if (!email) { skippedNoEmail++; continue; }
+    if (outOfTime()) { remaining++; continue; }
     const vars = {
       이름: p.nickname, 누락횟수: s.missed, 책이름: CONFIG.book.name, 일수: days,
       라이브횟수: liveCount, 정리본링크: link, 앱주소: CONFIG.appUrl
@@ -77,6 +84,7 @@ async function runGiftMail({ link, subject, body, resend, by }) {
     const email = String(x.email).trim().toLowerCase();
     if (eligibleEmails.has(email)) { extrasOut.push(x); continue; }
     if (x.sentAt && !resend) { skippedAlready++; extrasOut.push(x); continue; }
+    if (outOfTime()) { remaining++; extrasOut.push(x); continue; }
     const vars = {
       이름: x.name || email.split('@')[0], 누락횟수: '', 책이름: CONFIG.book.name, 일수: days,
       라이브횟수: liveCount, 정리본링크: link, 앱주소: CONFIG.appUrl
@@ -102,9 +110,10 @@ async function runGiftMail({ link, subject, body, resend, by }) {
       ? Object.assign({}, x, { sentAt: sentMap.get(String(x.email).toLowerCase()) }) : x)) }, { merge: true });
   }
 
-  const result = { eligible: eligible.length, extras: extras.length, extrasSent, sent, skippedAlready, skippedNoEmail, failed: failures.length, failures };
+  const result = { eligible: eligible.length, extras: extras.length, extrasSent, sent, skippedAlready, skippedNoEmail, remaining, failed: failures.length, failures };
   await metaDoc().set({
-    giftLastRun: { at: U.nowStamp(), by, link, eligible: eligible.length, extrasSent, sent, skippedAlready, skippedNoEmail, failed: failures.length }
+    // skippedAlready = 이미 받은 사람(앞선 묶음 포함) → sent + skippedAlready 가 지금까지 받은 인원
+    giftLastRun: { at: U.nowStamp(), by, link, eligible: eligible.length, extrasSent, sent, skippedAlready, skippedNoEmail, remaining, failed: failures.length }
   }, { merge: true });
   return result;
 }

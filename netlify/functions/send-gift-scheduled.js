@@ -1,4 +1,4 @@
-/* 🎁 정리본 예약 발송 — 매시 정각(UTC) 자동 실행(netlify.toml schedule).
+/* 🎁 정리본 예약 발송 — 10분마다 자동 실행(netlify.toml schedule).
  *
  * 시즌마다(정리본 기준 giftMissLimit이 있는 시즌만) 아래 둘 중 하나가 있으면, 예약 시각이 지났고 그 시즌의
  * 인증 기간이 끝났을 때 그 시즌 대상자 전원(+운영진이 추가한 받는 사람)에게 한 번 보낸다.
@@ -47,10 +47,12 @@ exports.handler = async () => {
         if (!due) return;
         const { ref, sch } = due;
         try {
-          const r = await runGiftMail({ link: sch.link, subject: sch.subject, body: sch.body, resend: false, by: '예약 발송' });
-          await ref.set({ giftSchedule: Object.assign({}, sch, {
-            status: 'sent', doneAt: U.nowStamp(), sent: r.sent, eligible: r.eligible, failed: r.failed
-          }) }, { merge: true });
+          // 예약 함수 실행 제한(30초) 안에서 20초어치만 보낸다. 남으면 'scheduled'로 되돌려 다음 실행(10분 뒤)에 이어 보낸다.
+          const r = await runGiftMail({ link: sch.link, subject: sch.subject, body: sch.body, resend: false, by: '예약 발송', budgetMs: 20000 });
+          const sentSoFar = (sch.sentSoFar || 0) + r.sent;
+          await ref.set({ giftSchedule: Object.assign({}, sch, r.remaining
+            ? { status: 'scheduled', sentSoFar, remaining: r.remaining, lastBatchAt: U.nowStamp() }
+            : { status: 'sent', doneAt: U.nowStamp(), sent: sentSoFar, sentSoFar, remaining: 0, eligible: r.eligible, failed: r.failed }) }, { merge: true });
           console.log(`[send-gift-scheduled] ${cfg.seasonId} 대상 ${r.eligible}명 + 추가 ${r.extras || 0}명 중 ${r.sent}건 발송, 실패 ${r.failed}건`);
           results.push(Object.assign({ season: cfg.seasonId }, r));
         } catch (err) {

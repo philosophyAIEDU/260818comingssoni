@@ -12,7 +12,7 @@
  * resend: true 로 부르면 이미 받은 사람에게도 다시 보낸다(링크를 고쳤을 때 등).
  *
  * 요청(JSON): { link, subject?, body?, resend? }   — subject/body를 비우면 기본 문구
- * 응답(JSON): { sent, skippedAlready, skippedNoEmail, failed, failures, eligible }
+ * 응답(JSON): { sent, skippedAlready, skippedNoEmail, remaining, failed, failures, eligible }
  */
 const { CONFIG, withSeason } = require('./_lib/appLogic');
 const { runGiftMail } = require('./_lib/giftMail');
@@ -33,8 +33,10 @@ exports.handler = async (event) => {
 
   // 운영진 화면이 보고 있던 시즌으로 계산한다(다음 시즌이 켜진 뒤 ?season=s2로 지난 시즌을 보낼 때도 맞게)
   const seasonId = global.CS.seasonById(payload.seasonId) ? payload.seasonId : CONFIG.seasonId;
+  // 실행 시간 제한(약 10초) 안에 끝나도록 6초어치만 보내고 남은 인원(remaining)을 돌려준다 —
+  // 운영진 화면이 remaining이 0이 될 때까지 다시 부른다(이미 받은 사람은 건너뛴다)
   const result = await withSeason(seasonId, () => runGiftMail({
-    link, subject: payload.subject, body: payload.body, resend: !!payload.resend, by: auth.email
+    link, subject: payload.subject, body: payload.body, resend: !!payload.resend, by: auth.email, budgetMs: 6000
   }));
   return json(200, result);
 };
