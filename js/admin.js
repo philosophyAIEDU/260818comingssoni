@@ -1274,13 +1274,94 @@
     if (!$('giftMailBody').value) $('giftMailBody').value = gm.body || MailTemplates.defaultGiftBody();
   }
 
+  /* ── 받는 사람 추가 ── 대상 명단 밖의 사람에게도 정리본을 보낸다.
+   * meta/app.giftExtras = [{ name, email, addedAt, sentAt? }] — 서버 발송(지금 보내기·예약)이 같이 읽는다.
+   * 이름만 넣으면 이 시즌 명단(→ 알림 메일 목록) 순서로 이메일을 찾고, 못 찾으면 이메일을 같이 적게 한다. */
+  let giftExtras = [];
+  const EMAIL_IN_TEXT = /[^\s<>,;()]+@[^\s<>,;()]+\.[^\s<>,;()]+/;
+
+  function findEmailByName(name) {
+    const n = U.normalizeNick(name);
+    const base = (x) => U.normalizeNick(x).replace(/\(\d{4}\)$/, ''); // 동명이인 표시 "이름(1234)"도 이름으로 찾는다
+    const p = participants.find((x) => U.normalizeNick(x.nickname) === n)
+      || participants.find((x) => base(x.nickname) === n);
+    if (p) {
+      const email = resolveEmailFor(p);
+      if (email) return { name: p.nickname, email };
+    }
+    const m = notifyEmails.find((e) => U.normalizeNick(e.name) === n || base(e.name || '') === n);
+    return m && m.email ? { name: m.name, email: m.email } : null;
+  }
+
+  function giftExtraPending(resend) {
+    const eligibleEmails = new Set(giftCandidates().eligible.map((r) => (r.email || '').toLowerCase()));
+    return giftExtras.filter((x) => !eligibleEmails.has(x.email.toLowerCase()) && (resend || !x.sentAt));
+  }
+
+  function paintGiftExtras() {
+    const eligibleEmails = new Set(giftCandidates().eligible.map((r) => (r.email || '').toLowerCase()));
+    $('giftExtraCount').textContent = giftExtras.length ? `${giftExtras.length}명` : '';
+    const t = $('giftExtraTable');
+    t.innerHTML = giftExtras.length
+      ? `<thead><tr><th>이름</th><th>이메일</th><th>정리본</th><th></th></tr></thead><tbody>${giftExtras.map((x, i) => `<tr>
+          <td>${esc(x.name || '-')}</td>
+          <td>${esc(x.email)}</td>
+          <td>${x.sentAt ? `보냄 ${esc(U.shortLabel(x.sentAt))}`
+            : (eligibleEmails.has(x.email.toLowerCase()) ? '<span class="muted">위 대상자에 이미 있음</span>' : '<span class="muted">보낼 예정</span>')}</td>
+          <td><button class="small" type="button" data-gift-extra-del="${i}">빼기</button></td>
+        </tr>`).join('')}</tbody>`
+      : '<tbody><tr><td class="empty">추가한 사람이 없습니다.</td></tr></tbody>';
+    t.querySelectorAll('[data-gift-extra-del]').forEach((b) => b.addEventListener('click', async () => {
+      const x = giftExtras[+b.dataset.giftExtraDel];
+      if (!x || !confirm(`${x.name || x.email} 님을 받는 사람에서 뺄까요?`)) return;
+      giftExtras = giftExtras.filter((y) => y !== x);
+      await Store.setMeta({ giftExtras });
+      paintGiftExtras();
+    }));
+  }
+
+  async function addGiftExtras() {
+    const lines = $('giftExtraInput').value.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) { msg($('giftExtraMsg'), '이름이나 이메일을 적어 주세요.', 'bad'); return; }
+    const eligibleEmails = new Set(giftCandidates().eligible.map((r) => (r.email || '').toLowerCase()));
+    const added = [], already = [], notFound = [];
+    lines.forEach((line) => {
+      const m = line.match(EMAIL_IN_TEXT);
+      let item;
+      if (m) {
+        const name = line.replace(m[0], '').replace(/[<>,;()]/g, ' ').trim();
+        const known = name ? findEmailByName(name) : null;
+        item = { name: (known && known.name) || name || m[0].split('@')[0], email: m[0].toLowerCase() };
+      } else {
+        item = findEmailByName(line);
+        if (!item) { notFound.push(line); return; }
+      }
+      const email = item.email.toLowerCase();
+      if (eligibleEmails.has(email) || giftExtras.some((x) => x.email.toLowerCase() === email)) { already.push(item.name || email); return; }
+      giftExtras.push({ name: item.name, email, addedAt: U.nowStamp() });
+      added.push(`${item.name} <${email}>`);
+    });
+    if (added.length) {
+      await Store.setMeta({ giftExtras });
+      $('giftExtraInput').value = notFound.join('\n'); // 못 찾은 줄만 남겨 이메일을 덧붙이게
+    }
+    paintGiftExtras();
+    msg($('giftExtraMsg'), [
+      added.length && `${added.length}명 추가: ${esc(added.join(', '))}`,
+      already.length && `이미 받을 예정: ${esc(already.join(', '))}`,
+      notFound.length && `<strong>이메일을 찾지 못함</strong>: ${esc(notFound.join(', '))} — 이름 뒤에 이메일을 같이 적어 주세요.`
+    ].filter(Boolean).join('<br>'), notFound.length ? 'warn' : 'ok');
+  }
+
   async function refreshGiftLastRun() {
     if (!CONFIG.giftMissLimit) return;
     const meta = await Store.getMeta();
+    giftExtras = Array.isArray(meta.giftExtras) ? meta.giftExtras.filter((x) => x && x.email) : [];
+    paintGiftExtras();
     paintGiftSchedule(meta);
     const r = meta.giftLastRun;
     $('giftLastRun').textContent = r
-      ? `최근 발송: ${U.stampLabel(r.at)} · 대상 ${r.eligible}명 중 ${r.sent}건 발송` +
+      ? `최근 발송: ${U.stampLabel(r.at)} · 대상 ${r.eligible}명${r.extrasSent ? ` + 추가 ${r.extrasSent}명` : ''} 중 ${r.sent}건 발송` +
         (r.skippedAlready ? ` · 이미 받은 사람 ${r.skippedAlready}명 건너뜀` : '') +
         (r.skippedNoEmail ? ` · 이메일 없음 ${r.skippedNoEmail}명` : '') +
         (r.failed ? ` · 실패 ${r.failed}건` : '')
@@ -1342,7 +1423,9 @@
     if (!(atMs > Date.now())) { msg($('giftScheduleMsg'), '지난 시각입니다. 앞으로의 시각을 골라 주세요.', 'bad'); return; }
     const at = new Date(atMs).toISOString();
     const { eligible } = giftCandidates();
-    if (!confirm(`${kstLabel(at)}에 정리본 메일을 자동으로 보낼까요?\n지금 기준 대상 ${eligible.length}명(보내는 시각의 최종 누락 기준으로 다시 계산)\n${link}`)) return;
+    const extra = giftExtraPending(false).length;
+    if (!confirm(`${kstLabel(at)}에 정리본 메일을 자동으로 보낼까요?\n지금 기준 대상 ${eligible.length}명(보내는 시각의 최종 누락 기준으로 다시 계산)`
+      + `${extra ? ` + 추가한 ${extra}명` : ''}\n${link}`)) return;
     await Store.setMeta({ giftSchedule: {
       link, at, seasonId: CONFIG.seasonId, status: 'scheduled', createdAt: U.nowStamp(),
       subject: $('giftMailSubject').value.trim(), body: $('giftMailBody').value.trim(),
@@ -1366,8 +1449,9 @@
     const { eligible } = giftCandidates();
     const resend = $('giftResend').checked;
     const fresh = eligible.filter((r) => resend || !r.stat.participant.giftSentAt);
-    if (!fresh.length) { msg($('giftSendMsg'), '보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).', 'warn'); return; }
-    if (!confirm(`${fresh.length}명에게 정리본 메일을 보낼까요?\n${link}`)) return;
+    const extra = giftExtraPending(resend);
+    if (!fresh.length && !extra.length) { msg($('giftSendMsg'), '보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).', 'warn'); return; }
+    if (!confirm(`${fresh.length + extra.length}명에게 정리본 메일을 보낼까요?${extra.length ? `\n(추가한 ${extra.length}명 포함)` : ''}\n${link}`)) return;
     const btn = $('giftSendBtn');
     btn.disabled = true;
     const old = btn.textContent;
@@ -1988,6 +2072,7 @@
     $('giftCopy').addEventListener('click', copyGiftList);
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
+    $('giftExtraAdd').addEventListener('click', addGiftExtras);
     $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);
     $('giftScheduleCancel').addEventListener('click', cancelGiftSchedule);
     $('importJson').addEventListener('click', importJson);

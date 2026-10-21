@@ -1,7 +1,7 @@
 /* 🎁 정리본 예약 발송 — 매시 정각(UTC) 자동 실행(netlify.toml schedule).
  *
  * 시즌마다(정리본 기준 giftMissLimit이 있는 시즌만) 아래 둘 중 하나가 있으면, 예약 시각이 지났고 그 시즌의
- * 인증 기간이 끝났을 때 그 시즌 대상자 전원에게 한 번 보낸다.
+ * 인증 기간이 끝났을 때 그 시즌 대상자 전원(+운영진이 추가한 받는 사람)에게 한 번 보낸다.
  *   1) 운영진 화면 [이 시각에 예약하기]로 저장한 meta/app.giftSchedule (status:'scheduled')
  *   2) js/config.js 시즌 설정의 giftMail { sendAt(KST), link, subject, body } — link가 채워져 있을 때만
  *      (운영진 화면 예약이 있으면 그쪽이 우선. 예약을 취소하면 status:'cancelled'라 둘 다 안 보낸다)
@@ -51,7 +51,7 @@ exports.handler = async () => {
           await ref.set({ giftSchedule: Object.assign({}, sch, {
             status: 'sent', doneAt: U.nowStamp(), sent: r.sent, eligible: r.eligible, failed: r.failed
           }) }, { merge: true });
-          console.log(`[send-gift-scheduled] ${cfg.seasonId} 대상 ${r.eligible}명 중 ${r.sent}건 발송, 실패 ${r.failed}건`);
+          console.log(`[send-gift-scheduled] ${cfg.seasonId} 대상 ${r.eligible}명 + 추가 ${r.extras || 0}명 중 ${r.sent}건 발송, 실패 ${r.failed}건`);
           results.push(Object.assign({ season: cfg.seasonId }, r));
         } catch (err) {
           await ref.set({ giftSchedule: Object.assign({}, sch, { status: 'failed', error: err.message, doneAt: U.nowStamp() }) }, { merge: true });
