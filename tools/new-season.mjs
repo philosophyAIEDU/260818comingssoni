@@ -27,8 +27,9 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { seasonVars, josaEulReul, addDays, md, longD, shortD, LIVE_DAYS, D } from './lib/season-vars.mjs';
+import { seasonVars, addDays, md, longD, shortD, LIVE_DAYS, D } from './lib/season-vars.mjs';
 import { renderSeason } from './season-render.mjs';
+import { giftMailText, giftMailBlock, replaceLastGiftMail } from './lib/gift-mail.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const [, , specPath, ...flags] = process.argv;
@@ -47,11 +48,8 @@ const { startDate, endDate, days, switchAt, lockPrevAt, retroFrom, retroUntil, n
   recruitLabel, monthLabel, liveTime, plan, liveDates, liveWd } = S;
 
 /* ── 1) 시즌 객체 ── */
-// 정리본 메일 문구는 상수(tools/templates/정리본메일.txt — 첫 줄이 제목). {{이름}}·{{정리본링크}}는 발송 때 사람마다 채운다.
-const [giftSubject, ...giftBody] = readFileSync(join(root, 'tools/templates/정리본메일.txt'), 'utf8')
-  .replace(/\n+$/, '').replaceAll('{{책이름}}', spec.book.name).replaceAll('{{을를}}', josaEulReul(spec.book.name))
-  .replace('{{다음책안내}}', spec.nextBookNote || '다음 책은 4주차 마지막 라이브에서 공개합니다.')
-  .split('\n');
+// 정리본 메일 문안 — 상수(tools/templates/정리본메일*.txt) + 이 책. 다음 책은 다음 시즌을 만들 때 채운다.
+const gift = giftMailText(spec.book.name, null);
 const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 const q = (v) => (v == null ? 'null' : `'${esc(v)}'`);
 const planSrc = plan.map((day) => {
@@ -91,7 +89,7 @@ const seasonSrc = `, {
     '<strong>${liveWd}요일은 새로 읽을 분량이 없습니다.</strong> 그날 오전 단톡방에 올라오는 <strong>발제문</strong>을 '
       + '보고 생각을 정리해 <strong>[읽고 느낀 점]</strong>에 남기면 그날 인증이 완료됩니다. '
       + '밀린 분량이 있다면 이날 따라잡아 주세요.',
-    '인증을 놓쳐도 <strong>킥아웃되지 않습니다</strong>. 다만 ${days}일 동안 <strong>누락이 ${spec.giftMissLimit || 6}회 미만(${(spec.giftMissLimit || 6) - 1}회 이하)</strong>이면 '
+    '${days}일 동안 <strong>누락이 ${spec.giftMissLimit || 6}회 미만(${(spec.giftMissLimit || 6) - 1}회 이하)</strong>이면 '
       + '커밍쏜이 직접 정리한 『${esc(spec.book.name)}』 <strong>인사이트 정리본</strong>을 드립니다.',
     ${q(spec.bookEditionRule || '')} ,
     '지난달에 이어 함께하시는 분은 이름 옆에 <strong>🔥2 🔥3 …</strong> 연속 시즌 표시가 붙습니다. 한 달 더 할 때마다 올라갑니다.',
@@ -116,17 +114,7 @@ const seasonSrc = `, {
   autoWarnThreshold: Infinity,
   // 🎁 정리본 선물 기준 — 누락이 이 횟수 미만이면 대상. 운영진 [알림 메일 › 선물 대상자]가 쓴다.
   giftMissLimit: ${spec.giftMissLimit || 6},
-  // 🎁 정리본 메일 자동 발송 — link를 채워 배포하면 sendAt(KST)에 이 시즌 대상자 전원에게 한 번 보낸다.
-  // 다음 시즌이 켜진 뒤여도 이 시즌 명단으로 계산한다. link가 비어 있으면 아무것도 안 보낸다.
-  // 다음 책 소개 줄은 다음 책이 정해지면(4주차 라이브) 다음 시즌을 만들 때 채운다.
-  giftMail: {
-    sendAt: ${q(nextStart + 'T09:00')},
-    link: '',
-    subject: ${q(giftSubject)},
-    body: [
-${giftBody.map((l) => `      ${q(l)},`).join('\n')}
-    ].join('\\n'),
-  },
+${giftMailBlock({ sendAt: nextStart + 'T09:00', subject: gift.subject, body: gift.body })}
   // 📝 주간 발제문 — 라이브 날 앱 [오늘의 범위]와 운영진 [공지문 › 발제문]에 쓰인다.
   weeklyPrompts: [
 ${promptsSrc}
@@ -186,6 +174,11 @@ if (lockAtIdx >= 0) {
     + head.slice(lineEnd);
   lockedPrev = true;
 }
+// 앞 시즌 정리본 메일 끝의 "다음 책" 소개를 이 책으로 다시 채운다(book.mailPitch가 소개 문구)
+const prevBook = (head.slice(head.lastIndexOf('\n  book: {')).match(/name: '([^']*)'/) || [])[1];
+const prevGift = prevBook ? replaceLastGiftMail(head, prevBook,
+  { month: monthLabel, name: spec.book.name, pitch: spec.book.mailPitch || '' }) : { replaced: false };
+if (prevGift.replaced) head = prevGift.src;
 writeFileSync(cfgPath, head + '\n}' + seasonSrc + cfg.slice(at + marker.length));
 
 // 시즌마다 out/<시즌id>/ 에 따로 — 앞 시즌 초안을 덮어쓰지 않는다
@@ -210,6 +203,7 @@ writeFileSync(join(outDir, '노션게시.json'), JSON.stringify({
 }, null, 2));
 
 console.log('\n✓ js/config.js 에 시즌을 추가했습니다.' + (lockedPrev ? ` 앞 시즌 lockAt = ${lockPrevAt}` : ''));
+if (prevGift.replaced) console.log(`✓ 앞 시즌(『${prevBook}』) 정리본 메일 끝에 다음 책 『${spec.book.name}』 소개를 넣었습니다${spec.book.mailPitch ? '' : ' (book.mailPitch가 비어 있어 한 줄만)'}.`);
 console.log(`✓ ${outRel}/ 에 상세페이지.md · 설명서.md · 일정표.md · 카톡공지.txt 를 만들었습니다.`);
 console.log(`✓ ${outRel}/노션게시.json — 노션에 올릴 제목·위치 목록 (new-season 스킬이 이걸 보고 페이지를 만든다)`);
 console.log('  노션에 게시한 뒤에는 archive/ 에 최종본을 보관하세요(archive/README.md).');
@@ -224,6 +218,7 @@ const todo = [
   !spec.applyUrl && '래피드 신청 링크 (applyUrl) — 상세페이지 신청 버튼 3곳',
   !(spec.pages && spec.pages.detailBookIntro) && '상세페이지 책 소개 문단 (pages.detailBookIntro)',
   !(spec.pages && spec.pages.guideWeek4) && '설명서 4주차 읽는 방법 (pages.guideWeek4)',
+  !spec.book.mailPitch && '앞 시즌 정리본 메일에 들어갈 이 책 소개 2~3줄 (book.mailPitch)',
   spec.toc && '목차로 나눈 일자별 분량이 적당한지 (위 표 · 쪽수를 주면 더 고르게 나뉜다)',
   !(spec.weeklyPrompts || []).length && '발제문 4주치 (weeklyPrompts)',
   !spec.bookEditionRule && '판본 안내가 필요한 책인지 (다른 판과 목차가 다르면 규칙에 한 줄)',

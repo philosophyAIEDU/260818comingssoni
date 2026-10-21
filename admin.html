@@ -327,8 +327,7 @@
     <p class="hint" id="missedWarnHintNoKick" hidden>
       현재 누락이 있는 참여자 목록입니다(이미 아웃 처리된 분은 빠집니다). <strong>[메일 작성]</strong>을
       누르면 지금까지 몇 회 누락했는지를 담은 제목·본문이 위 작성창에 채워집니다 — 확인 후
-      [Gmail로 작성하기]나 [복사하기]로 보내주세요. 이 시즌에는 킥아웃이 없어 경고가 아닌
-      안내 문구로 채워집니다.
+      [Gmail로 작성하기]나 [복사하기]로 보내주세요.
     </p>
     </details>
     <div id="missedWarnMsg"></div>
@@ -347,6 +346,28 @@
     </div>
     <div class="scroll">
       <table id="giftTable"></table>
+    </div>
+
+    <!-- 대상 명단 밖의 사람에게도 정리본을 보낼 때 — 이름만 넣으면 명단·알림 메일 목록에서 이메일을 찾아 붙인다 -->
+    <h3 style="margin-top:18px">받는 사람 추가 <span class="tag" id="giftExtraCount"></span></h3>
+    <details class="help"><summary>설명 보기</summary>
+    <p class="hint">
+      위 명단에 없는 분에게도 같은 정리본 메일을 보내고 싶을 때 여기에 추가하세요.
+      <strong>이름</strong>만 넣으면 이 시즌 명단·알림 메일 목록에서 이메일을 찾아 자동으로 붙이고,
+      못 찾으면 <strong>이메일을 직접</strong> 같이 적어 주세요(예: <code>홍길동 hong@example.com</code>, 또는 이메일만).
+      여러 명은 줄을 바꿔 한 번에 넣을 수 있습니다. 추가한 분은 예약 발송·지금 바로 보내기 모두에서 함께 받고,
+      한 번 받은 분에게는 다시 가지 않습니다.
+    </p>
+    </details>
+    <div class="field">
+      <textarea id="giftExtraInput" rows="2" placeholder="이름 또는 이메일 — 예) 홍길동 / 김철수 kim@example.com"></textarea>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="giftExtraAdd" type="button">추가</button>
+    </div>
+    <div id="giftExtraMsg"></div>
+    <div class="scroll">
+      <table id="giftExtraTable"></table>
     </div>
 
     <h3 style="margin-top:18px">정리본 메일 보내기</h3>
