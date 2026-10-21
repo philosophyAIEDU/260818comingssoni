@@ -65,6 +65,8 @@ const promptsSrc = (spec.weeklyPrompts || []).map((w) =>
 const seasonSrc = `, {
   id: ${q(need('id'))},
   label: ${q(need('label'))},
+  // 끝난 뒤에도 참여자가 책 소개 화살표로 넘겨 볼 수 있다(읽기 전용 · 기록 내려받기 닫힘)
+  browsable: true,
   startsAt: ${q(switchAt)},   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
   title: '퍼스널메이커스 독서 멤버십',
   subtitle: '${esc(spec.book.name)} 인증 시스템',

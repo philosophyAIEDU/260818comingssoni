@@ -62,7 +62,9 @@
       + `${esc(U.longLabel(CONFIG.endDate))}, ${weeks}주간<br>`
       + `📢 <strong>독서모임</strong> ${esc(CONFIG.live.label)}`;
     $('introFineprint').textContent = CONFIG.live.note;
-    $('introDesc').textContent = b.desc;
+    // 설정의 \n은 넓은 화면에서만 줄바꿈(한 줄씩 블록) — 휴대폰에서는 띄어쓰기로 이어진다
+    $('introDesc').innerHTML = String(b.desc || '').split('\n')
+      .map((line) => `<span class="desc-line">${esc(line)}</span>`).join(' ');
 
     // 킥아웃이 없는 시즌에는 킥아웃 규칙 줄을 아예 내린다(빈 값이나 Infinity가 보이지 않게).
     if (CONFIG.kickoutEnabled) $('kickN').textContent = CONFIG.kickoutThreshold;
@@ -1307,8 +1309,9 @@
     return flagsPromise;
   }
 
-  /* 책 표지 양옆 화살표 — 이미 시작한 시즌 중 참여자가 볼 수 있는 시즌으로만 넘긴다
-   * (진행 중이거나, 잠겼어도 운영진이 "지난 시즌 공개"를 켜 둔 시즌).
+  /* 책 소개 카드 양옆 화살표 — 이미 시작한 시즌 중 참여자가 볼 수 있는 시즌으로만 넘긴다
+   * (설정에 browsable: true 인 시즌, 또는 운영진이 "지난 시즌 공개"를 켜 둔 시즌, 그리고 지금 시즌).
+   * 지금 시즌에서는 다음 시즌이 아직 없으니 오른쪽 화살표가 없다.
    * 링크로 페이지를 새로 여는 방식이라 화살표를 누르기 전까지는 지난 시즌 데이터를 하나도 읽지 않는다. */
   async function paintShelf() {
     const flags = await seasonFlags();
@@ -1317,7 +1320,7 @@
     const auto = CS.pickSeason(now);
     const started = CS.SEASONS.filter((x) => !x.startsAt || x.startsAt <= now);
     const viewable = started.filter((x) => x.id === CS.SEASON.id || x.id === auto.id
-      || !CS.seasonLocked(x, now) || open.includes(x.id));
+      || x.browsable || open.includes(x.id));
     const i = viewable.findIndex((x) => x.id === CS.SEASON.id);
     if (i < 0) return;
     const chev = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -1339,7 +1342,8 @@
     if (!CS.seasonLocked(CS.SEASON)) return true;
 
     const flags = await seasonFlags(); // 못 읽으면 빈 값 → 잠긴 것으로 본다
-    const opened = Array.isArray(flags.openSeasons) && flags.openSeasons.includes(CS.SEASON.id);
+    const opened = CS.SEASON.browsable
+      || (Array.isArray(flags.openSeasons) && flags.openSeasons.includes(CS.SEASON.id));
 
     const banner = $('seasonBanner');
     banner.hidden = false;
