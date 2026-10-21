@@ -67,7 +67,7 @@ export function seasonObjectSrc(spec, S = seasonVars(spec)) {
       + '커밍쏜이 직접 정리한 『${esc(spec.book.name)}』 <strong>인사이트 정리본</strong>을 드립니다.',
     ${q(spec.bookEditionRule || '')} ,
     '지난달에 이어 함께하시는 분은 이름 옆에 <strong>🔥2 🔥3 …</strong> 연속 시즌 표시가 붙습니다. 한 달 더 할 때마다 올라갑니다.',
-    '${days}일간 기록한 내용은 <strong>한 번에 내려받을 수</strong> 있습니다. 화면 맨 아래 <strong>[나의 진행 현황]</strong>에서 '
+    '${days}일간 기록한 내용은 <strong>한 번에 내려받을 수</strong> 있습니다. <strong>[내 현황]</strong> 탭에서 '
       + '지금까지 몇 번 인증했고 몇 번 놓쳤는지도 확인할 수 있습니다.'
   ].filter(Boolean),
   sentencePlaceholder: '예) 오늘 범위에서 가장 와닿은 한 문장을 그대로 옮겨 적고, '
@@ -92,7 +92,7 @@ export function seasonObjectSrc(spec, S = seasonVars(spec)) {
   // 다음 시즌이 켜진 뒤여도 이 시즌 명단으로 계산한다. link가 비어 있으면 아무것도 안 보낸다.
   // 다음 책이 정해지면(4주차 라이브) 아래 "다음 책은 …" 줄을 다음 책 소개로 바꾼다 — 시즌 설명서 nextBookNote에도 같이.
   giftMail: {
-    sendAt: ${q(nextStart + 'T09:00')},
+    sendAt: ${q(nextStart + 'T10:00')},
     link: '',
     subject: ${q(giftSubject)},
     body: [

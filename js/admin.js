@@ -1292,7 +1292,7 @@
    * 매시 정각에 확인해서 시각이 지났고 시즌 인증 기간이 끝났으면 대상자 전원에게 한 번 보낸다. */
   const KST_OFFSET = '+09:00';
 
-  /** 기본 예약 시각 — 시즌 설정 giftMail.sendAt, 없으면 시즌이 끝난 다음 날(또는 오늘) 이후 첫 월요일 09:00 (KST) */
+  /** 기본 예약 시각 — 시즌 설정 giftMail.sendAt, 없으면 시즌이 끝난 다음 날(또는 오늘) 이후 첫 월요일 10:00 (KST) — 정리본 메일은 10시 고정 */
   function defaultGiftScheduleAt() {
     const preset = CONFIG.giftMail && CONFIG.giftMail.sendAt;
     if (preset && Date.parse(preset + ':00' + KST_OFFSET) > Date.now()) return preset;
@@ -1300,8 +1300,8 @@
     const afterEnd = U.addDays(CONFIG.endDate, 1);
     let d = afterEnd > today ? afterEnd : today;
     while (U.weekday(d) !== '월') d = U.addDays(d, 1);
-    let at = `${d}T09:00`;
-    if (Date.parse(at + ':00' + KST_OFFSET) <= Date.now()) at = `${U.addDays(d, 7)}T09:00`;
+    let at = `${d}T10:00`;
+    if (Date.parse(at + ':00' + KST_OFFSET) <= Date.now()) at = `${U.addDays(d, 7)}T10:00`;
     return at;
   }
   function kstLabel(isoUtc) {

@@ -128,7 +128,7 @@ node tools/new-season.mjs seasons/<id>.json --write  # config.js + out/<id>/ 문
 문서는 **상수(`tools/templates/`) + 변수(시즌 JSON)** 로 렌더된 것이라 손으로 고치지 않는다.
 고칠 게 보이면 책 문단이면 시즌 JSON의 `pages.*`를, 구조·공통 문구면 템플릿을 고치고
 `node tools/season-render.mjs seasons/<id>.json`으로 다시 뽑는다.
-config에는 이 시즌의 `giftMail`(정리본 메일, 다음 시즌 시작일 09:00, link 비움)도 같이 들어간다.
+config에는 이 시즌의 `giftMail`(정리본 메일, 다음 시즌 시작일 10:00 고정, link 비움)도 같이 들어간다.
 다음 책이 정해지면 **앞 시즌** `giftMail.body`의 "다음 책은 …" 줄을 다음 책 소개로 바꾸고, 앞 시즌 설명서의 `nextBookNote`에도 같은 문구를 넣는다
 (둘이 다르면 `check:season`의 "앱 시즌 객체 = 틀 + 설명서"가 빨간불).
 
