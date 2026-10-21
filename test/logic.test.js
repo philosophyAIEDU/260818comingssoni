@@ -463,6 +463,38 @@ function t(name, cond, extra) {
     await Store.removeParticipant(q.id);
   }
 
+  console.log('— 공지문 여러 날짜 한 번에 넣기 (parseNoticeBatch) —');
+  {
+    // 시즌0: 2026-08-24(월) ~ 2026-09-20(일). 실제 운영진이 붙여 넣는 모양(코드 펜스 · ==== 구분 · "N일차 공지")
+    const raw = '```\n📖 퍼스널메이커스 독서 멤버십 1일차 공지\n2026년 8월 24일(월)\n\n오늘부터 시작합니다!\n\n[필로소피]\n첫날 이야기\n\n'
+      + '==================================================\n\n'
+      + '📖 퍼스널메이커스 독서 멤버십 2일차 공지\n2026년 8월 25일(화)\n\n오늘은 2일차 / 총 28일 입니다.\n\n'
+      + '==================================================\n\n'
+      + '📖 퍼스널메이커스 독서 멤버십 3일차 공지\n2026년 8월 26일(수)\n본문\n\n'
+      + '==================================================\n\n'
+      + '📖 퍼스널메이커스 독서 멤버십 5일차 공지\n2026년 8월 27일(목)\n일차가 날짜와 안 맞음\n\n'
+      + '==================================================\n\n'
+      + '날짜가 없는 덩어리\n\n'
+      + '==================================================\n\n'
+      + '📖 중복\n2026년 8월 25일(화)\n같은 날짜 두 번째\n\n'
+      + '==================================================\n\n'
+      + '📖 없는 날짜\n2026년 2월 31일\n```';
+    const r = U.parseNoticeBatch(raw);
+    t('하루치마다 잘라 날짜별로 읽음(코드 펜스 제거)',
+      r.items.map((x) => x.date).join() === '2026-08-24,2026-08-25,2026-08-26,2026-08-27', r.items.map((x) => x.date));
+    t('각 공지 전문이 그대로 들어감(머리줄 포함, 앞뒤 공백만 정리)',
+      r.items[0].text.startsWith('📖 퍼스널메이커스 독서 멤버십 1일차 공지\n2026년 8월 24일(월)') && r.items[0].text.endsWith('첫날 이야기')
+      && r.items[0].text.includes('[필로소피]') && !r.items[0].text.includes('====') && !r.items[0].text.includes('```'), r.items[0].text);
+    t('머리줄 "N일차"가 실제 회차와 같으면 정상, 다르면 mismatch',
+      !r.items[0].mismatch && !r.items[2].mismatch && r.items[3].mismatch && r.items[3].dayNo === 5, r.items.map((x) => [x.date, x.dayNo, x.mismatch]));
+    t('날짜가 없는 덩어리 · 같은 날짜 두 번 · 없는 날짜는 건너뛰고 이유를 알려 줌',
+      r.skipped.length === 3 && r.skipped.some((x) => x.reason.includes('찾지 못')) && r.skipped.some((x) => x.reason.includes('두 번'))
+      && r.skipped.some((x) => x.reason.includes('없는 날짜')), r.skipped);
+    t('같은 날짜가 두 번이면 앞의 것을 씀', r.items[1].text.includes('오늘은 2일차'), r.items[1].text);
+    t('빈 글이면 아무것도 없음', U.parseNoticeBatch('  \n ').items.length === 0 && U.parseNoticeBatch('').skipped.length === 0);
+    t('구분선이 없으면 한 덩어리(하루치)로 읽음', U.parseNoticeBatch('📖 1일차 공지\n2026년 8월 24일(월)\n본문').items.length === 1);
+  }
+
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);
   await Store.setNotice('2026-08-24', '  8/24 공지 초안입니다  ');

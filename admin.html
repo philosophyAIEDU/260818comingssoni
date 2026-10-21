@@ -212,6 +212,24 @@
     </div>
     <div id="noticeMsg"></div>
 
+    <!-- 여러 날짜 공지문을 한 번에 — 하루치마다 "====" 줄로 나뉜 글을 붙여 넣는다 -->
+    <details class="help" id="noticeBatch" style="margin-top:18px">
+      <summary>여러 날짜 공지문 한 번에 넣기</summary>
+      <p class="hint">
+        하루치마다 <code>==========</code> 줄로 나눈 공지문 전체를 붙여 넣으세요. 각 공지의
+        <code>2026년 10월 21일(수)</code> 같은 날짜 줄을 읽어 날짜별로 저장합니다.
+        [미리보기]로 날짜가 맞게 읽혔는지 확인한 뒤 [모두 저장]을 누르세요.
+        이미 저장해 둔 날짜는 덮어씁니다.
+      </p>
+      <textarea class="report" id="noticeBatchText" rows="8" placeholder="📖 퍼스널메이커스 독서 멤버십 1일차 공지&#10;2026년 10월 21일(수)&#10;…&#10;&#10;==========&#10;&#10;📖 퍼스널메이커스 독서 멤버십 2일차 공지&#10;2026년 10월 22일(목)&#10;…"></textarea>
+      <div class="actions">
+        <button id="noticeBatchPreview">미리보기</button>
+        <button class="primary" id="noticeBatchSave">모두 저장</button>
+      </div>
+      <div id="noticeBatchList"></div>
+      <div id="noticeBatchMsg"></div>
+    </details>
+
     <!-- 📝 주간 발제문 — weeklyPrompts가 있는 시즌에서만 보인다(admin.js가 연다) -->
     <div id="promptSection" hidden>
       <h2 style="margin-top:26px">발제문 (라이브 날 오전 단톡방용)</h2>

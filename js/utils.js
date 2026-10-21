@@ -247,6 +247,35 @@ CS.U = (function () {
     return { cls: 'ok', label: '참여중' };
   }
 
+  /* ── 공지문 여러 날짜 한 번에 넣기 ─────────────────
+   * 하루치 공지가 "====" 줄로 나뉘어 이어 붙은 글에서 날짜별로 잘라 낸다. 날짜는 각 덩어리에서
+   * 처음 나오는 "2026년 10월 21일" 꼴을 읽는다(요일은 안 본다). 머리줄의 "N일차"가 그 날짜의
+   * 실제 회차와 다르면 날짜가 잘못 적힌 것일 수 있어 mismatch로 표시해 준다. */
+  function parseNoticeBatch(raw) {
+    const text = String(raw || '').replace(/\r\n?/g, '\n')
+      .replace(/^\s*```[^\n]*\n/, '').replace(/\n\s*```\s*$/, '');
+    const items = [];
+    const skipped = [];
+    const seen = new Set();
+    for (const block of text.split(/^[ \t]*[=＝]{5,}[ \t]*$/m)) {
+      const body = block.trim();
+      if (!body) continue;
+      const title = body.split('\n')[0].trim();
+      const m = body.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+      if (!m) { skipped.push({ title, reason: '날짜(예: 2026년 10월 21일)를 찾지 못했습니다' }); continue; }
+      const date = `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+      if (addDays(date, 0) !== date) { skipped.push({ title, reason: `${m[0]}는 없는 날짜입니다` }); continue; }
+      if (seen.has(date)) { skipped.push({ title, date, reason: '같은 날짜가 두 번 나옵니다(앞의 것만 씀)' }); continue; }
+      seen.add(date);
+      const d = title.match(/(\d+)\s*일차/);
+      const dayNo = d ? Number(d[1]) : null;
+      const real = dayIndex(date);
+      items.push({ date, title, text: body, dayNo, mismatch: dayNo != null && real != null && dayNo !== real });
+    }
+    items.sort((a, b) => a.date.localeCompare(b.date));
+    return { items, skipped };
+  }
+
   /* ── 이번 주 시상(인기 게시자·메신저) ──────────────
    * 한 주는 월~토. 그 주가 끝난 다음 날(보통 일요일) 0시(KST)에 발표된다. 시즌 기간 밖 날짜는 빼고
    * 세므로 첫 주·마지막 주는 며칠짜리일 수 있다 — 시즌이 주 중간에 끝나면 그 마지막 주는 시즌이 끝난
@@ -342,6 +371,6 @@ CS.U = (function () {
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
     normalizeNick, deadlineInstant, isLate, statusFor, buildStats, riskTag, pad2,
-    awardWeeks, lastAwardWeek, weeklyAwards
+    awardWeeks, lastAwardWeek, weeklyAwards, parseNoticeBatch
   };
 })();

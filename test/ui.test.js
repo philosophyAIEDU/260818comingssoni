@@ -559,6 +559,53 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   t('삭제 후 자동 생성 문구로 되돌아감', /자동 생성/.test(await page.textContent('#noticeStatus')));
   t('삭제 후 저장된 공지 0건', /저장된 공지 없음/.test(await page.textContent('#noticeSavedCount')));
 
+  // 공지문 여러 날짜 한 번에 넣기 — 하루치마다 "====" 줄로 나뉜 글을 붙여 넣어 날짜별로 저장
+  {
+    const WD = ['일', '월', '화', '수', '목', '금', '토'];
+    const ko = (iso) => { const d = new Date(iso + 'T00:00:00Z'); return `${d.getUTCFullYear()}년 ${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${WD[d.getUTCDay()]})`; };
+    const day = (n) => `📖 퍼스널메이커스 독서 멤버십 ${n}일차 공지\n${ko(shift(-8 + n - 1))}\n\n${n}일차 본문입니다.\n\n[필로소피]\n${n}일차 필로소피`;
+    const sep = '\n\n==================================================\n\n';
+    // 기존에 저장해 둔 날짜(2일차)가 하나 있으면 "덮어씀"으로 보여야 한다
+    await page.fill('#noticeDate', shift(-7));
+    await page.dispatchEvent('#noticeDate', 'change');
+    await page.fill('#noticeOut', '예전에 저장해 둔 2일차 공지');
+    await page.click('#noticeSave');
+    await page.waitForTimeout(300);
+
+    await page.click('#noticeBatch summary');
+    await page.fill('#noticeBatchText', '```\n' + [day(1), day(2), day(3), `📖 날짜 없음`].join(sep)
+      + sep + `📖 퍼스널메이커스 독서 멤버십 9일차 공지\n${ko(shift(-5))}\n일차가 안 맞는 공지` + '\n```');
+    await page.click('#noticeBatchPreview');
+    await page.waitForTimeout(200);
+    const prev = await page.textContent('#noticeBatchList');
+    t('미리보기: 읽은 날짜 수와 건너뛰는 건수', prev.includes('4일치를 저장합니다') && prev.includes('건너뛰는 1건'), prev);
+    t('미리보기: 이미 저장된 날짜는 "덮어씀", 새 날짜는 "새로"', prev.includes('덮어씀') && prev.includes('새로'), prev);
+    t('미리보기: 날짜가 없는 덩어리는 이유와 함께 저장 안 함 표시', prev.includes('날짜(예: 2026년 10월 21일)를 찾지 못했습니다') && prev.includes('저장 안 함'), prev);
+    t('미리보기: 날짜와 "N일차"가 안 맞으면 경고', prev.includes('글엔 9일차'), prev);
+
+    await page.click('#noticeBatchSave'); // confirm()은 자동 수락
+    await page.waitForTimeout(800);
+    t('모두 저장 완료 메시지', /4일치 공지문을 모두 저장했습니다/.test(await page.textContent('#noticeBatchMsg')), await page.textContent('#noticeBatchMsg'));
+    t('저장된 공지 개수가 늘어남', /저장된 공지 4일치/.test(await page.textContent('#noticeSavedCount')), await page.textContent('#noticeSavedCount'));
+    for (const [n, iso] of [[1, shift(-8)], [2, shift(-7)], [3, shift(-6)]]) {
+      await page.fill('#noticeDate', iso);
+      await page.dispatchEvent('#noticeDate', 'change');
+      await page.waitForTimeout(150);
+      const out = await page.inputValue('#noticeOut');
+      t(`${n}일차 날짜에 그 공지가 그대로 저장됨(필로소피 문단 포함)`,
+        out.startsWith(`📖 퍼스널메이커스 독서 멤버십 ${n}일차 공지`) && out.includes(`${n}일차 필로소피`) && !out.includes('=====') && !out.includes('```'), out);
+    }
+    t('덮어쓴 날짜는 새 내용으로 바뀜', !(await page.inputValue('#noticeOut')).includes('예전에 저장'), null);
+
+    // 이 시즌 공지 기간 밖 날짜는 저장하지 않고 이유를 알려 준다
+    await page.fill('#noticeBatchText', `📖 먼 훗날 공지\n2099년 1월 1일(목)\n본문`);
+    await page.click('#noticeBatchPreview');
+    await page.waitForTimeout(200);
+    const far = await page.textContent('#noticeBatchList');
+    t('공지 기간 밖 날짜는 건너뜀', far.includes('공지 기간') && far.includes('0일치를 저장합니다'), far);
+    await page.fill('#noticeBatchText', '');
+  }
+
   // 제출 기록 필터
   await page.click('button[data-tab="entries"]');
   await page.waitForTimeout(300);
