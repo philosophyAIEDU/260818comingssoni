@@ -656,9 +656,8 @@ body.award-open { overflow: hidden; }
 .award-medal { display: block; width: 100%; max-width: 150px; height: auto; filter: drop-shadow(0 4px 6px rgba(120, 80, 0, .25)); animation: award-swing 1.6s ease-out; transform-origin: 50% 0; }
 @keyframes award-swing { 0% { transform: rotate(-9deg); } 30% { transform: rotate(6deg); } 55% { transform: rotate(-3deg); } 80% { transform: rotate(1deg); } 100% { transform: rotate(0); } }
 .award-sparkle { fill: #f5c542; }
-.award-laurel { fill: #a87410; opacity: .55; }
-.award-num { font: 800 34px var(--font); fill: #7a4b00; }
-.award-unit { font-size: 15px; font-weight: 700; }
+.award-laurel { color: #aa8035; fill: currentColor; opacity: .65; }
+.award-label { font: 800 14px var(--font); fill: #704b1e; letter-spacing: -.04em; }
 .award-kind-label { margin-top: 2px; font-size: 14px; font-weight: 700; color: var(--text); }
 .award-who { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; max-width: 100%; padding: 5px 12px 5px 6px; border-radius: 999px; background: var(--surface-2); font-size: 15px; font-weight: 700; color: var(--accent); box-sizing: border-box; }
 .award-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

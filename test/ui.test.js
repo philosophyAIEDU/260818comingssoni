@@ -2392,17 +2392,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       box.includes('이번 주의 메신저로 전달왕님이 선정되셨습니다. 1주일간 2분의 글을 공유해주셨습니다. 덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 전달왕님.'), box);
     t('지난주 밖(그 전 주) 글의 엄지척은 세지 않음', !box.includes('보통님이 선정'), box);
 
-    // 처음 들어오면 두 상을 한 장에 담은 축하 카드가 화면 가득 뜬다 — 메달 숫자 = "N분"
+    // 처음 들어오면 두 상을 한 장에 담은 축하 카드가 화면 가득 뜬다 — 메달 중앙에는 수상 부문
     t('이번 주 발표를 처음 보면 축하 카드가 뜸', await w.isVisible('#awardModal'));
     t('넘기지 않고 한 장에 모두 보임', (await w.locator('#awardModal .award-card').count()) === 1);
     const winners = w.locator('#awardModal .award-winner');
     t('두 상(인기 게시자 · 메신저)의 메달이 나란히', (await winners.count()) === 2, await winners.count());
-    t('인기 게시자 메달: 숫자 = 좋아요 눌러 준 사람 수, 이름',
-      (await winners.nth(0).locator('.award-num').textContent()) === '3분'
+    t('인기 게시자 메달: 부문 문구와 이름',
+      (await winners.nth(0).locator('.award-label').textContent()) === '인기 게시자'
       && (await winners.nth(0).textContent()).includes('인기 게시자') && (await winners.nth(0).textContent()).includes('인기왕님'),
       await winners.nth(0).textContent());
-    t('메신저 메달: 숫자 = 공유한 글의 작성자 수, 이름',
-      (await winners.nth(1).locator('.award-num').textContent()) === '2분'
+    t('메신저 메달: 부문 문구와 이름',
+      (await winners.nth(1).locator('.award-label').textContent()) === '메신저'
       && (await winners.nth(1).textContent()).includes('메신저') && (await winners.nth(1).textContent()).includes('전달왕님'),
       await winners.nth(1).textContent());
     const msgs = await w.textContent('#awardModal .award-msgs');

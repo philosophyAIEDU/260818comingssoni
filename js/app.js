@@ -976,40 +976,45 @@
     ];
   }
 
-  /** 올림픽 메달 — 엇갈린 리본에 매달린 둥근 금메달, 테두리 안쪽에 월계수, 가운데 숫자("N분"의 N).
-   *  리본 색으로 상을 구분한다(인기 게시자 빨강 · 메신저 파랑). */
+  /** 리본과 월계수로 꾸민 금메달. 중앙에는 수상 부문을 새긴다. */
   function awardMedal(item, i) {
-    const ribbon = item.kind === 'popular' ? ['#d62839', '#a3162a'] : ['#1f6fd1', '#14509c'];
-    const cx = 80, cy = 146;
+    const popular = item.kind === 'popular';
+    const ribbon = popular ? ['#df6378', '#982c49'] : ['#6499d7', '#28528e'];
+    const label = popular ? '인기 게시자' : '메신저';
     const leaves = [];
-    const leaf = (deg) => {
-      const r = 37, a = deg * Math.PI / 180;
-      const x = (cx + r * Math.cos(a)).toFixed(1), y = (cy + r * Math.sin(a)).toFixed(1);
-      leaves.push(`<ellipse cx="${x}" cy="${y}" rx="5.2" ry="2.3" transform="rotate(${deg + 90 + (deg > 90 && deg < 270 ? -35 : 35)} ${x} ${y})"/>`);
-    };
-    for (let d = 110; d <= 235; d += 18) leaf(d);  // 왼쪽 가지(아래에서 위로)
-    for (let d = 70; d >= -55; d -= 18) leaf(d);   // 오른쪽 가지
-    const sp = (x, y, r) => `<path d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z"/>`;
-    return `<svg class="award-medal" viewBox="0 0 160 206" aria-hidden="true">
+    for (let n = 0; n < 7; n++) {
+      const a = (35 + n * 17) * Math.PI / 180;
+      const x = 80 - 39 * Math.sin(a), y = 133 + 39 * Math.cos(a);
+      leaves.push(`<ellipse cx="${x}" cy="${y}" rx="3" ry="6" transform="rotate(${-35 - n * 17} ${x} ${y})"/>`);
+      leaves.push(`<ellipse cx="${160 - x}" cy="${y}" rx="3" ry="6" transform="rotate(${35 + n * 17} ${160 - x} ${y})"/>`);
+    }
+    return `<svg class="award-medal" viewBox="0 0 160 206" role="img" aria-label="${label} 금메달">
       <defs>
-        <radialGradient id="medalFace${i}" cx="38%" cy="32%" r="75%">
-          <stop offset="0" stop-color="#fff6c9"/><stop offset=".45" stop-color="#f7cf4b"/><stop offset="1" stop-color="#c58b14"/></radialGradient>
+        <linearGradient id="medalRibbon${i}" x1="0" y1="0" x2="1" y2="1">
+          <stop stop-color="${ribbon[0]}"/><stop offset="1" stop-color="${ribbon[1]}"/></linearGradient>
+        <radialGradient id="medalFace${i}" cx="34%" cy="24%" r="85%">
+          <stop stop-color="#fff9dc"/><stop offset=".55" stop-color="#f8df94"/><stop offset="1" stop-color="#d9ad50"/></radialGradient>
         <linearGradient id="medalRim${i}" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffe58a"/><stop offset=".5" stop-color="#d79c1c"/><stop offset="1" stop-color="#9c6a08"/></linearGradient>
+          <stop stop-color="#fff2bd"/><stop offset=".3" stop-color="#deb451"/><stop offset=".5" stop-color="#fff0ad"/><stop offset="1" stop-color="#b67d2a"/></linearGradient>
       </defs>
-      <g class="award-sparkle">${sp(18, 118, 8)}${sp(144, 104, 6)}${sp(146, 190, 7)}<circle cx="16" cy="182" r="3.5"/><circle cx="150" cy="140" r="3"/></g>
-      <polygon points="22,0 56,0 94,96 70,104" fill="${ribbon[1]}"/>
-      <polygon points="31,0 47,0 85,99 77,101" fill="#fff" opacity=".85"/>
-      <polygon points="138,0 104,0 66,96 90,104" fill="${ribbon[0]}"/>
-      <polygon points="129,0 113,0 75,99 83,101" fill="#fff" opacity=".85"/>
-      <rect x="66" y="88" width="28" height="12" rx="3" fill="url(#medalRim${i})"/>
-      <circle cx="${cx}" cy="${cy + 2}" r="54" fill="rgba(0,0,0,.18)"/>
-      <circle cx="${cx}" cy="${cy}" r="54" fill="url(#medalRim${i})"/>
-      <circle cx="${cx}" cy="${cy}" r="46" fill="url(#medalFace${i})"/>
-      <circle cx="${cx}" cy="${cy}" r="46" fill="none" stroke="#a87410" stroke-opacity=".45" stroke-width="1.5"/>
-      <g class="award-laurel">${leaves.join('')}</g>
-      <ellipse cx="62" cy="122" rx="20" ry="9" transform="rotate(-30 62 122)" fill="#fff" opacity=".35"/>
-      <text class="award-num" x="${cx}" y="${cy + 11}" text-anchor="middle">${item.count}<tspan class="award-unit" dx="1">분</tspan></text>
+      <path d="M37 10 69 10 98 88 75 103Z" fill="${ribbon[1]}"/>
+      <path d="M123 10 91 10 62 88 85 103Z" fill="url(#medalRibbon${i})"/>
+      <path d="M45 10 51 10 83 96 78 98Z M109 10 115 10 82 98 77 96Z" fill="#fff" opacity=".42"/>
+      <path d="M37 10H69M91 10H123" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>
+      <rect x="69" y="83" width="22" height="22" rx="7" fill="none" stroke="url(#medalRim${i})" stroke-width="5"/>
+      <circle cx="80" cy="144" r="58" fill="#9d6a24" opacity=".2"/>
+      <circle cx="80" cy="141" r="58" fill="url(#medalRim${i})"/>
+      <circle cx="80" cy="141" r="53" fill="none" stroke="#fff5ce" stroke-width="1.5"/>
+      <circle cx="80" cy="141" r="49" fill="url(#medalFace${i})" stroke="#be913c"/>
+      <circle cx="80" cy="141" r="45" fill="none" stroke="#fff8d9" stroke-opacity=".65"/>
+      <g class="award-laurel">${leaves.join('')}
+        <path d="M49 118Q31 156 76 178M111 118Q129 156 84 178" fill="none" stroke="currentColor" stroke-width="1"/>
+      </g>
+      <path d="m80 107 2 4 4 .6-3 3 .7 4.4-3.7-2-3.7 2 .7-4.4-3-3 4-.6Z" fill="#a7782d"/>
+      <text class="award-label" x="80" y="146" text-anchor="middle">${label}</text>
+      <path d="M63 157H97" stroke="#b58a3c" stroke-width="1"/>
+      <circle cx="80" cy="164" r="2" fill="#b58a3c"/>
+      <g class="award-sparkle"><path d="M16 105Q16 114 24 114Q16 114 16 123Q16 114 8 114Q16 114 16 105ZM143 167Q143 173 149 173Q143 173 143 179Q143 173 137 173Q143 173 143 167Z"/></g>
     </svg>`;
   }
 
