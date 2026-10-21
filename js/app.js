@@ -1400,10 +1400,37 @@
   }
 
   /* ── 제출 ────────────────────────────── */
+  /** 이름 칸에 보이는 글자로 정확히 한 사람을 찾는다(없거나 애매하면 null). */
+  function participantByTyped(typed) {
+    const exact = participants.filter((x) => x.nickname === typed || comboLabel(x) === typed);
+    return exact.length === 1 ? exact[0] : null;
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
-    const pid = $('participant').value;
-    if (!pid) { msg($('formMsg'), '참여 아이디를 선택해 주세요.', 'bad'); return; }
+    // 이름 칸에 보이는 이름과 실제로 골라진 사람이 다르면 보이는 이름을 따른다. 예: "김"+Enter로
+    // 첫 줄(김정은)이 골라진 뒤 칸을 지우고 "김현우"를 쳤지만 목록을 누르지 않은 경우 — 예전엔 화면엔
+    // 김현우인데 김정은 이름으로 저장됐다(그 사람이 이미 인증했으면 그 글을 덮어쓰기까지 했다).
+    const typed = $('participantSearch').value.trim();
+    let pid = $('participant').value;
+    const picked = participants.find((x) => x.id === pid);
+    if (typed && (!picked || comboLabel(picked) !== typed)) {
+      const p = participantByTyped(typed);
+      if (!p) {
+        msg($('formMsg'), `이름 칸의 '${esc(typed)}'은(는) 아직 선택되지 않았습니다. 이름을 입력한 뒤 ` +
+          '아래 목록에서 <strong>본인 이름을 눌러</strong> 선택해 주세요.', 'bad');
+        openCombo();
+        return;
+      }
+      // 글을 쓰는 중이라 폼을 다시 불러오지 않고(쓴 글이 지워지지 않게) 선택만 맞춘다.
+      pid = p.id;
+      $('participant').value = pid;
+      currentPid = pid;
+      markPicked(p);
+      if ($('meWho')) $('meWho').value = pid;
+      CS.ShareCard.rememberMe(pid);
+    }
+    if (!pid || !typed) { msg($('formMsg'), '참여 아이디를 선택해 주세요.', 'bad'); return; }
 
     if (!canSubmitToday()) {
       msg($('formMsg'),

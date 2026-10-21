@@ -2343,6 +2343,61 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await d.close();
   }
 
+  // ── 이름 칸에 보이는 이름으로 저장 (실제 제보: 김현우로 썼는데 김정은으로 저장됨) ──
+  // "김"+Enter로 첫 줄(김정은)이 골라진 뒤, 칸을 지우고 "김현우"를 쳤지만 목록을 누르지 않은 경우.
+  {
+    const nCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+    await nCtx.route('**/js/config.js', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text())
+        .replace(/startDate: '[^']+'/, `startDate: '${shift(-3)}'`)
+        .replace(/endDate: '[^']+'/, `endDate: '${shift(20)}'`)
+        .replace(/backend: '[^']+'/, `backend: 'local'`);
+      await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    });
+    await nCtx.addInitScript(({ today }) => {
+      if (sessionStorage.getItem('seeded')) return;
+      sessionStorage.setItem('seeded', '1');
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify([
+        { id: 'jeu', nickname: '김정은', status: 'active' }, { id: 'hw', nickname: '김현우', status: 'active' }]));
+      // 김정은은 오늘 이미 인증했다 — 예전엔 이 글이 김현우가 쓴 글로 덮어써질 수 있었다
+      localStorage.setItem(K + '.submissions', JSON.stringify([{ id: 'je1', participantId: 'jeu', nickname: '김정은', date: today,
+        sentence: '김정은의 문장', reflection: '김정은의 느낀 점', upvotes: 0, upvotedBy: [], createdAt: `${today}T01:00:00.000Z`, updatedAt: `${today}T01:00:00.000Z` }]));
+    }, { today });
+    const n = await nCtx.newPage();
+    n.on('pageerror', (e) => errs.push('pageerror(name): ' + e.message));
+    await n.goto(BASE + '/index.html');
+    await n.waitForTimeout(600);
+    await n.click('#participantSearch');
+    await n.keyboard.type('김');
+    await n.keyboard.press('Enter');
+    await n.waitForTimeout(300);
+    t('"김"+Enter는 첫 줄(김정은)을 고름(재현 준비)', (await n.inputValue('#participantSearch')) === '김정은');
+    // 덜 친 이름으로는 저장하지 않는다
+    await n.fill('#participantSearch', '김현');
+    await n.fill('#sentence', '김현우의 문장');
+    await n.fill('#reflection', '김현우의 느낀 점');
+    await n.click('#submitBtn');
+    await n.waitForTimeout(400);
+    const stored = () => n.evaluate(() => JSON.parse(localStorage.getItem('comingsoon.reading.v1.submissions')));
+    t('이름 칸이 정확한 이름이 아니면 저장하지 않고 다시 고르라고 안내',
+      (await n.textContent('#formMsg')).includes('아직 선택되지 않았습니다') && (await stored()).length === 1, await n.textContent('#formMsg'));
+    // 정확히 "김현우"를 쳤지만 목록은 누르지 않고 바로 인증
+    await n.fill('#participantSearch', '김현우');
+    await n.fill('#sentence', '김현우의 문장');
+    await n.fill('#reflection', '김현우의 느낀 점');
+    await n.click('#submitBtn');
+    await n.waitForTimeout(500);
+    const after = await stored();
+    t('이름 칸에 보이는 사람(김현우) 이름으로 저장됨',
+      after.some((x) => x.participantId === 'hw' && x.nickname === '김현우' && x.sentence === '김현우의 문장'), after);
+    t('먼저 골라졌던 사람(김정은)의 글은 그대로',
+      after.some((x) => x.id === 'je1' && x.participantId === 'jeu' && x.sentence === '김정은의 문장'), after);
+    t('저장 안내도 김현우 님으로', (await n.textContent('#formMsg')).includes('김현우 님'), await n.textContent('#formMsg'));
+    await nCtx.close();
+  }
+
   // ── 이번 주 인기 게시자 · 메신저 ──
   // 시계를 고정해 요일별 동작을 본다: 발표 당일(일) 축하 카드 · 다음 날엔 글만 · 수상자 없는 주에도
   // 지난 수상자 유지 · 시즌이 끝나면 주간 수상 기록. 시즌: 8/31(월) ~ 9/22(화)
