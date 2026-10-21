@@ -9,6 +9,25 @@
 window.CS = window.CS || {};
 
 CS.ShareCard = (function () {
+  /* "이번 주 메신저"를 뽑으려면 누가 복사했는지 알아야 한다. 로그인이 없으니 인증 화면에서
+   * 마지막으로 고른 참여 아이디를 이 기기에 기억해 두고(전체 보기 창에서도 같은 값을 쓴다),
+   * 그 사람이 남의 글을 복사하면 그 글에 기록한다. 이름을 한 번도 고르지 않은 기기는 세지 않는다. */
+  const ME_KEY = `${CS.CONFIG.storagePrefix}.me`;
+  function rememberMe(pid) {
+    try { if (pid) localStorage.setItem(ME_KEY, pid); } catch (e) { /* 저장 불가 환경이면 넘어감 */ }
+  }
+  function whoAmI() {
+    try { return localStorage.getItem(ME_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  /** 복사 기록은 화면 동작과 무관하게 뒤에서 조용히 남긴다 — 실패해도 복사는 이미 끝났다. */
+  function recordCopy(ds) {
+    const me = whoAmI();
+    if (!me || !ds.id || !ds.author || ds.author === me) return;
+    if (!CS.Store || !CS.Store.recordCopy) return;
+    CS.Store.recordCopy(ds.id, me).catch((err) => console.error('[복사 기록] 실패', err));
+  }
+
   /** submission: { nickname, date, sentence, reflection, isWinner }
    *  meta: { title, dateLabel } */
   function buildText(submission, meta) {
@@ -66,6 +85,7 @@ CS.ShareCard = (function () {
         try {
           const text = buildText(submissionFromDataset(btn.dataset), meta);
           await copyToClipboard(text);
+          recordCopy(btn.dataset);
           btn.classList.add('copied');
           btn.innerHTML = `${CS.U.icon('check')}<span class="lbl">복사 완료</span>`;
         } catch (err) {
@@ -81,5 +101,5 @@ CS.ShareCard = (function () {
     });
   }
 
-  return { buildText, bindButtons };
+  return { buildText, bindButtons, rememberMe, whoAmI };
 })();

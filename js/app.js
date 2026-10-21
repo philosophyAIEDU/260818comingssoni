@@ -542,6 +542,7 @@
       return;
     }
 
+    CS.ShareCard.rememberMe(pid); // 이 기기에서 남의 글을 복사하면 이 사람 이름으로 센다(이번 주 메신저)
     const p = participants.find((x) => x.id === pid);
     populateCertifyDateOptions(p);
     await loadEntryForm(pid, $('certifyDate').value);
@@ -868,7 +869,7 @@
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(s.nickname)}" data-date="${esc(s.date)}"
           data-sentence="${esc(s.sentence)}" data-reflection="${esc(s.reflection)}"
-          data-winner="${isWinner ? '1' : ''}"
+          data-winner="${isWinner ? '1' : ''}"${READONLY ? '' : ` data-id="${esc(s.id)}" data-author="${esc(s.participantId)}"`}
           aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
       </div>
     </article>`;
@@ -950,6 +951,38 @@
     }
   }
 
+  /* ── 이번 주 인기 게시자 · 메신저 ──────────
+   * 일요일 0시(KST)가 되면 막 끝난 주(월~토)의 두 상을 피드 맨 위에 올리고, 다음 일요일까지 둔다.
+   * 피드가 이미 읽어 둔 전체 기록(allSubsCache)으로 계산하므로 Firestore를 따로 읽지 않는다. */
+  function awardsHtml(range, awards) {
+    const items = [
+      ...awards.popular.map((w) => ({
+        kind: '🏆 이번 주 인기 게시자',
+        text: `이번 주의 인기 게시자로 <strong>${esc(w.nickname)}님</strong>이 선정되셨습니다. ` +
+          `1주일간 ${w.people || w.likes}분에게 좋아요를 받으셨습니다. ` +
+          `앞으로도 좋은 인사이트 공유해주세요. 감사합니다. ${esc(w.nickname)}님`
+      })),
+      ...awards.messenger.map((w) => ({
+        kind: '💌 이번 주 메신저',
+        text: `이번 주의 메신저로 <strong>${esc(w.nickname)}님</strong>이 선정되셨습니다. ` +
+          `1주일간 ${w.authors}분의 글을 공유해주셨습니다. ` +
+          `덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 ${esc(w.nickname)}님.`
+      }))
+    ];
+    if (!items.length) return '';
+    return `<div class="award-range">${esc(U.shortLabel(range.from))} ~ ${esc(U.shortLabel(range.to))} 이번 주 소식</div>` +
+      items.map((x) => `<div class="award"><div class="award-kind">${x.kind}</div><p>${x.text}</p></div>`).join('');
+  }
+
+  async function paintWeeklyAwards() {
+    const box = $('weeklyAwards');
+    if (!box) return;
+    const range = U.lastAwardWeek();
+    const html = range ? awardsHtml(range, U.weeklyAwards(await loadAllSubs(), range, participants)) : '';
+    box.innerHTML = html;
+    box.hidden = !html;
+  }
+
   // 인증 피드 "전체 보기"는 feed-all.html(새 창)에서 js/feed-all.js가 별도로 렌더링합니다.
 
   // 명예의 전당에서 이름을 클릭하면 그 사람이 그날 쓴 인사이트를 펼쳐 보여준다.
@@ -967,7 +1000,7 @@
         <button type="button" class="share-btn" data-share
           data-nickname="${esc(item.nickname)}" data-date="${esc(item.date)}"
           data-sentence="${esc(item.sentence)}" data-reflection="${esc(item.reflection)}"
-          data-winner="${item.rank === 1 ? '1' : ''}"
+          data-winner="${item.rank === 1 ? '1' : ''}"${READONLY ? '' : ` data-id="${esc(item.id)}" data-author="${esc(item.participantId)}"`}
           aria-label="텍스트 복사" title="텍스트 복사">${U.icon('copy')}<span class="lbl">텍스트 복사</span></button>
       </div>
       <div class="fame-entry">
@@ -1072,7 +1105,7 @@
       // 동점이면 같은 등수(1,1,3…). 공동 1등을 둘 다 1등으로 보여주기 위함.
       const rank = votes === prevVotes ? prevRank : idx + 1;
       prevVotes = votes; prevRank = rank;
-      return { nickname: s.nickname, votes, rank, date: s.date, sentence: s.sentence, reflection: s.reflection };
+      return { id: s.id, participantId: s.participantId, nickname: s.nickname, votes, rank, date: s.date, sentence: s.sentence, reflection: s.reflection };
     }).filter((item) => item.rank <= FAME_TOP_RANK);
 
     // 순위가 바뀌면서 펼쳐 두었던 사람이 목록에서 사라질 수 있으니 닫아 준다.
@@ -1446,6 +1479,7 @@
       try {
         await loadAllSubs(true); // 수동 새로고침은 다른 사람의 새 기록까지 진짜로 다시 읽는다
         await refreshSocialFeed();
+        await paintWeeklyAwards();
         await calculateRanksAndFame();
         await paintOverall();
       } finally { btn.disabled = false; }
@@ -1464,6 +1498,7 @@
     // (예전엔 이걸 다 그린 뒤에야 이름 고르기·검색 같은 손길에 반응해서, 느린 폰·카톡 브라우저에서
     //  이름을 골라도 아무 일이 안 일어났다)
     await refreshSocialFeed();
+    await paintWeeklyAwards();
     await calculateRanksAndFame();
     if (!READONLY) await paintOverall();
 

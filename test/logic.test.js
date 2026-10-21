@@ -397,6 +397,57 @@ function t(name, cond, extra) {
     filledReminder.includes('소니') && filledReminder.includes('약 3시간')
     && filledReminder.includes(CONFIG.appUrl), filledReminder);
 
+  console.log('— 이번 주 인기 게시자 · 메신저 (월~토, 일요일 0시 발표) —');
+  {
+    // 시즌0: 2026-08-24(월) ~ 2026-09-20(일)
+    const wk = (d) => JSON.stringify(U.lastAwardWeek(d));
+    t('일요일에는 막 끝난 월~토가 발표됨', wk('2026-09-06') === JSON.stringify({ from: '2026-08-31', to: '2026-09-05' }), wk('2026-09-06'));
+    t('월요일에도 지난주 그대로', wk('2026-09-07') === wk('2026-09-06'));
+    t('토요일까지는 이번 주가 안 끝나서 지난주를 보여줌', wk('2026-09-12') === wk('2026-09-06'));
+    t('다음 일요일이 되면 새 주로 바뀜', wk('2026-09-13') === JSON.stringify({ from: '2026-09-07', to: '2026-09-12' }), wk('2026-09-13'));
+    t('시즌 첫 주(아직 끝난 주가 없음)는 발표 없음', U.lastAwardWeek('2026-08-26') === null);
+    t('시즌 마지막 날(일요일)엔 마지막 주 발표', wk('2026-09-20') === JSON.stringify({ from: '2026-09-14', to: '2026-09-19' }), wk('2026-09-20'));
+    t('시즌이 끝나 기간 밖이 된 주는 발표 없음', U.lastAwardWeek('2026-09-27') === null);
+
+    const people = [{ id: 'a', nickname: '가람' }, { id: 'b', nickname: '나래' }, { id: 'c', nickname: '다온' }];
+    const range = { from: '2026-09-07', to: '2026-09-12' };
+    const subs = [
+      { id: '1', participantId: 'a', nickname: '가람', date: '2026-09-07', upvotes: 3, upvotedBy: ['x', 'y', 'z'], copiedBy: ['b'] },
+      { id: '2', participantId: 'a', nickname: '가람', date: '2026-09-08', upvotes: 2, upvotedBy: ['x', 'y'], copiedBy: ['b', 'a'] },
+      { id: '3', participantId: 'b', nickname: '나래', date: '2026-09-09', upvotes: 4, upvotedBy: ['w', 'x', 'y', 'z'], copiedBy: ['c'] },
+      { id: '4', participantId: 'c', nickname: '다온', date: '2026-09-13', upvotes: 99, upvotedBy: ['q'], copiedBy: ['b'] }, // 일요일 → 다음 주
+      { id: '5', participantId: 'c', nickname: '다온', date: '2026-09-06', upvotes: 99, upvotedBy: ['q'], copiedBy: ['b'] }  // 지난주
+    ];
+    const aw = U.weeklyAwards(subs, range, people);
+    t('인기 게시자 = 그 주 받은 엄지척 합계 1위(기간 밖 글은 안 셈)',
+      aw.popular.length === 1 && aw.popular[0].nickname === '가람' && aw.popular[0].likes === 5, aw.popular);
+    t('인기 게시자 "N분" = 눌러 준 서로 다른 사람 수', aw.popular[0].people === 3, aw.popular);
+    t('메신저 = 남의 글을 가장 많이 복사한 사람(본인 글 복사는 안 셈)',
+      aw.messenger.length === 1 && aw.messenger[0].nickname === '나래' && aw.messenger[0].posts === 2, aw.messenger);
+    t('메신저 "N분의 글" = 복사한 글의 서로 다른 작성자 수', aw.messenger[0].authors === 1, aw.messenger);
+
+    const tie = U.weeklyAwards([
+      { id: '1', participantId: 'a', nickname: '가람', date: '2026-09-07', upvotes: 2, upvotedBy: ['x', 'y'], copiedBy: ['c'] },
+      { id: '2', participantId: 'b', nickname: '나래', date: '2026-09-07', upvotes: 2, upvotedBy: ['x', 'z'], copiedBy: ['c'] }
+    ], range, people);
+    t('동점이면 모두 선정', tie.popular.map((w) => w.nickname).join() === '가람,나래', tie.popular);
+    t('메신저는 여러 작성자 글을 복사하면 그만큼 셈', tie.messenger[0].posts === 2 && tie.messenger[0].authors === 2, tie.messenger);
+    const none = U.weeklyAwards([{ id: '1', participantId: 'a', nickname: '가람', date: '2026-09-07', upvotes: 0 }], range, people);
+    t('엄지척·복사가 하나도 없으면 발표 없음', !none.popular.length && !none.messenger.length, none);
+    t('발표 주가 없으면 빈 결과', !U.weeklyAwards(subs, null, people).popular.length);
+
+    // 아래 백업 테스트가 지금까지의 저장소 상태를 쓰므로, 만든 것은 끝나고 지운다.
+    const p = await Store.addParticipant('복사왕');
+    const q = await Store.addParticipant('글쓴이');
+    const sub = await Store.saveSubmission({ participantId: q.id, nickname: '글쓴이', date: '2026-09-07', sentence: 'a', reflection: 'b' });
+    await Store.recordCopy(sub.id, p.id);
+    await Store.recordCopy(sub.id, p.id);
+    const saved = (await Store.listSubmissions({ participantId: q.id }))[0];
+    t('복사 기록이 글에 남고, 같은 사람이 여러 번 복사해도 한 번만', JSON.stringify(saved.copiedBy) === JSON.stringify([p.id]), saved.copiedBy);
+    await Store.removeParticipant(p.id);
+    await Store.removeParticipant(q.id);
+  }
+
   console.log('— 공지문 (날짜별 미리 작성) —');
   t('저장 전에는 null', (await Store.getNotice('2026-08-24')) === null);
   await Store.setNotice('2026-08-24', '  8/24 공지 초안입니다  ');

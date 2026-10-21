@@ -17,6 +17,7 @@
  *   removeSubmission(id)                  → Promise<void>
  *   upvoteSubmission(id, clientId)        → Promise<Submission|null>
  *   unvoteSubmission(id, clientId)        → Promise<Submission|null>
+ *   recordCopy(id, participantId)         → Promise<void>  (submission.copiedBy[]에 복사한 참여자 추가)
  *   getMeta() / setMeta(patch)            → Promise<object>
  *     (meta.kickoutMailTemplate: {subject, body, updatedAt}|null 에 [알림 메일] 탭의
  *      "킥아웃 통보 메일 문구 편집"에서 저장한 제목·본문을 보관한다. null이면 기본 문구 사용.
@@ -241,6 +242,17 @@ CS.LocalStore = (function () {
     return all[i];
   }
 
+  /** 남의 글을 [텍스트 복사]한 참여자를 그 글에 남긴다(이번 주 메신저 집계용). 같은 글은 한 번만 센다. */
+  async function recordCopy(id, participantId) {
+    const all = read(S, []);
+    const i = all.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    const copiedBy = all[i].copiedBy || [];
+    if (copiedBy.includes(participantId)) return;
+    all[i] = Object.assign({}, all[i], { copiedBy: copiedBy.concat(participantId) });
+    write(S, all);
+  }
+
   async function getMeta() { return read(M, {}); }
   async function setMeta(patch) { return write(M, Object.assign(read(M, {}), patch)); }
 
@@ -353,7 +365,7 @@ CS.LocalStore = (function () {
     name: 'local',
     init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
+    removeSubmission, upvoteSubmission, unvoteSubmission, recordCopy, getMeta, setMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
     getNotice, setNotice, listNotices
