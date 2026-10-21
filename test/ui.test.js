@@ -2343,33 +2343,34 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await d.close();
   }
 
-  // ── 이번 주 인기 게시자 · 메신저: 일요일 0시에 지난주(월~토) 결과가 피드 맨 위에 ──
+  // ── 이번 주 인기 게시자 · 메신저 ──
+  // 시계를 고정해 요일별 동작을 본다: 발표 당일(일) 축하 카드 · 다음 날엔 글만 · 수상자 없는 주에도
+  // 지난 수상자 유지 · 시즌이 끝나면 주간 수상 기록. 시즌: 8/31(월) ~ 9/22(화)
   {
-    const dow = new Date(today + 'T00:00:00Z').getUTCDay();
-    const sat = shift(-(dow + 1)); // 가장 최근에 끝난 주의 토요일
-    const dayOf = (n) => { const d = new Date(sat + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-    const mon = dayOf(-5);
+    const KST = (d, hh = 12) => new Date(`${d}T${String(hh).padStart(2, '0')}:00:00+09:00`);
     const wCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+    await wCtx.clock.setFixedTime(KST('2026-09-13')); // 일요일 — 2주차(9/7~9/12) 발표일
     await wCtx.route('**/js/config.js', async (route) => {
       const res = await route.fetch();
       const body = (await res.text())
-        .replace(/startDate: '[^']+'/, `startDate: '${dayOf(-12)}'`)
-        .replace(/endDate: '[^']+'/, `endDate: '${shift(10)}'`)
+        .replace(/startDate: '[^']+'/, "startDate: '2026-08-31'")
+        .replace(/endDate: '[^']+'/, "endDate: '2026-09-22'")
         .replace(/backend: '[^']+'/, `backend: 'local'`);
       await route.fulfill({ response: res, body: pinSeason(body, { awardPopup: true }), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
     });
-    const parts = ['인기왕', '전달왕', '보통'].map((n, i) => ({ id: 'w' + i, nickname: n, status: 'active', createdAt: `${dayOf(-12)}T00:00:00.000Z` }));
+    const parts = ['인기왕', '전달왕', '보통'].map((n, i) => ({ id: 'w' + i, nickname: n, status: 'active', createdAt: '2026-08-31T00:00:00.000Z' }));
     const sub = (id, pid, date, upvotedBy, copiedBy) => ({
       id, participantId: pid, nickname: parts.find((p) => p.id === pid).nickname, date, sentence: '문장', reflection: '느낀 점',
       upvotes: upvotedBy.length, upvotedBy, copiedBy, createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`
     });
     const subs = [
-      sub('a1', 'w0', mon, ['c1', 'c2', 'c3'], ['w1']),
-      sub('a2', 'w0', dayOf(-3), ['c1', 'c2'], []),
-      sub('b1', 'w1', dayOf(-2), ['c1'], []),
-      sub('c1', 'w2', dayOf(-1), ['c4'], ['w1']),
-      sub('c2', 'w2', dayOf(-6), ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'], ['w0']), // 그 전 주 일요일 — 이번 집계 밖
-      sub('t1', 'w2', today, [], [])
+      sub('a1', 'w0', '2026-09-07', ['c1', 'c2', 'c3'], ['w1']),
+      sub('a2', 'w0', '2026-09-09', ['c1', 'c2'], []),
+      sub('b1', 'w1', '2026-09-10', ['c1'], []),
+      sub('c1', 'w2', '2026-09-11', ['c4'], ['w1']),
+      sub('c2', 'w2', '2026-09-06', ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'], ['w0']), // 일요일 — 어느 주에도 안 셈
+      sub('t1', 'w2', '2026-09-13', [], []),
+      sub('d1', 'w2', '2026-09-21', ['c9'], [])  // 마지막 주(9/21~9/22) 인기 게시자 = 보통
     ];
     await wCtx.addInitScript(({ parts, subs }) => {
       if (sessionStorage.getItem('seeded')) return; // 다시 불러와도 복사 기록이 지워지지 않게 한 번만 심는다
@@ -2384,16 +2385,9 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     w.on('dialog', (d) => d.accept());
     await w.goto(BASE + '/index.html');
     await w.waitForTimeout(600);
-    const box = (await w.isVisible('#weeklyAwards')) ? await w.textContent('#weeklyAwards') : '';
-    t('지난주 결과가 인증 피드 맨 위에 보임', !!box, box);
-    t('인기 게시자 문구 — 받은 엄지척이 가장 많은 사람, 눌러 준 사람 수',
-      box.includes('이번 주의 인기 게시자로 인기왕님이 선정되셨습니다. 1주일간 3분에게 좋아요를 받으셨습니다. 앞으로도 좋은 인사이트 공유해주세요. 감사합니다. 인기왕님'), box);
-    t('메신저 문구 — 남의 글을 가장 많이 복사한 사람, 공유한 글의 작성자 수',
-      box.includes('이번 주의 메신저로 전달왕님이 선정되셨습니다. 1주일간 2분의 글을 공유해주셨습니다. 덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 전달왕님.'), box);
-    t('지난주 밖(그 전 주) 글의 엄지척은 세지 않음', !box.includes('보통님이 선정'), box);
 
-    // 처음 들어오면 두 상을 한 장에 담은 축하 카드가 화면 가득 뜬다 — 메달 중앙에는 수상 부문
-    t('이번 주 발표를 처음 보면 축하 카드가 뜸', await w.isVisible('#awardModal'));
+    // 발표 당일(일요일): 두 상을 한 장에 담은 축하 카드가 화면 가득 — 메달 중앙에는 수상 부문
+    t('발표 당일 처음 들어오면 축하 카드가 뜸', await w.isVisible('#awardModal'));
     t('넘기지 않고 한 장에 모두 보임', (await w.locator('#awardModal .award-card').count()) === 1);
     const winners = w.locator('#awardModal .award-winner');
     t('두 상(인기 게시자 · 메신저)의 메달이 나란히', (await winners.count()) === 2, await winners.count());
@@ -2406,7 +2400,11 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       && (await winners.nth(1).textContent()).includes('메신저') && (await winners.nth(1).textContent()).includes('전달왕님'),
       await winners.nth(1).textContent());
     const msgs = await w.textContent('#awardModal .award-msgs');
-    t('두 축하 문구가 함께 보임', msgs.includes('1주일간 3분에게 좋아요를 받으셨습니다') && msgs.includes('1주일간 2분의 글을 공유해주셨습니다'), msgs);
+    t('요청 문구 그대로 두 축하 문구가 함께 보임',
+      msgs.includes('이번 주의 인기 게시자로 인기왕님이 선정되셨습니다. 1주일간 3분에게 좋아요를 받으셨습니다. 앞으로도 좋은 인사이트 공유해주세요. 감사합니다. 인기왕님')
+      && msgs.includes('이번 주의 메신저로 전달왕님이 선정되셨습니다. 1주일간 2분의 글을 공유해주셨습니다. 덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 전달왕님.'), msgs);
+    t('지난주 밖(일요일) 글의 엄지척은 세지 않음', !msgs.includes('보통님'), msgs);
+    t('시즌 중에는 축하 카드에 시즌 기록이 붙지 않음', !(await w.isVisible('#awardModal .award-history')));
     const vp = w.viewportSize();
     const [b0, b1] = [await winners.nth(0).boundingBox(), await winners.nth(1).boundingBox()];
     t('두 메달이 같은 줄에 나란히, 화면 안에 들어옴',
@@ -2414,9 +2412,16 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await w.click('#awardModal .award-close');
     await w.waitForTimeout(200);
     t('닫기를 누르면 사라짐', !(await w.isVisible('#awardModal')));
+
+    // 인증 피드 맨 위에는 누가 받았는지 글로 남는다
+    const feedBox = async () => ((await w.isVisible('#weeklyAwards')) ? w.textContent('#weeklyAwards') : '');
+    let box = await feedBox();
+    t('인증 피드 맨 위에 이번 주 수상자가 글로 적힘',
+      box.includes('2주차') && box.includes('이번 주 인기 게시자 인기왕님') && box.includes('3분에게 좋아요')
+      && box.includes('이번 주 메신저 전달왕님') && box.includes('2분의 글 공유'), box);
     await w.reload();
     await w.waitForTimeout(600);
-    t('같은 주에는 다시 들어와도 또 뜨지 않음', !(await w.isVisible('#awardModal')));
+    t('같은 날 다시 들어와도 또 뜨지 않음', !(await w.isVisible('#awardModal')));
     await w.click('#weeklyAwards [data-award-open]');
     await w.waitForTimeout(400);
     t('피드의 [축하 카드 보기]로 다시 볼 수 있음', await w.isVisible('#awardModal'));
@@ -2433,6 +2438,39 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       !!m0 && !!m1 && Math.abs(m0.y - m1.y) < 2 && m0.x >= 0 && m1.x + m1.width <= 360 && m1.y + m1.height <= 740, [m0, m1]);
     await w.keyboard.press('Escape');
     await w.setViewportSize(vp);
+
+    // 다음 날(월요일): 카드는 발표 당일에만 — 처음 들어온 기기라도 뜨지 않고, 피드 글은 그대로
+    const freshVisit = async (day) => {
+      await w.clock.setFixedTime(KST(day));
+      await w.evaluate(() => localStorage.removeItem('comingsoon.reading.v1.awardSeen'));
+      await w.reload();
+      await w.waitForTimeout(600);
+    };
+    await freshVisit('2026-09-14');
+    t('발표 다음 날엔 처음 들어와도 축하 카드가 안 뜸', !(await w.isVisible('#awardModal')));
+    t('다음 날에도 피드에는 이번 주 수상자가 그대로', (await feedBox()).includes('이번 주 인기 게시자 인기왕님'), await feedBox());
+
+    // 다음 일요일: 3주차(9/14~9/19)는 엄지척·복사가 없어 수상자 없음 → 카드 없이 2주차 수상자를 계속 보여 줌
+    await freshVisit('2026-09-20');
+    t('수상자가 없는 주의 발표일엔 카드가 안 뜸', !(await w.isVisible('#awardModal')));
+    box = await feedBox();
+    t('다음 수상자가 나올 때까지 지난 수상자를 계속 적어 둠', box.includes('2주차') && box.includes('인기왕님'), box);
+
+    // 시즌이 화요일(9/22)에 끝남 → 마지막 주(9/21~9/22)는 다음 날(9/23) 발표 + 시즌 전체 기록
+    await freshVisit('2026-09-23');
+    t('시즌이 끝난 다음 날 마지막 주 축하 카드가 뜸', await w.isVisible('#awardModal')
+      && (await w.textContent('#awardModal .award-winner')).includes('보통님'), await w.isVisible('#awardModal'));
+    const hist = await w.textContent('#awardModal .award-history');
+    t('마지막 축하 카드에 주간 수상 기록(1~4주차)이 함께',
+      ['1주차', '2주차', '3주차', '4주차'].every((x) => hist.includes(x)) && hist.includes('인기왕님') && hist.includes('전달왕님'), hist);
+    await w.keyboard.press('Escape');
+    await w.waitForTimeout(200);
+    box = await feedBox();
+    t('시즌이 끝나면 피드 맨 위가 주간 수상 기록으로 바뀜',
+      box.includes('주간 수상 기록') && box.includes('2주차') && box.includes('🏆 인기 게시자 인기왕님')
+      && box.includes('💌 메신저 전달왕님') && box.includes('4주차') && box.includes('🏆 인기 게시자 보통님'), box);
+    t('수상자가 없는 주는 "없음"으로 표시', (await w.textContent('#weeklyAwards .award-history li')).includes('없음'),
+      await w.textContent('#weeklyAwards .award-history li'));
 
     // 이름을 고른 기기에서 남의 글을 [텍스트 복사]하면 그 글에 복사한 사람이 남는다
     await w.evaluate(() => { navigator.clipboard.writeText = () => Promise.resolve(); });

@@ -400,14 +400,29 @@ function t(name, cond, extra) {
   console.log('— 이번 주 인기 게시자 · 메신저 (월~토, 일요일 0시 발표) —');
   {
     // 시즌0: 2026-08-24(월) ~ 2026-09-20(일)
-    const wk = (d) => JSON.stringify(U.lastAwardWeek(d));
+    const wk = (d) => { const w = U.lastAwardWeek(d); return JSON.stringify(w && { from: w.from, to: w.to }); };
     t('일요일에는 막 끝난 월~토가 발표됨', wk('2026-09-06') === JSON.stringify({ from: '2026-08-31', to: '2026-09-05' }), wk('2026-09-06'));
     t('월요일에도 지난주 그대로', wk('2026-09-07') === wk('2026-09-06'));
     t('토요일까지는 이번 주가 안 끝나서 지난주를 보여줌', wk('2026-09-12') === wk('2026-09-06'));
     t('다음 일요일이 되면 새 주로 바뀜', wk('2026-09-13') === JSON.stringify({ from: '2026-09-07', to: '2026-09-12' }), wk('2026-09-13'));
     t('시즌 첫 주(아직 끝난 주가 없음)는 발표 없음', U.lastAwardWeek('2026-08-26') === null);
     t('시즌 마지막 날(일요일)엔 마지막 주 발표', wk('2026-09-20') === JSON.stringify({ from: '2026-09-14', to: '2026-09-19' }), wk('2026-09-20'));
-    t('시즌이 끝나 기간 밖이 된 주는 발표 없음', U.lastAwardWeek('2026-09-27') === null);
+    t('시즌이 끝난 뒤에도 마지막 주 수상자가 그대로 남음', wk('2026-09-27') === wk('2026-09-20'), wk('2026-09-27'));
+    t('발표일은 그 주가 끝난 다음 날(일요일)', U.lastAwardWeek('2026-09-13').announce === '2026-09-13');
+    const all = U.awardWeeks('2026-09-21');
+    t('시즌 전체 주차 목록(1주차부터 차례로)', all.map((x) => `${x.from}~${x.to}`).join() ===
+      '2026-08-24~2026-08-29,2026-08-31~2026-09-05,2026-09-07~2026-09-12,2026-09-14~2026-09-19', all);
+    t('아직 끝나지 않은 주는 목록에 없음', U.awardWeeks('2026-09-12').length === 2, U.awardWeeks('2026-09-12'));
+    {
+      // 시즌이 주 중간(화요일)에 끝나면, 마지막 주(월~화)는 시즌이 끝난 다음 날 발표된다
+      const keep = CONFIG.endDate;
+      CONFIG.endDate = '2026-09-15';
+      const last = U.lastAwardWeek('2026-09-16');
+      t('주 중간에 끝난 시즌의 마지막 주는 다음 날 발표',
+        !!last && last.from === '2026-09-14' && last.to === '2026-09-15' && last.announce === '2026-09-16', last);
+      t('끝나는 날 당일엔 아직 발표 전', U.lastAwardWeek('2026-09-15').to === '2026-09-12');
+      CONFIG.endDate = keep;
+    }
 
     const people = [{ id: 'a', nickname: '가람' }, { id: 'b', nickname: '나래' }, { id: 'c', nickname: '다온' }];
     const range = { from: '2026-09-07', to: '2026-09-12' };
