@@ -1,0 +1,56 @@
+/* 🔥 연속 참여 배지 — 명단(participants)에 seasonStreak가 비어 있을 때 쓰는 값. 참여자 id → 연속 시즌 수(2 이상만).
+ * 2026-10-21 시즌 2(혁명의 팡파르) 명단을 운영진 화면 업로드로 넣으면서 연속 참여가 계산되지 않아 한 번 채워 둔 것.
+ * (앞 시즌 명단과 이메일 → 이름 순으로 맞춤 · tools/lib/streak.mjs 규칙) 이후 시즌은 운영진 화면 명단 업로드 때 자동으로 계산된다.
+ * 개인정보 없이 id와 숫자만 담는다. 명단의 seasonStreak가 있으면 그 값이 우선이다. */
+window.CS = window.CS || {};
+CS.STREAKS = {
+  s3: {
+    '10Ao7NRVmX3ko4gaWScc': 2,
+    '2eeepvKt6Uum0Pnjqi0J': 2,
+    '2rQov6Zb7CuHZshMod2f': 2,
+    '4dPWNZbimdb0ARew5DLi': 2,
+    '5PtW9SkYEZwKougSm65N': 2,
+    '5Vl6oY08JFmO1ApvRBTI': 2,
+    '93BStV6SP8Wms2bgAwpB': 2,
+    'BG8IgAMw5mxey3wlhXi5': 2,
+    'BGCvOugmRcdPnVn0rJaa': 2,
+    'DcBj4jh0hNvHycBFgGp1': 2,
+    'HHhOyyh4StKZC2wV10PK': 2,
+    'Hekzy8x5hRBigXi5Hp33': 2,
+    'IrppFBKfacUHIMa8fW5I': 2,
+    'Is1cJHY3SGOScuQNIQXP': 2,
+    'LcsURwmZpI1Coxa36JZG': 2,
+    'N1sIlqK9YPejPbgEoj2D': 2,
+    'N7VJMneHdJkailB49VFv': 2,
+    'Nd3ELPL8nu2WBUoq2vC2': 2,
+    'OexGrywgdOYPrh192DzP': 2,
+    'Q1gm0CmjMpOqV5jWa3SW': 2,
+    'RflkdngZWXqTYIWEW7x7': 2,
+    'RtHMz0tyic8vXaSCDIak': 2,
+    'S2ISDaxP2hgZKUmnIGsR': 2,
+    'V6xKGMLWUkMpFXZ11AYw': 2,
+    'VzhbdAgcKRxkTHCF4L6c': 2,
+    'WTXQ2i8J9By4RuE82nMG': 2,
+    'WYER3B92v6uONMk80Mah': 2,
+    'd09nOCqYuT3sDUwADeQP': 2,
+    'ddtKc5CyDB74U10C7FHk': 2,
+    'eYbctWKtynUsQIP5DUmt': 2,
+    'f0r673AA8zPqdDbm45qw': 2,
+    'hGBmu88Qau2zmMT5pPcS': 2,
+    'oHcHQ8UeBJo6wQntKA53': 2,
+    'pFSde6nldV393pORxkM1': 2,
+    'pgBG005Py5LQPzZcBZyy': 2,
+    'qXNCkky2BuL1LdvmH1FJ': 2,
+    'rY7ElPmR7KhJCo6A2CJb': 2,
+    'rkeiR0YzGOhSKtvIqXIW': 2,
+    'rqQ2XqRxECaGneapfAwq': 2,
+    'ruXp5RO3bpbFTf9up03I': 2,
+    's6BlJupseuNdtenXii1p': 2,
+    'vK3yryjLAPPmiNaxjWwC': 2,
+    'w78b6VEg3ZUH3X6arTAz': 2,
+    'wfQvTctcMGx6ALoidTXB': 2,
+    'wpWjeU0oZHgdJqNT7S0v': 2,
+    'xeKvpJbHlRexq7eLc8H9': 2,
+    'yzpgyEh0CfF8LDgUukRl': 2
+  }
+};

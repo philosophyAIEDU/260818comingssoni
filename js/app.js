@@ -295,9 +295,10 @@
   function comboLabel(p) { return `${p.nickname}${outSuffix(p)}`; }
 
   /* ── 연속 참여 배지 — 2시즌째부터 이름 옆에 🔥N ──
-   * participants/{id}.seasonStreak (roster-upload 도구가 앞 시즌 명단과 맞춰 넣는다). */
+   * participants/{id}.seasonStreak (명단 업로드 때 앞 시즌 명단과 맞춰 넣는다).
+   * 비어 있으면 js/streaks.js(CS.STREAKS — 한 번 채워 둔 id → 수)를 본다. */
   function streakBadge(p) {
-    const n = p && Number(p.seasonStreak);
+    const n = p && (Number(p.seasonStreak) || ((CS.STREAKS || {})[CONFIG.seasonId] || {})[p.id]);
     if (!n || n < 2) return '';
     return `<span class="season-badge" title="${n}시즌 연속 참여">🔥 ${n}</span>`;
   }

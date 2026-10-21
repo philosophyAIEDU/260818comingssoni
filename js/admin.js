@@ -304,7 +304,7 @@
         <td><select data-editkakao="${p.id}">
           ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
         </select></td>
-        <td><input type="number" min="1" max="99" value="${p.seasonStreak || 1}" data-editstreak="${p.id}" title="이번 시즌 포함 연속 참여 시즌 수 (2부터 앱에 배지)" style="width:58px"></td>
+        <td><input type="number" min="1" max="99" value="${p.seasonStreak || ((CS.STREAKS || {})[CONFIG.seasonId] || {})[p.id] || 1}" data-editstreak="${p.id}" title="이번 시즌 포함 연속 참여 시즌 수 (2부터 앱에 배지)" style="width:58px"></td>
         <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
         <td class="num">${st.missed}</td>
@@ -643,6 +643,11 @@
       input.value = '';
       await refreshLite();
       await refreshNotify();
+      // 연속 참여(🔥)는 업로드할 때마다 앞 시즌 명단과 맞춰 자동으로 채운다
+      if (pAdded.length) {
+        const fire = await recalcStreaks({ silent: true });
+        if (fire) msg($('rosterCsvMsg'), `${parts.join(' · ')} · 🔥 연속 참여 ${fire}명`, 'ok');
+      }
     } catch (e) {
       msg($('rosterCsvMsg'), `업로드 실패: ${esc(e.message)}`, 'bad');
     } finally {
@@ -1226,12 +1231,14 @@
     return { byEmail, byName };
   }
 
-  async function recalcStreaks() {
+  /** silent: 명단 업로드 직후 자동 실행 — 묻지 않고 저장, 바뀐 수를 돌려준다 */
+  async function recalcStreaks(opts) {
+    const silent = !!(opts && opts.silent);
     const at = CS.SEASONS.findIndex((x) => x.id === CONFIG.seasonId);
     const fromId = CS.COMMON.streakFromSeason;
     const from = fromId ? CS.SEASONS.findIndex((x) => x.id === fromId) : 0;
     const prior = CS.SEASONS.slice(Math.max(0, from), at).reverse(); // 가까운 시즌부터
-    if (!prior.length) { msg($('streakMsg'), '이 시즌 앞에 이어서 셀 시즌이 없습니다.', 'warn'); return; }
+    if (!prior.length) { if (!silent) msg($('streakMsg'), '이 시즌 앞에 이어서 셀 시즌이 없습니다.', 'warn'); return 0; }
     const btn = $('streakRecalc');
     btn.disabled = true;
     try {
@@ -1248,10 +1255,10 @@
       });
       const changes = all.filter((c) => (c.p.seasonStreak || 1) !== c.streak);
       const cont = all.filter((c) => c.streak > 1).length;
-      if (!changes.length) { msg($('streakMsg'), `이미 맞습니다 — 연속 참여 ${cont}명.`, 'ok'); return; }
+      if (!changes.length) { if (!silent) msg($('streakMsg'), `이미 맞습니다 — 연속 참여 ${cont}명.`, 'ok'); return 0; }
       const up = changes.filter((c) => c.streak > 1);
-      if (!confirm(`앞 시즌(${prior.map((s) => s.book.name).join(' · ')}) 명단과 맞춰 ${changes.length}명의 연속 참여 수를 바꿀까요?\n`
-        + `🔥 붙는 분 ${up.length}명${changes.length - up.length ? ` · 배지 빠지는 분 ${changes.length - up.length}명` : ''}`)) return;
+      if (!silent && !confirm(`앞 시즌(${prior.map((s) => s.book.name).join(' · ')}) 명단과 맞춰 ${changes.length}명의 연속 참여 수를 바꿀까요?\n`
+        + `🔥 붙는 분 ${up.length}명${changes.length - up.length ? ` · 배지 빠지는 분 ${changes.length - up.length}명` : ''}`)) return 0;
       let done = 0;
       for (const c of changes) {
         await Store.updateParticipant(c.p.id, { seasonStreak: c.streak });
@@ -1260,10 +1267,12 @@
         btn.textContent = `🔥 저장 중… ${done}/${changes.length}`;
       }
       const list = up.map((c) => `${esc(c.p.nickname)} 🔥${c.streak}`).join(', ');
-      msg($('streakMsg'), `${done}명 바꿨습니다.${list ? ` ${list}` : ''}`, 'ok');
+      msg($('streakMsg'), `${silent ? '명단 업로드 — 연속 참여 자동 계산: ' : ''}${done}명 바꿨습니다.${list ? ` ${list}` : ''}`, 'ok');
       await refreshLite();
+      return up.length;
     } catch (e) {
       msg($('streakMsg'), `계산하지 못했습니다: ${esc(e.message)}`, 'bad');
+      return 0;
     } finally {
       btn.disabled = false;
       btn.textContent = '🔥 연속 참여 다시 계산';
@@ -2173,7 +2182,7 @@
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
     $('giftExtraAdd').addEventListener('click', addGiftExtras);
-    $('streakRecalc').addEventListener('click', recalcStreaks);
+    $('streakRecalc').addEventListener('click', () => recalcStreaks());
     $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);
     $('giftScheduleCancel').addEventListener('click', cancelGiftSchedule);
     $('importJson').addEventListener('click', importJson);
