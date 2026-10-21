@@ -283,6 +283,13 @@ body.app {
 /* ── 하단 탭바 ── 기본은 숨김(넓은 화면) */
 .tabbar { display: none; }
 
+/* 지난 시즌 둘러보기(읽기 전용) — 책 소개 · 인증 피드 · 명예의 전당만 보인다.
+   인증·내 현황 화면, 규칙(킥아웃 등), 전체 진행현황(누락 인원)은 감춘다. */
+.season-browse #rulesCard, .season-browse #overallCard,
+.season-browse #pane-certify, .season-browse #pane-me,
+.season-browse .tabbar [data-go="certify"], .season-browse .tabbar [data-go="me"] { display: none !important; }
+@media (max-width: 899px) { .app.season-browse .tabbar { grid-template-columns: repeat(3, 1fr); } }
+
 @media (max-width: 899px) {
   .app .top { position: sticky; top: 0; z-index: 30; margin-bottom: 12px; }
   .app.has-tabs .navlinks { display: none; }        /* 운영진 링크는 [내 현황] 맨 아래로 */

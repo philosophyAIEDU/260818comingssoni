@@ -1358,6 +1358,9 @@
     }
 
     READONLY = true;
+    // 지난 시즌 둘러보기에서는 책 소개 · 인증 피드 · 명예의 전당만 — 누락·킥아웃·진행현황·개인 현황은 감춘다
+    document.body.classList.add('season-browse');
+    if (!['info', 'feed', 'fame'].includes((location.hash || '').slice(1))) location.hash = 'info';
     msg(banner, `<strong>지난 시즌 『${esc(CONFIG.book.name)}』 둘러보기</strong> · 읽기 전용<br>`
       + '그때 멤버들이 남긴 인사이트를 [피드]에서 볼 수 있어요. '
       + '<a href="index.html#info">지금 시즌으로 돌아가기</a>', 'warn');
@@ -1461,7 +1464,7 @@
     //  이름을 골라도 아무 일이 안 일어났다)
     await refreshSocialFeed();
     await calculateRanksAndFame();
-    await paintOverall();
+    if (!READONLY) await paintOverall();
 
     // 실시간 동기화
     window.addEventListener('storage', async (e) => {
