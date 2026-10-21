@@ -32,7 +32,7 @@ function getTransporter() {
  * 한 통마다 새로 연결하면 3초쯤 걸려 함수 제한 시간 안에 두세 통밖에 못 보냈다(2026-10-21).
  * 다 보낸 뒤 closePool()로 닫는다(다음 실행 때 끊긴 연결을 다시 쓰지 않게). */
 function getPool() {
-  if (!pooled) pooled = nodemailer.createTransport({ service: 'gmail', auth: credentials(), pool: true, maxConnections: 1, maxMessages: 200 });
+  if (!pooled) pooled = nodemailer.createTransport({ service: 'gmail', auth: credentials(), pool: true, maxConnections: 4, maxMessages: 200 });
   return pooled;
 }
 function closePool() {

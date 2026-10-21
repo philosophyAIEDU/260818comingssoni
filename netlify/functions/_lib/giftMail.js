@@ -16,6 +16,7 @@ const { U, MailTemplates, collectionName, currentConfig } = require('./appLogic'
 
 const GIFT_FROM_NAME = '커밍쏜';
 const GIFT_REPLY_TO = 'comingssoni@gmail.com';
+const GIFT_CONCURRENCY = 4; // 동시에 보내는 통 수(지메일 연결 수와 같게)
 
 const col = (name) => getDb().collection(collectionName(name));
 const metaDoc = () => getDb().collection(collectionName('meta')).doc('app');
@@ -53,13 +54,17 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
   let sent = 0, skippedAlready = 0, skippedNoEmail = 0, extrasSent = 0, remaining = 0;
   const failures = [];
   const eligibleEmails = new Set();
+  // 보낼 사람을 먼저 추리고, 연결 4개로 동시에 보낸다(한 통씩 차례로 보내면 함수 제한 시간 안에 몇 통 못 보낸다)
+  const queue = [];
   for (const s of eligible) {
     const p = s.participant;
     const email = resolveEmailFor(p, notifyEmails);
     if (email) eligibleEmails.add(email.toLowerCase());
     if (p.giftSentAt && !resend) { skippedAlready++; continue; }
     if (!email) { skippedNoEmail++; continue; }
-    if (outOfTime()) { remaining++; continue; }
+    queue.push({ s, p, email });
+  }
+  const sendOne = async ({ s, p, email }) => {
     const vars = {
       이름: p.nickname, 누락횟수: s.missed, 책이름: CONFIG.book.name, 일수: days,
       라이브횟수: liveCount, 정리본링크: link, 앱주소: CONFIG.appUrl
@@ -76,8 +81,13 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
       failures.push({ id: p.id, nickname: p.nickname, error: err.message });
       await col('participants').doc(p.id).update({ giftError: String(err.message).slice(0, 200) }).catch(() => {});
     }
-    await sleep(100);
-  }
+  };
+  let next = 0;
+  const worker = async () => {
+    while (next < queue.length && !outOfTime()) await sendOne(queue[next++]);
+  };
+  await Promise.all(Array.from({ length: GIFT_CONCURRENCY }, worker));
+  remaining += queue.length - next;
 
   // 운영진이 추가한 받는 사람 — 대상자와 겹치지 않는 사람에게만
   let extrasChanged = false;
