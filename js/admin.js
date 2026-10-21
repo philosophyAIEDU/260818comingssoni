@@ -793,6 +793,68 @@
     $('noticeStatus').textContent = '자동 생성 문구로 다시 채웠습니다 ([저장]을 눌러야 반영됩니다).';
   }
 
+  /* 여러 날짜 한 번에 넣기: 붙여 넣은 글을 날짜별로 잘라 이 시즌 공지 기간 안의 날짜만 저장한다. */
+  function noticeBatchPlan() {
+    const { items, skipped } = U.parseNoticeBatch($('noticeBatchText').value);
+    const lo = $('noticeDate').min, hi = $('noticeDate').max;
+    const saveable = [];
+    for (const it of items) {
+      if (it.date < lo || it.date > hi) {
+        skipped.push({ title: it.title, date: it.date, reason: `이번 시즌 공지 기간(${U.shortLabel(lo)} ~ ${U.shortLabel(hi)}) 밖입니다` });
+      } else {
+        saveable.push(Object.assign({ overwrite: notices.some((n) => n.date === it.date) }, it));
+      }
+    }
+    return { saveable, skipped };
+  }
+
+  function paintNoticeBatch() {
+    const { saveable, skipped } = noticeBatchPlan();
+    const rows = saveable.map((it) => `<li>${esc(U.shortLabel(it.date))}
+        <span class="muted">${esc(it.title)}</span>
+        ${it.overwrite ? '<span class="tag warn">덮어씀</span>' : '<span class="tag ok">새로</span>'}
+        ${it.mismatch ? `<span class="tag bad">날짜는 ${U.dayIndex(it.date)}일차인데 글엔 ${it.dayNo}일차</span>` : ''}</li>`);
+    const bad = skipped.map((x) => `<li class="bad">${x.date ? esc(U.shortLabel(x.date)) + ' ' : ''}${esc(x.title)} — ${esc(x.reason)} (저장 안 함)</li>`);
+    $('noticeBatchList').innerHTML = (saveable.length || skipped.length)
+      ? `<p><strong>${saveable.length}일치</strong>를 저장합니다${skipped.length ? ` · 건너뛰는 ${skipped.length}건` : ''}</p>` +
+        `<ul class="batch-list">${rows.join('')}${bad.join('')}</ul>`
+      : '<p class="muted">읽을 수 있는 공지가 없습니다. 날짜 줄(예: 2026년 10월 21일)이 들어 있는지 확인해 주세요.</p>';
+    return { saveable, skipped };
+  }
+
+  async function saveNoticeBatch() {
+    const { saveable, skipped } = paintNoticeBatch();
+    if (!saveable.length) { msg($('noticeBatchMsg'), '저장할 공지가 없습니다.', 'warn'); return; }
+    const over = saveable.filter((x) => x.overwrite).length;
+    const wrong = saveable.filter((x) => x.mismatch).length;
+    if (!confirm(`${saveable.length}일치 공지문을 저장합니다.` +
+      (over ? `\n이미 저장된 ${over}일치는 덮어씁니다.` : '') +
+      (wrong ? `\n⚠ ${wrong}건은 날짜와 "N일차"가 안 맞습니다.` : '') +
+      (skipped.length ? `\n건너뛰는 ${skipped.length}건은 저장되지 않습니다.` : '') + '\n계속할까요?')) return;
+
+    const btn = $('noticeBatchSave');
+    btn.disabled = true;
+    const old = btn.textContent;
+    const failed = [];
+    try {
+      for (let i = 0; i < saveable.length; i++) {
+        btn.textContent = `저장 중… ${i + 1}/${saveable.length}`;
+        try { await Store.setNotice(saveable[i].date, saveable[i].text); }
+        catch (e) { failed.push(`${U.shortLabel(saveable[i].date)}: ${e.message}`); }
+      }
+      noticeDirty = false;
+      await refreshNotices();
+      loadNoticeForDate();
+      paintNoticeBatch();
+      msg($('noticeBatchMsg'), failed.length
+        ? `${saveable.length - failed.length}일치 저장, 실패 ${failed.length}건 — ${esc(failed.join(' / '))}`
+        : `${saveable.length}일치 공지문을 모두 저장했습니다.`, failed.length ? 'bad' : 'ok');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  }
+
   async function deleteNotice() {
     const date = $('noticeDate').value || U.today();
     if (!confirm(`${U.longLabel(date)}에 저장해 둔 공지문을 삭제하고 자동 생성 문구로 되돌릴까요?`)) return;
@@ -2155,6 +2217,8 @@
     $('noticeSave').addEventListener('click', saveNotice);
     $('noticeDelete').addEventListener('click', deleteNotice);
     $('copyNotice').addEventListener('click', (e) => copyText($('noticeOut').value, e.target));
+    $('noticeBatchPreview').addEventListener('click', paintNoticeBatch);
+    $('noticeBatchSave').addEventListener('click', saveNoticeBatch);
 
     $('applyFilter').addEventListener('click', paintEntries);
     $('fKeyword').addEventListener('keydown', (e) => { if (e.key === 'Enter') paintEntries(); });
