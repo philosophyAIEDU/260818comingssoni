@@ -247,6 +247,51 @@ CS.U = (function () {
     return { cls: 'ok', label: '참여중' };
   }
 
+  /* ── 이번 주 시상(인기 게시자·메신저) ──────────────
+   * 한 주는 월~토. 일요일 0시(KST)가 되면 막 끝난 주가 발표되고, 다음 일요일까지 그대로 보인다.
+   * 시즌 기간 밖 날짜는 빼고 센다(시즌 첫 주·마지막 주는 며칠짜리일 수 있다). */
+  function lastAwardWeek(todayIso) {
+    const t = todayIso || today();
+    const sat = addDays(t, -(toDate(t).getUTCDay() + 1)); // 일→어제, 월→그저께 … 토→지난 토요일
+    const from = addDays(sat, -5) < CS.CONFIG.startDate ? CS.CONFIG.startDate : addDays(sat, -5);
+    const to = sat > CS.CONFIG.endDate ? CS.CONFIG.endDate : sat;
+    return from <= to ? { from, to } : null;
+  }
+
+  /** 기간 안의 글로 두 상을 뽑는다(동점이면 모두).
+   *  인기 게시자 — 받은 엄지척 합계가 가장 많은 사람. people = 눌러 준 서로 다른 사람 수.
+   *  메신저 — 남의 글을 [텍스트 복사]한 글 수가 가장 많은 사람. authors = 그 글의 서로 다른 작성자 수. */
+  function weeklyAwards(subs, range, participants) {
+    if (!range) return { popular: [], messenger: [] };
+    const nick = new Map((participants || []).map((p) => [p.id, p.nickname]));
+    const likes = new Map();
+    const copies = new Map();
+    for (const s of subs) {
+      if (s.date < range.from || s.date > range.to) continue;
+      const l = likes.get(s.participantId) || { participantId: s.participantId, nickname: nick.get(s.participantId) || s.nickname, likes: 0, voters: new Set() };
+      l.likes += s.upvotes || 0;
+      (s.upvotedBy || []).forEach((c) => l.voters.add(c));
+      likes.set(s.participantId, l);
+      for (const pid of s.copiedBy || []) {
+        if (pid === s.participantId || !nick.has(pid)) continue;
+        const c = copies.get(pid) || { participantId: pid, nickname: nick.get(pid), posts: 0, authorSet: new Set() };
+        c.posts += 1;
+        c.authorSet.add(s.participantId);
+        copies.set(pid, c);
+      }
+    }
+    const top = (list, key) => {
+      const max = list.reduce((m, x) => Math.max(m, x[key]), 0);
+      return max > 0 ? list.filter((x) => x[key] === max).sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko')) : [];
+    };
+    return {
+      popular: top([...likes.values()], 'likes')
+        .map(({ participantId, nickname, likes: n, voters }) => ({ participantId, nickname, likes: n, people: voters.size })),
+      messenger: top([...copies.values()], 'posts')
+        .map(({ participantId, nickname, posts, authorSet }) => ({ participantId, nickname, posts, authors: authorSet.size }))
+    };
+  }
+
   /* ── 아이콘 ────────────────────────────
    * 이모지 대신 쓰는 미니멀 선(stroke) 아이콘. 색은 글자색(currentColor)을 따라가고
    * 크기는 em 기준이라 버튼 글씨 크기에 맞춰 자연스럽게 커지고 작아진다. */
@@ -282,6 +327,7 @@ CS.U = (function () {
     nowParts, today, secondsToMidnight, addDays, dateRange, diffDays,
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
-    normalizeNick, deadlineInstant, isLate, statusFor, buildStats, riskTag, pad2
+    normalizeNick, deadlineInstant, isLate, statusFor, buildStats, riskTag, pad2,
+    lastAwardWeek, weeklyAwards
   };
 })();

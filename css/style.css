@@ -631,6 +631,11 @@ footer.foot {
 .feed-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
 .feed-head h2 { margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .feed-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 이번 주 인기 게시자 · 메신저 — 피드 맨 위 공지 */
+.weekly-awards { margin: 10px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--warn-soft); border: 1px solid var(--warn); display: grid; gap: 10px; }
+.weekly-awards .award-range { font-size: 12px; font-weight: 700; color: var(--text-dim); }
+.weekly-awards .award-kind { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.weekly-awards .award p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); word-break: keep-all; }
 button.ghost { background: transparent; }
 
 /* 인증 피드 탭 — "전체 보기"는 새 창(feed-all.html)으로 랜딩되는 링크 */

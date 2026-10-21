@@ -2340,6 +2340,72 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     await d.close();
   }
 
+  // ── 이번 주 인기 게시자 · 메신저: 일요일 0시에 지난주(월~토) 결과가 피드 맨 위에 ──
+  {
+    const dow = new Date(today + 'T00:00:00Z').getUTCDay();
+    const sat = shift(-(dow + 1)); // 가장 최근에 끝난 주의 토요일
+    const dayOf = (n) => { const d = new Date(sat + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const mon = dayOf(-5);
+    const wCtx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+    await wCtx.route('**/js/config.js', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text())
+        .replace(/startDate: '[^']+'/, `startDate: '${dayOf(-12)}'`)
+        .replace(/endDate: '[^']+'/, `endDate: '${shift(10)}'`)
+        .replace(/backend: '[^']+'/, `backend: 'local'`);
+      await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    });
+    const parts = ['인기왕', '전달왕', '보통'].map((n, i) => ({ id: 'w' + i, nickname: n, status: 'active', createdAt: `${dayOf(-12)}T00:00:00.000Z` }));
+    const sub = (id, pid, date, upvotedBy, copiedBy) => ({
+      id, participantId: pid, nickname: parts.find((p) => p.id === pid).nickname, date, sentence: '문장', reflection: '느낀 점',
+      upvotes: upvotedBy.length, upvotedBy, copiedBy, createdAt: `${date}T05:00:00.000Z`, updatedAt: `${date}T05:00:00.000Z`
+    });
+    const subs = [
+      sub('a1', 'w0', mon, ['c1', 'c2', 'c3'], ['w1']),
+      sub('a2', 'w0', dayOf(-3), ['c1', 'c2'], []),
+      sub('b1', 'w1', dayOf(-2), ['c1'], []),
+      sub('c1', 'w2', dayOf(-1), ['c4'], ['w1']),
+      sub('c2', 'w2', dayOf(-6), ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'], ['w0']), // 그 전 주 일요일 — 이번 집계 밖
+      sub('t1', 'w2', today, [], [])
+    ];
+    await wCtx.addInitScript(({ parts, subs }) => {
+      if (sessionStorage.getItem('seeded')) return; // 다시 불러와도 복사 기록이 지워지지 않게 한 번만 심는다
+      sessionStorage.setItem('seeded', '1');
+      const K = 'comingsoon.reading.v1';
+      localStorage.setItem(K + '.participants', JSON.stringify(parts));
+      localStorage.setItem(K + '.submissions', JSON.stringify(subs));
+      localStorage.setItem(K + '.meta', JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' }));
+    }, { parts, subs });
+    const w = await wCtx.newPage();
+    w.on('pageerror', (e) => errs.push('pageerror(weekly): ' + e.message));
+    w.on('dialog', (d) => d.accept());
+    await w.goto(BASE + '/index.html');
+    await w.waitForTimeout(600);
+    const box = (await w.isVisible('#weeklyAwards')) ? await w.textContent('#weeklyAwards') : '';
+    t('지난주 결과가 인증 피드 맨 위에 보임', !!box, box);
+    t('인기 게시자 문구 — 받은 엄지척이 가장 많은 사람, 눌러 준 사람 수',
+      box.includes('이번 주의 인기 게시자로 인기왕님이 선정되셨습니다. 1주일간 3분에게 좋아요를 받으셨습니다. 앞으로도 좋은 인사이트 공유해주세요. 감사합니다. 인기왕님'), box);
+    t('메신저 문구 — 남의 글을 가장 많이 복사한 사람, 공유한 글의 작성자 수',
+      box.includes('이번 주의 메신저로 전달왕님이 선정되셨습니다. 1주일간 2분의 글을 공유해주셨습니다. 덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 전달왕님.'), box);
+    t('지난주 밖(그 전 주) 글의 엄지척은 세지 않음', !box.includes('보통님이 선정'), box);
+
+    // 이름을 고른 기기에서 남의 글을 [텍스트 복사]하면 그 글에 복사한 사람이 남는다
+    await w.evaluate(() => { navigator.clipboard.writeText = () => Promise.resolve(); });
+    await w.selectOption('#participant', { label: '보통' });
+    await w.waitForTimeout(400);
+    await w.locator('#socialFeedList .share-btn[data-id="a2"]').click();
+    await w.waitForTimeout(300);
+    await w.locator('#socialFeedList .share-btn[data-id="t1"]').click(); // 본인 글
+    await w.waitForTimeout(300);
+    const stored = await w.evaluate(() => JSON.parse(localStorage.getItem('comingsoon.reading.v1.submissions')));
+    t('남의 글을 복사하면 그 글에 복사한 사람이 기록됨',
+      JSON.stringify(stored.find((s) => s.id === 'a2').copiedBy) === JSON.stringify(['w2']), stored.find((s) => s.id === 'a2'));
+    t('본인 글 복사는 기록하지 않음', !(stored.find((s) => s.id === 't1').copiedBy || []).length, stored.find((s) => s.id === 't1'));
+    t('고른 이름은 이 기기에 기억됨(전체 보기 창에서도 같은 이름으로 셈)',
+      (await w.evaluate(() => localStorage.getItem('comingsoon.reading.v1.me'))) === 'w2');
+    await wCtx.close();
+  }
+
   await page.screenshot({ path: (process.env.SHOT_DIR || '.') + '/admin.png', fullPage: true });
   await m.screenshot({ path: (process.env.SHOT_DIR || '.') + '/mobile.png', fullPage: true });
 

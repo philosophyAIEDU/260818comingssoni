@@ -229,6 +229,13 @@ CS.FirebaseStore = (function () {
     });
   }
 
+  /** 남의 글을 [텍스트 복사]한 참여자를 그 글에 남긴다(이번 주 메신저 집계용).
+   *  읽기 없이 쓰기 1번 — arrayUnion이라 같은 사람이 같은 글을 여러 번 복사해도 한 번만 남는다. */
+  async function recordCopy(id, participantId) {
+    await init();
+    await fs.updateDoc(docRef('submissions', id), { copiedBy: fs.arrayUnion(participantId) });
+  }
+
   /** 추천 취소 (본인이 눌렀던 엄지척을 되돌린다) */
   async function unvoteSubmission(id, clientId) {
     await init();
@@ -380,7 +387,7 @@ CS.FirebaseStore = (function () {
     name: 'firebase',
     init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
+    removeSubmission, upvoteSubmission, unvoteSubmission, recordCopy, getMeta, setMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser, getIdToken,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
