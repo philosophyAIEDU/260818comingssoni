@@ -19,10 +19,13 @@ let pass = 0, fail = 0;
  * lockAt도 함께 지운다. 시즌0의 잠금 시각이 지나고 나면 인증 화면이 아예 열리지 않아
  * (그게 맞는 동작이다) 아래 테스트가 전부 빈 화면을 보게 된다. 잠금 동작 자체는
  * logic 테스트와 별도 확인에서 본다. */
-const pinSeason = (body) => body
+const NO_AWARD_POPUP = "\ntry { localStorage.setItem(CS.CONFIG.storagePrefix + '.awardSeen', '9999-12-31'); } catch (e) {}\n";
+const pinSeason = (body, opts) => body
   .replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)',
     "CS.pickSeason(CS.seasonNowKST(), 's1')")
-  .replace(/lockAt: '[^']*'/g, 'lockAt: null');
+  .replace(/lockAt: '[^']*'/g, 'lockAt: null')
+  // 이번 주 시상 축하 카드는 화면 전체를 덮는 팝업이라, 그걸 보는 테스트 말고는 "이미 봤음"으로 둔다.
+  + ((opts && opts.awardPopup) ? '' : NO_AWARD_POPUP);
 const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console.log('  FAIL', n, x === undefined ? '' : JSON.stringify(x)));
 
 (async () => {
@@ -2043,7 +2046,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
                .replace("endDate: '2026-10-18'", `endDate: '${end}'`)
                .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${grade}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: body + NO_AWARD_POPUP, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   };
   const s2Ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await s2Ctx.route('**/js/config.js', s2Route(shift(-6), shift(21), shift(-5)));
@@ -2145,7 +2148,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
                .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${shift(-29)}'`)
                .replace("retroUntil: '2026-10-20'", `retroUntil: '${shift(2)}'`)
                .replace(/backend: '[^']+'/, `backend: 'local'`);
-    await route.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+    await route.fulfill({ response: res, body: body + NO_AWARD_POPUP, headers: { ...res.headers(), 'content-type': 'application/javascript' } });
   });
   {
     const rp = await retroCtx.newPage();
@@ -2353,7 +2356,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
         .replace(/startDate: '[^']+'/, `startDate: '${dayOf(-12)}'`)
         .replace(/endDate: '[^']+'/, `endDate: '${shift(10)}'`)
         .replace(/backend: '[^']+'/, `backend: 'local'`);
-      await route.fulfill({ response: res, body: pinSeason(body), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
+      await route.fulfill({ response: res, body: pinSeason(body, { awardPopup: true }), headers: { ...res.headers(), 'content-type': 'application/javascript' } });
     });
     const parts = ['인기왕', '전달왕', '보통'].map((n, i) => ({ id: 'w' + i, nickname: n, status: 'active', createdAt: `${dayOf(-12)}T00:00:00.000Z` }));
     const sub = (id, pid, date, upvotedBy, copiedBy) => ({
@@ -2388,6 +2391,35 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('메신저 문구 — 남의 글을 가장 많이 복사한 사람, 공유한 글의 작성자 수',
       box.includes('이번 주의 메신저로 전달왕님이 선정되셨습니다. 1주일간 2분의 글을 공유해주셨습니다. 덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 전달왕님.'), box);
     t('지난주 밖(그 전 주) 글의 엄지척은 세지 않음', !box.includes('보통님이 선정'), box);
+
+    // 처음 들어오면 축하 카드가 화면 가득 뜬다 — 육각형 메달 숫자 = "N분"
+    t('이번 주 발표를 처음 보면 축하 카드가 뜸', await w.isVisible('#awardModal'));
+    const cards = w.locator('#awardModal .award-card');
+    t('상마다 카드 한 장(인기 게시자 · 메신저)', (await cards.count()) === 2, await cards.count());
+    t('인기 게시자 카드: 메달 숫자 = 좋아요 눌러 준 사람 수, 이름·문구',
+      (await cards.nth(0).locator('.award-num').textContent()) === '3'
+      && (await cards.nth(0).textContent()).includes('인기왕님')
+      && (await cards.nth(0).textContent()).includes('1주일간 3분에게 좋아요를 받으셨습니다'), await cards.nth(0).textContent());
+    t('메신저 카드: 메달 숫자 = 공유한 글의 작성자 수',
+      (await cards.nth(1).locator('.award-num').textContent()) === '2'
+      && (await cards.nth(1).textContent()).includes('전달왕님'), await cards.nth(1).textContent());
+    t('여러 장이면 넘김 표시 점이 보임', (await w.locator('#awardModal .award-dots span').count()) === 2);
+    const cardBox = await cards.nth(0).boundingBox();
+    t('카드가 화면 폭 안에 들어옴', !!cardBox && cardBox.width <= 400 && cardBox.x >= 0, cardBox);
+    await w.click('#awardModal .award-close');
+    await w.waitForTimeout(200);
+    t('닫기를 누르면 사라짐', !(await w.isVisible('#awardModal')));
+    await w.reload();
+    await w.waitForTimeout(600);
+    t('같은 주에는 다시 들어와도 또 뜨지 않음', !(await w.isVisible('#awardModal')));
+    await w.click('#weeklyAwards [data-award="1"]');
+    await w.waitForTimeout(400);
+    t('피드의 [축하 카드 보기]로 다시 볼 수 있음(누른 상의 카드부터)', await w.isVisible('#awardModal')
+      && (await w.locator('#awardModal .award-dots span.on').count()) === 1
+      && (await w.locator('#awardModal .award-dots span').nth(1).getAttribute('class')) === 'on');
+    await w.keyboard.press('Escape');
+    await w.waitForTimeout(200);
+    t('Esc로도 닫힘', !(await w.isVisible('#awardModal')));
 
     // 이름을 고른 기기에서 남의 글을 [텍스트 복사]하면 그 글에 복사한 사람이 남는다
     await w.evaluate(() => { navigator.clipboard.writeText = () => Promise.resolve(); });
