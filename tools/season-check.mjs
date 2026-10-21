@@ -13,8 +13,33 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { renderSeason, compareWith } from './season-render.mjs';
+import { seasonObjectSrc } from './lib/season-app.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** 표지 최소 가로 — 앱 116px(레티나 3배 ≈ 350px)·인증 카드 480px·노션 본문 폭(약 700px)에서 깨지지 않는 크기 */
+const COVER_MIN_W = 800;
+
+/** jpg·png·webp 머리에서 가로·세로만 읽는다(이미지 라이브러리 없이) */
+function imageSize(b) {
+  if (b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+    return null;
+  }
+  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') {
+    const t = b.toString('ascii', 12, 16);
+    if (t === 'VP8X') return { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
+    if (t === 'VP8 ') return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+    if (t === 'VP8L') { const n = b.readUInt32LE(21); return { w: (n & 0x3fff) + 1, h: ((n >> 14) & 0x3fff) + 1 }; }
+  }
+  return null;
+}
 
 /** config.js·utils.js는 브라우저용이라 window에 얹힌다. 샌드박스에서 그대로 불러온다. */
 function loadCS() {
@@ -30,6 +55,7 @@ function loadCS() {
 const CS = loadCS();
 let fail = 0;
 const results = [];
+const warns = []; // 막지는 않지만 사람이 봐야 하는 것
 const check = (season, name, ok, detail) => {
   results.push({ season, name, ok, detail });
   if (!ok) fail++;
@@ -187,6 +213,42 @@ CS.SEASONS.forEach((s, i) => {
     check(L, '일자별 분량(readingPlan)이 config.js와 같다', !spec.readingPlan || same(spec.readingPlan, s.readingPlan),
       '앱을 고쳤으면 시즌 설명서에도 옮겨 주세요');
     check(L, '발제문(weeklyPrompts)이 config.js와 같다', !spec.weeklyPrompts || same(spec.weeklyPrompts, s.weeklyPrompts));
+    // 앱 시즌 객체 전체 = 앱 상수 틀(tools/lib/season-app.mjs) + 이 설명서. config에서 손으로 고친 문구가
+    // 틀·설명서에 안 옮겨져 있으면 다음 시즌에 옛 문구로 돌아가니 여기서 잡는다.
+    // 시즌 중에 바뀌는 값(lockAt — 다음 시즌이 넣는다, giftMail.link — 정리본이 나오면 채운다)은 빼고 본다.
+    if (spec.pages) {
+      const gen = vm.runInNewContext('(' + seasonObjectSrc(spec).replace(/^,\s*/, '').replace(/\];\s*$/, '') + ')');
+      const norm = (o) => JSON.parse(JSON.stringify(o, (k, v) => {
+        if (v === Infinity) return 'Infinity';
+        // 노션 공개 주소는 제목 슬러그(…/10-<ID>)가 있어도 없어도 같은 페이지 — 페이지 ID로만 견준다
+        if (typeof v === 'string' && /notion\.site\//.test(v)) return v.replace(/\/[^/]*-?([0-9a-f]{32})$/, '/$1');
+        return v;
+      }));
+      const a = norm(Object.assign({}, gen, { lockAt: null, giftMail: Object.assign({}, gen.giftMail, { link: '' }) }));
+      const b = norm(Object.assign({}, s, { lockAt: null, giftMail: Object.assign({}, s.giftMail, { link: '' }) }));
+      const firstDiff = (x, y, path = '') => {
+        if (JSON.stringify(x) === JSON.stringify(y)) return null;
+        if (x && y && typeof x === 'object' && typeof y === 'object') {
+          for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+            const d = firstDiff(x[k], y[k], path ? `${path}.${k}` : k);
+            if (d) return d;
+          }
+        }
+        return `${path}: 틀+설명서 「${JSON.stringify(x)}」 / config 「${JSON.stringify(y)}」`;
+      };
+      const d = firstDiff(a, b);
+      check(L, '앱 시즌 객체 = 앱 상수 틀(season-app) + 시즌 설명서', !d, d && d.slice(0, 400));
+    }
+    // 표지 — 노션·인증 카드에서 크게 쓰여도 깨지지 않게 가로 800px 이상(시즌운영매뉴얼 「표지 이미지」)
+    if (s.book && s.book.cover && existsSync(join(root, s.book.cover))) {
+      const dim = imageSize(readFileSync(join(root, s.book.cover)));
+      const ok = !!dim && dim.w >= COVER_MIN_W;
+      const name = `표지 해상도 가로 ${COVER_MIN_W}px 이상 (${s.book.cover})`;
+      const detail = dim ? `지금 ${dim.w}×${dim.h} — 서점 이미지 서버 원본으로 바꿔 주세요` : '크기를 읽지 못함(jpg·png·webp만)';
+      // 준비 중인(아직 안 켜진) 시즌은 막고, 이미 진행 중인 시즌은 경고만 — 진행 중 시즌 때문에 다음 시즌 준비가 막히지 않게
+      if (!s.startsAt || s.startsAt <= CS.seasonNowKST()) { if (!ok) warns.push(`${L} · ${name} → ${detail}`); }
+      else check(L, name, ok, detail);
+    }
     const arch = existsSync(archiveDir) && readdirSync(archiveDir).find((d) => d.startsWith(spec.id + '-'));
     if (!arch || !spec.pages) continue; // 템플릿 이전 시즌(s1·s2)은 대조하지 않는다
     const { docs, leftovers } = renderSeason(spec);
@@ -206,6 +268,7 @@ for (const r of results) {
   if (r.season !== cur) { cur = r.season; console.log(`\n── ${cur} ──`); }
   if (!r.ok) console.log(`  ✗ ${r.name}${r.detail ? '  → ' + r.detail : ''}`);
 }
+if (warns.length) console.log('\n⚠ 확인 필요\n' + warns.map((w) => '  · ' + w).join('\n'));
 const pass = results.length - fail;
 console.log(fail ? `\n✗ ${fail}건 실패 / ${pass}건 통과` : `\n✓ 시즌 검사 전부 통과 (${pass}건)`);
 process.exit(fail ? 1 : 0);

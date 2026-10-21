@@ -166,7 +166,8 @@ export function seasonVars(spec) {
     '다음월': `${+addMonths(startDate, 1).slice(5, 7)}월`,
     '책이름': book.name,
     '은는': josaEunNeun(book.name || ''),
-    '책소개': book.desc,
+    // 앱 책 소개의 \n은 넓은 화면 줄바꿈 자리 — 카톡 공지에서는 한 문단으로 잇는다
+    '책소개': String(book.desc || '').replace(/\s*\n\s*/g, ' '),
     '저자표기': book.byline,
     '책표지URL': book.coverUrl,
     '일수': String(days),
