@@ -952,8 +952,8 @@
   }
 
   /* ── 이번 주 인기 게시자 · 메신저 ──────────
-   * 일요일 0시(KST)가 되면 막 끝난 주(월~토)의 두 상을 발표한다. 그 주에 처음 들어오면 축하 카드가
-   * 화면 가득 한 번 뜨고(기기마다 한 주에 한 번), 피드 맨 위에는 다음 일요일까지 요약이 남아 다시 볼 수 있다.
+   * 일요일 0시(KST)가 되면 막 끝난 주(월~토)의 두 상을 발표한다. 그 주에 처음 들어오면 두 상을 한 장에
+   * 담은 축하 카드가 화면 가득 한 번 뜨고(기기마다 한 주에 한 번), 피드 맨 위에는 다음 일요일까지 요약이 남는다.
    * 피드가 이미 읽어 둔 전체 기록(allSubsCache)으로 계산하므로 Firestore를 따로 읽지 않는다. */
   const AWARD_SEEN_KEY = `${CONFIG.storagePrefix}.awardSeen`;
   let awardItems = [];
@@ -976,40 +976,55 @@
     ];
   }
 
-  /** 육각형 메달 + 가운데 숫자 + 둘레의 반짝이. 숫자는 "N분"의 N. */
-  function awardBadge(item, i) {
+  /** 올림픽 메달 — 엇갈린 리본에 매달린 둥근 금메달, 테두리 안쪽에 월계수, 가운데 숫자("N분"의 N).
+   *  리본 색으로 상을 구분한다(인기 게시자 빨강 · 메신저 파랑). */
+  function awardMedal(item, i) {
+    const ribbon = item.kind === 'popular' ? ['#d62839', '#a3162a'] : ['#1f6fd1', '#14509c'];
+    const cx = 80, cy = 146;
+    const leaves = [];
+    const leaf = (deg) => {
+      const r = 37, a = deg * Math.PI / 180;
+      const x = (cx + r * Math.cos(a)).toFixed(1), y = (cy + r * Math.sin(a)).toFixed(1);
+      leaves.push(`<ellipse cx="${x}" cy="${y}" rx="5.2" ry="2.3" transform="rotate(${deg + 90 + (deg > 90 && deg < 270 ? -35 : 35)} ${x} ${y})"/>`);
+    };
+    for (let d = 110; d <= 235; d += 18) leaf(d);  // 왼쪽 가지(아래에서 위로)
+    for (let d = 70; d >= -55; d -= 18) leaf(d);   // 오른쪽 가지
     const sp = (x, y, r) => `<path d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z"/>`;
-    return `<div class="award-badge" aria-hidden="true">
-      <svg viewBox="0 0 260 240">
-        <defs><linearGradient id="awardHex${i}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#ffe9a6"/></linearGradient></defs>
-        <g class="award-confetti">
-          ${sp(130, 14, 11)}${sp(36, 112, 10)}${sp(92, 222, 10)}${sp(222, 196, 7)}
-          <circle cx="58" cy="52" r="5"/><circle cx="206" cy="30" r="6"/><circle cx="30" cy="168" r="5"/>
-          <circle cx="232" cy="120" r="5"/><circle cx="172" cy="226" r="4"/><circle cx="160" cy="18" r="4"/>
-          <rect x="84" y="26" width="5" height="15" rx="2.5" transform="rotate(20 86 33)"/>
-          <rect x="214" y="70" width="5" height="15" rx="2.5" transform="rotate(45 216 77)"/>
-          <rect x="18" y="128" width="15" height="5" rx="2.5" transform="rotate(15 25 130)"/>
-          <rect x="196" y="214" width="15" height="5" rx="2.5" transform="rotate(30 203 216)"/>
-          <rect x="54" y="206" width="13" height="5" rx="2.5" transform="rotate(-20 60 208)"/>
-        </g>
-        <polygon class="award-hex-out" points="130,32 208,77 208,167 130,212 52,167 52,77"/>
-        <polygon points="130,46 196,84 196,160 130,198 64,160 64,84" fill="url(#awardHex${i})"/>
-        <rect class="award-pill" x="72" y="104" width="116" height="46" rx="23"/>
-        <text class="award-num" x="130" y="140" text-anchor="middle">${item.count}</text>
-      </svg>
-      <span class="award-star">${U.icon(item.kind === 'popular' ? 'thumb' : 'copy')}</span>
-    </div>`;
+    return `<svg class="award-medal" viewBox="0 0 160 206" aria-hidden="true">
+      <defs>
+        <radialGradient id="medalFace${i}" cx="38%" cy="32%" r="75%">
+          <stop offset="0" stop-color="#fff6c9"/><stop offset=".45" stop-color="#f7cf4b"/><stop offset="1" stop-color="#c58b14"/></radialGradient>
+        <linearGradient id="medalRim${i}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffe58a"/><stop offset=".5" stop-color="#d79c1c"/><stop offset="1" stop-color="#9c6a08"/></linearGradient>
+      </defs>
+      <g class="award-sparkle">${sp(18, 118, 8)}${sp(144, 104, 6)}${sp(146, 190, 7)}<circle cx="16" cy="182" r="3.5"/><circle cx="150" cy="140" r="3"/></g>
+      <polygon points="22,0 56,0 94,96 70,104" fill="${ribbon[1]}"/>
+      <polygon points="31,0 47,0 85,99 77,101" fill="#fff" opacity=".85"/>
+      <polygon points="138,0 104,0 66,96 90,104" fill="${ribbon[0]}"/>
+      <polygon points="129,0 113,0 75,99 83,101" fill="#fff" opacity=".85"/>
+      <rect x="66" y="88" width="28" height="12" rx="3" fill="url(#medalRim${i})"/>
+      <circle cx="${cx}" cy="${cy + 2}" r="54" fill="rgba(0,0,0,.18)"/>
+      <circle cx="${cx}" cy="${cy}" r="54" fill="url(#medalRim${i})"/>
+      <circle cx="${cx}" cy="${cy}" r="46" fill="url(#medalFace${i})"/>
+      <circle cx="${cx}" cy="${cy}" r="46" fill="none" stroke="#a87410" stroke-opacity=".45" stroke-width="1.5"/>
+      <g class="award-laurel">${leaves.join('')}</g>
+      <ellipse cx="62" cy="122" rx="20" ry="9" transform="rotate(-30 62 122)" fill="#fff" opacity=".35"/>
+      <text class="award-num" x="${cx}" y="${cy + 11}" text-anchor="middle">${item.count}<tspan class="award-unit" dx="1">분</tspan></text>
+    </svg>`;
   }
 
-  function awardCardHtml(item, i) {
-    return `<section class="award-card" aria-label="${esc(item.title)}">
+  /** 두 상(동점이면 모두)을 한 장에 나란히 — 넘겨 봐야 하면 첫 장만 보고 닫기 쉽다. */
+  function awardCardHtml() {
+    return `<section class="award-card">
       <div class="award-brand">${esc(CONFIG.title)}</div>
-      <h3 class="award-title">${esc(item.title)}</h3>
-      ${awardBadge(item, i)}
-      <div class="award-who">${CS.Post.avatar(item.nickname)}<span>${esc(item.nickname)}님</span></div>
-      <p class="award-msg">${item.text}</p>
+      <h3 class="award-title">이번 주 시상</h3>
       <div class="award-date">${esc(U.shortLabel(awardRange.from))} ~ ${esc(U.shortLabel(awardRange.to))}</div>
+      <div class="award-podium">${awardItems.map((x, i) => `<div class="award-winner">
+        ${awardMedal(x, i)}
+        <div class="award-kind-label">${esc(x.title.replace('이번 주 ', ''))}</div>
+        <div class="award-who">${CS.Post.avatar(x.nickname)}<span>${esc(x.nickname)}님</span></div>
+      </div>`).join('')}</div>
+      <div class="award-msgs">${awardItems.map((x) => `<p class="award-msg"><span class="award-msg-kind">${x.emoji} ${esc(x.title)}</span>${x.text}</p>`).join('')}</div>
     </section>`;
   }
 
@@ -1022,7 +1037,7 @@
   }
   function awardKeydown(e) { if (e.key === 'Escape') closeAwardModal(); }
 
-  function openAwardModal(start) {
+  function openAwardModal() {
     if (!awardItems.length) return;
     closeAwardModal();
     const m = document.createElement('div');
@@ -1032,23 +1047,12 @@
     m.setAttribute('aria-modal', 'true');
     m.setAttribute('aria-label', '이번 주 시상');
     m.tabIndex = -1;
-    const multi = awardItems.length > 1;
-    m.innerHTML = `
-      ${multi ? `<div class="award-dots">${awardItems.map((_, i) => `<span class="${i === 0 ? 'on' : ''}"></span>`).join('')}</div>` : ''}
-      <button type="button" class="award-close" aria-label="닫기"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
-      <div class="award-track">${awardItems.map(awardCardHtml).join('')}</div>
-      ${multi ? '<div class="award-hint">옆으로 넘겨 보세요</div>' : ''}`;
+    m.innerHTML = `<button type="button" class="award-close" aria-label="닫기"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
+      ${awardCardHtml()}`;
     document.body.appendChild(m);
     document.body.classList.add('award-open');
-    const track = m.querySelector('.award-track');
-    const dots = m.querySelectorAll('.award-dots span');
-    track.addEventListener('scroll', () => {
-      const i = Math.round(track.scrollLeft / track.clientWidth);
-      dots.forEach((d, j) => d.classList.toggle('on', j === i));
-    }, { passive: true });
-    if (start) track.scrollLeft = track.clientWidth * start;
     m.querySelector('.award-close').addEventListener('click', closeAwardModal);
-    m.addEventListener('click', (e) => { if (e.target === m || e.target === track) closeAwardModal(); });
+    m.addEventListener('click', (e) => { if (e.target === m) closeAwardModal(); });
     document.addEventListener('keydown', awardKeydown);
     m.focus(); // 키보드·화면낭독기 초점을 팝업 안으로(닫기 버튼에 테두리가 뜨지 않게 팝업 자체에)
   }
@@ -1061,10 +1065,11 @@
     box.hidden = !awardItems.length;
     box.innerHTML = awardItems.length
       ? `<div class="award-range">${esc(U.shortLabel(awardRange.from))} ~ ${esc(U.shortLabel(awardRange.to))} 이번 주 소식</div>` +
-        awardItems.map((x, i) => `<div class="award"><div class="award-kind">${x.emoji} ${esc(x.title)}</div><p>${x.text}</p>` +
-          `<button type="button" class="small award-open-btn" data-award="${i}">🎉 축하 카드 보기</button></div>`).join('')
+        awardItems.map((x) => `<div class="award"><div class="award-kind">${x.emoji} ${esc(x.title)}</div><p>${x.text}</p></div>`).join('') +
+        '<div><button type="button" class="small award-open-btn" data-award-open>🎉 축하 카드 보기</button></div>'
       : '';
-    box.querySelectorAll('[data-award]').forEach((b) => b.addEventListener('click', () => openAwardModal(Number(b.dataset.award))));
+    const btn = box.querySelector('[data-award-open]');
+    if (btn) btn.addEventListener('click', openAwardModal);
 
     // 이 기기에서 이번 발표를 처음 보는 거라면 축하 카드를 한 번 띄운다.
     if (!awardItems.length || READONLY) return;
@@ -1072,7 +1077,7 @@
     try { seen = localStorage.getItem(AWARD_SEEN_KEY) || ''; } catch (e) { /* 저장 불가 환경 */ }
     if (seen >= awardRange.to) return;
     try { localStorage.setItem(AWARD_SEEN_KEY, awardRange.to); } catch (e) { /* 저장 불가 환경 */ }
-    openAwardModal(0);
+    openAwardModal();
   }
 
   // 인증 피드 "전체 보기"는 feed-all.html(새 창)에서 js/feed-all.js가 별도로 렌더링합니다.

@@ -638,38 +638,35 @@ footer.foot {
 .weekly-awards .award p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); word-break: keep-all; }
 .weekly-awards .award-open-btn { margin-top: 6px; }
 
-/* 이번 주 시상 축하 카드 — 화면 가득 뜨는 팝업(주마다 기기에서 한 번), 여러 장이면 옆으로 넘긴다 */
+/* 이번 주 시상 축하 카드 — 화면 가득 뜨는 팝업(주마다 기기에서 한 번). 두 상을 한 장에 나란히 놓는다. */
 body.award-open { overflow: hidden; }
-.award-modal { position: fixed; inset: 0; z-index: 1000; outline: none; background: rgba(0, 0, 0, .92); display: flex; flex-direction: column; justify-content: center; animation: award-fade .25s ease-out; }
+.award-modal { position: fixed; inset: 0; z-index: 1000; outline: none; background: rgba(0, 0, 0, .92); display: flex; align-items: center; justify-content: center; padding: 72px 16px 24px; box-sizing: border-box; animation: award-fade .25s ease-out; }
 @keyframes award-fade { from { opacity: 0; } }
 .award-modal .award-close { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px; width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: rgba(255, 255, 255, .16); color: #fff; display: flex; align-items: center; justify-content: center; z-index: 2; cursor: pointer; }
 /* 참여자 화면의 .app button(css/app.css)보다 앞서도록 .award-modal을 붙여 둔다 */
 .award-modal .award-close:hover { background: rgba(255, 255, 255, .26); color: #fff; border: 0; }
 .award-modal .award-close .ico { width: 18px; height: 18px; stroke-width: 2; }
-.award-dots { position: absolute; top: max(30px, calc(env(safe-area-inset-top) + 14px)); left: 0; right: 0; display: flex; justify-content: center; gap: 7px; }
-.award-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .35); transition: background .2s; }
-.award-dots span.on { background: #ff9f2e; }
-.award-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
-.award-track::-webkit-scrollbar { display: none; }
-.award-card { flex: 0 0 calc(100% - 48px); max-width: 400px; margin: 0 24px; box-sizing: border-box; scroll-snap-align: center; align-self: center; background: var(--surface); color: var(--text); border-radius: 28px; padding: 30px 22px 26px; text-align: center; box-shadow: 0 0 36px rgba(255, 214, 74, .4); animation: award-pop .45s cubic-bezier(.2, 1.4, .4, 1); }
-@media (min-width: 460px) { .award-card { flex-basis: 400px; margin: 0 calc((100% - 400px) / 2); } }
+.award-card { width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; box-sizing: border-box; background: var(--surface); color: var(--text); border-radius: 28px; padding: 24px 18px 22px; text-align: center; box-shadow: 0 0 36px rgba(255, 214, 74, .4); animation: award-pop .45s cubic-bezier(.2, 1.4, .4, 1); }
 @keyframes award-pop { from { transform: scale(.85); opacity: 0; } }
 .award-brand { font-size: 13px; font-weight: 700; color: var(--text-dim); letter-spacing: -.01em; }
-.award-title { margin: 10px 0 4px; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
-.award-badge { position: relative; width: min(240px, 70%); margin: 4px auto 6px; }
-.award-badge svg { display: block; width: 100%; height: auto; }
-.award-confetti { fill: #f5c542; }
-.award-hex-out { fill: #f5b52e; }
-.award-pill { fill: #fff; filter: drop-shadow(0 2px 3px rgba(194, 120, 0, .25)); }
-.award-num { font: 700 32px var(--font); fill: #173fa7; }
-.award-star { position: absolute; left: 50%; top: 36%; width: 17%; aspect-ratio: 1; transform: translate(-50%, -50%); background: #ffc93b; clip-path: polygon(50% 0%, 63% 33%, 98% 36%, 71% 58%, 80% 94%, 50% 75%, 20% 94%, 29% 58%, 2% 36%, 37% 33%); display: flex; align-items: center; justify-content: center; color: #c2410c; }
-.award-star .ico { width: 42%; height: 42%; margin-top: 10%; stroke-width: 2; }
-.award-who { display: inline-flex; align-items: center; gap: 8px; margin: 2px auto 14px; padding: 7px 16px 7px 8px; border-radius: 999px; background: var(--surface-2); font-size: 17px; font-weight: 700; color: var(--accent); }
-.award-who .post-ava { width: 28px; height: 28px; font-size: 13px; }
-.award-msg { margin: 0 auto; max-width: 30em; font-size: 15px; line-height: 1.6; color: var(--text); word-break: keep-all; }
-.award-date { margin-top: 10px; font-size: 14px; color: var(--text-faint); }
-.award-hint { margin-top: 14px; text-align: center; font-size: 13px; color: rgba(255, 255, 255, .7); }
-@media (prefers-reduced-motion: reduce) { .award-modal, .award-card { animation: none; } }
+.award-title { margin: 6px 0 2px; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+.award-date { font-size: 13px; color: var(--text-faint); }
+.award-podium { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 10px; margin: 10px 0 14px; }
+.award-winner { flex: 1 1 0; min-width: 112px; max-width: 180px; display: flex; flex-direction: column; align-items: center; }
+.award-medal { display: block; width: 100%; max-width: 150px; height: auto; filter: drop-shadow(0 4px 6px rgba(120, 80, 0, .25)); animation: award-swing 1.6s ease-out; transform-origin: 50% 0; }
+@keyframes award-swing { 0% { transform: rotate(-9deg); } 30% { transform: rotate(6deg); } 55% { transform: rotate(-3deg); } 80% { transform: rotate(1deg); } 100% { transform: rotate(0); } }
+.award-sparkle { fill: #f5c542; }
+.award-laurel { fill: #a87410; opacity: .55; }
+.award-num { font: 800 34px var(--font); fill: #7a4b00; }
+.award-unit { font-size: 15px; font-weight: 700; }
+.award-kind-label { margin-top: 2px; font-size: 14px; font-weight: 700; color: var(--text); }
+.award-who { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; max-width: 100%; padding: 5px 12px 5px 6px; border-radius: 999px; background: var(--surface-2); font-size: 15px; font-weight: 700; color: var(--accent); box-sizing: border-box; }
+.award-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.award-who .post-ava { width: 24px; height: 24px; font-size: 12px; flex: none; }
+.award-msgs { display: grid; gap: 10px; text-align: left; }
+.award-msg { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); font-size: 14px; line-height: 1.6; color: var(--text); word-break: keep-all; }
+.award-msg-kind { display: block; margin-bottom: 2px; font-size: 13px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .award-modal, .award-card, .award-medal { animation: none; } }
 button.ghost { background: transparent; }
 
 /* 인증 피드 탭 — "전체 보기"는 새 창(feed-all.html)으로 랜딩되는 링크 */
