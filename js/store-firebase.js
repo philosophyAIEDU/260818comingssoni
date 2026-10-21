@@ -95,6 +95,14 @@ CS.FirebaseStore = (function () {
       .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
   }
 
+  /** 다른 시즌의 명단(읽기만) — 연속 참여 배지 계산용. season: CS.SEASONS 항목 */
+  async function listParticipantsOf(season) {
+    await init();
+    const name = season.dataPrefix ? `${season.dataPrefix}_participants` : 'participants';
+    const snap = await fs.getDocs(fs.collection(db, name));
+    return snap.docs.map(withId);
+  }
+
   async function addParticipant(nickname, patch) {
     await init();
     const nick = CS.U.normalizeNick(nickname);
@@ -370,7 +378,7 @@ CS.FirebaseStore = (function () {
 
   return {
     name: 'firebase',
-    init, listParticipants, addParticipant, addParticipants, updateParticipant,
+    init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, getMeta, setMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
