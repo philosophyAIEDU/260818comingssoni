@@ -233,7 +233,9 @@
       visibleCount = FEED_PAGE_SIZE; // 날짜가 바뀌면 페이지도 처음부터
       refreshAllFeed();
     });
-    $('allFeedDownloadBtn').addEventListener('click', downloadPersonTxt);
+    // 끝난(잠긴) 시즌은 둘러보기만 — 한 사람 기록을 통째로 내려받는 버튼은 닫는다
+    if (CS.seasonLocked(CS.SEASON)) $('allFeedDownloadBtn').hidden = true;
+    else $('allFeedDownloadBtn').addEventListener('click', downloadPersonTxt);
     $('feedRefresh').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;

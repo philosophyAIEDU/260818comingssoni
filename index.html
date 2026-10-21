@@ -47,7 +47,12 @@
     <!-- 책 소개 -->
     <section class="card intro">
       <!-- 내용은 js/config.js의 활성 시즌 설정에서 채운다(app.js paintIntro) -->
-      <img class="intro-cover" id="introCover" src="" alt="">
+      <!-- 표지 양옆 화살표 = 지난 시즌 책으로 넘겨 보기(읽기 전용). 누를 때만 그 시즌을 불러온다. -->
+      <div class="intro-shelf">
+        <a class="shelf-arrow prev" id="shelfPrev" hidden></a>
+        <img class="intro-cover" id="introCover" src="" alt="">
+        <a class="shelf-arrow next" id="shelfNext" hidden></a>
+      </div>
       <div class="intro-body">
         <h2 id="introTitle"></h2>
         <p class="tagline" id="introTagline" hidden></p>

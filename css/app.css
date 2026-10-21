@@ -80,6 +80,26 @@ body.app {
 .app .card > h2, .app .feed-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .app .intro { background: var(--surface); }
 .app .intro-cover { box-shadow: 0 1px 6px rgba(0, 0, 0, .14); border-radius: 6px; }
+/* 표지 양옆 화살표 — 지난 시즌 책으로 넘겨 보기. 표지 위에 반투명으로 살짝 걸친다. */
+.app .intro-shelf { position: relative; }
+.app .shelf-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, .72); color: #102d84;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+  opacity: .8; transition: opacity .15s, transform .15s; text-decoration: none;
+}
+.app .shelf-arrow[hidden] { display: none; }
+.app .shelf-arrow:hover, .app .shelf-arrow:focus-visible { opacity: 1; }
+.app .shelf-arrow:active { transform: translateY(-50%) scale(.92); }
+.app .shelf-arrow svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.app .shelf-arrow.prev { left: -13px; }
+.app .shelf-arrow.next { right: -13px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app .shelf-arrow { background: rgba(20, 28, 52, .72); color: #cfe0ff; }
+}
 .app .rule-key { background: var(--surface-2); border-color: transparent; }
 .app a { color: var(--link); }
 .app .navlinks a, .app .head-links a, .app .feed-tabs a, .app .pane-foot a { color: var(--text); }
@@ -364,7 +384,8 @@ body.app {
      기간·모임·소개글은 그 아래 화면 폭 전체로 */
   .app .intro { grid-template-columns: minmax(0, 1fr) 72px; column-gap: 16px; row-gap: 0; align-items: start; }
   .app .intro-body { display: contents; }
-  .app .intro-cover { grid-column: 2; grid-row: 1 / span 3; align-self: start; width: 72px; border-radius: 8px; }
+  .app .intro-shelf { grid-column: 2; grid-row: 1 / span 3; align-self: start; width: 72px; }
+  .app .intro-cover { width: 72px; border-radius: 8px; }
   .app .intro-body > h2, .app .intro-body > .tagline, .app .intro-body > .author { grid-column: 1; }
   .app .intro-body > h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 2px 0 4px; }
   .app .intro-body > .tagline { font-size: 15px; font-weight: 400; color: var(--text); margin: 0 0 2px; }
