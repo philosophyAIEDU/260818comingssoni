@@ -723,7 +723,8 @@
 
     // 내보내기: 기록이 하나라도 있으면 보인다. 회고 기간엔 "자산화" 문구로 더 크게 권한다.
     mineForExport = { p, subs: all };
-    $('myExport').hidden = !all.length;
+    // 지난 시즌을 넘겨 보는 중에는 남의 시즌 기록을 통째로 가져가지 못하게 내려받기 창을 닫아 둔다
+    $('myExport').hidden = READONLY || !all.length;
     const inRetro = CONFIG.retroUntil && U.today() > CONFIG.endDate && U.today() <= CONFIG.retroUntil;
     $('myExportHint').innerHTML = inRetro
       ? `✍️ <strong>${all.length}개의 기록이 쌓였습니다.</strong> 한 번에 복사해서 블로그·스레드에 올려 보세요. 내가 쓴 글이 내 콘텐츠이자 자산이 됩니다.`
@@ -1299,11 +1300,45 @@
    *  - 잠겼는데 공개도 아니면 화면을 열지 않고 안내만 남긴다(운영진 화면에서 볼 수 있다).
    * 반환값 false = 이 화면을 더 그리지 않는다.
    */
+  /* 운영진이 공개해 둔 지난 시즌 목록(meta/seasonFlags) — 문서 하나라 한 번만 읽어 둔다 */
+  let flagsPromise = null;
+  function seasonFlags() {
+    if (!flagsPromise) flagsPromise = Store.getSeasonFlags().catch(() => ({}));
+    return flagsPromise;
+  }
+
+  /* 책 표지 양옆 화살표 — 이미 시작한 시즌 중 참여자가 볼 수 있는 시즌으로만 넘긴다
+   * (진행 중이거나, 잠겼어도 운영진이 "지난 시즌 공개"를 켜 둔 시즌).
+   * 링크로 페이지를 새로 여는 방식이라 화살표를 누르기 전까지는 지난 시즌 데이터를 하나도 읽지 않는다. */
+  async function paintShelf() {
+    const flags = await seasonFlags();
+    const open = Array.isArray(flags.openSeasons) ? flags.openSeasons : [];
+    const now = CS.seasonNowKST();
+    const auto = CS.pickSeason(now);
+    const started = CS.SEASONS.filter((x) => !x.startsAt || x.startsAt <= now);
+    const viewable = started.filter((x) => x.id === CS.SEASON.id || x.id === auto.id
+      || !CS.seasonLocked(x, now) || open.includes(x.id));
+    const i = viewable.findIndex((x) => x.id === CS.SEASON.id);
+    if (i < 0) return;
+    const chev = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+    const set = (el, target, dir) => {
+      if (!target) { el.hidden = true; return; }
+      // #info — 넘어가서도 같은 자리(책 소개)에서 바로 이어 넘길 수 있게
+      el.href = (target.id === auto.id ? 'index.html' : `index.html?season=${encodeURIComponent(target.id)}`) + '#info';
+      const label = `${dir === 'prev' ? '이전' : '다음'} 시즌 책 『${target.book.name}』 보기`;
+      el.setAttribute('aria-label', label);
+      el.title = label;
+      el.innerHTML = chev(dir === 'prev' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7');
+      el.hidden = false;
+    };
+    set($('shelfPrev'), viewable[i - 1], 'prev');
+    set($('shelfNext'), viewable[i + 1], 'next');
+  }
+
   async function applySeasonLock() {
     if (!CS.seasonLocked(CS.SEASON)) return true;
 
-    let flags = {};
-    try { flags = await Store.getSeasonFlags(); } catch (e) { /* 못 읽으면 잠긴 것으로 본다 */ }
+    const flags = await seasonFlags(); // 못 읽으면 빈 값 → 잠긴 것으로 본다
     const opened = Array.isArray(flags.openSeasons) && flags.openSeasons.includes(CS.SEASON.id);
 
     const banner = $('seasonBanner');
@@ -1319,9 +1354,9 @@
     }
 
     READONLY = true;
-    msg(banner, `<strong>지난 시즌(${esc(CONFIG.book.name)}) 기록을 보는 중입니다.</strong><br>`
-      + '읽기 전용이라 인증 제출과 추천은 할 수 없습니다. '
-      + '<a href="index.html">현재 진행 중인 시즌 보기</a>', 'warn');
+    msg(banner, `<strong>지난 시즌 『${esc(CONFIG.book.name)}』 둘러보기</strong> · 읽기 전용<br>`
+      + '그때 멤버들이 남긴 인사이트를 [피드]에서 볼 수 있어요. '
+      + '<a href="index.html#info">지금 시즌으로 돌아가기</a>', 'warn');
     $('certifyCard').hidden = true;
     return true;
   }
@@ -1330,6 +1365,7 @@
     await Store.init();
     if (!(await applySeasonLock())) return;
     paintIntro();
+    paintShelf().catch(console.error);
     paintHeader();
     renderTodayRange();
     $('rangePrevDay').addEventListener('click', () => shiftRangeDay(-1));

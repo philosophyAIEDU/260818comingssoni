@@ -2037,6 +2037,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const res = await route.fetch();
     let body = await res.text();
     body = body.replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)', "CS.pickSeason(CS.seasonNowKST(), 's2')")
+               // 실제 시계로는 s2가 10/21 02:00에 잠겼다 — 진행 중인 시즌처럼 보이게 잠금을 푼다
+               .replace("lockAt: '2026-10-21T02:00'", 'lockAt: null')
                .replace("startDate: '2026-09-21'", `startDate: '${start}'`)
                .replace("endDate: '2026-10-18'", `endDate: '${end}'`)
                .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${grade}'`)
@@ -2136,6 +2138,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     const res = await route.fetch();
     let body = await res.text();
     body = body.replace('CS.pickSeason(CS.seasonNowKST(), CS.seasonOverride)', "CS.pickSeason(CS.seasonNowKST(), 's2')")
+               // 실제 시계로는 s2가 10/21 02:00에 잠겼다 — 진행 중인 시즌처럼 보이게 잠금을 푼다
+               .replace("lockAt: '2026-10-21T02:00'", 'lockAt: null')
                .replace("startDate: '2026-09-21'", `startDate: '${shift(-30)}'`)
                .replace("endDate: '2026-10-18'", `endDate: '${shift(-3)}'`)
                .replace("gradeFrom: '2026-09-22'", `gradeFrom: '${shift(-29)}'`)
