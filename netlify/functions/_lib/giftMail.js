@@ -70,9 +70,11 @@ async function runGiftMail({ link, subject, body, resend, by, budgetMs = Infinit
         subject: MailTemplates.fill(subjectTpl, vars), text: MailTemplates.fill(bodyTpl, vars)
       });
       sent++;
-      await col('participants').doc(p.id).update({ giftSentAt: todayISO });
+      // 발송 확인용: 날짜 · 시각 · 받은 주소를 남긴다(운영진 명단의 ✅)
+      await col('participants').doc(p.id).update({ giftSentAt: todayISO, giftSentStamp: U.nowStamp(), giftSentTo: email, giftError: null });
     } catch (err) {
       failures.push({ id: p.id, nickname: p.nickname, error: err.message });
+      await col('participants').doc(p.id).update({ giftError: String(err.message).slice(0, 200) }).catch(() => {});
     }
     await sleep(300);
   }
