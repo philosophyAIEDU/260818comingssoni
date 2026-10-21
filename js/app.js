@@ -952,12 +952,15 @@
   }
 
   /* ── 이번 주 인기 게시자 · 메신저 ──────────
-   * 일요일 0시(KST)가 되면 막 끝난 주(월~토)의 두 상을 발표한다. 그 주에 처음 들어오면 두 상을 한 장에
-   * 담은 축하 카드가 화면 가득 한 번 뜨고(기기마다 한 주에 한 번), 피드 맨 위에는 다음 일요일까지 요약이 남는다.
+   * 한 주(월~토)가 끝난 다음 날(보통 일요일) 0시(KST)에 두 상을 발표한다.
+   *  - 발표 당일: 두 상을 한 장에 담은 축하 카드가 화면 가득 한 번 뜬다(기기마다 한 번).
+   *  - 인증 피드 맨 위: 누가 받았는지 글로 적어 두고, 다음 수상자가 나올 때까지 그대로 둔다.
+   *  - 시즌(책)이 끝나면: 피드 맨 위가 1주차부터 마지막 주까지의 주간 수상 기록으로 바뀐다.
    * 피드가 이미 읽어 둔 전체 기록(allSubsCache)으로 계산하므로 Firestore를 따로 읽지 않는다. */
   const AWARD_SEEN_KEY = `${CONFIG.storagePrefix}.awardSeen`;
-  let awardItems = [];
-  let awardRange = null;
+  let awardShown = null;   // 지금 보여 줄 주 { from, to, announce, no, items } — 수상자가 있는 가장 최근 주
+  let awardHistory = [];   // 지금까지 발표된 모든 주(수상자 없는 주 포함)
+  let seasonOver = false;
 
   function awardList(awards) {
     return [
@@ -1018,18 +1021,32 @@
     </svg>`;
   }
 
+  /** 시즌 전체 주간 수상 기록(1주차부터). 시즌이 끝난 뒤 피드와 마지막 축하 카드에 쓴다. */
+  function awardHistoryHtml() {
+    const who = (items, kind) => {
+      const names = items.filter((x) => x.kind === kind).map((x) => `${esc(x.nickname)}님`);
+      return names.length ? names.join(', ') : '<span class="muted">없음</span>';
+    };
+    return `<ol class="award-history">${awardHistory.map((w) => `<li>
+      <div class="award-history-week"><strong>${w.no}주차</strong> ${esc(U.shortLabel(w.from))} ~ ${esc(U.shortLabel(w.to))}</div>
+      <div class="award-history-who"><span>🏆 인기 게시자 ${who(w.items, 'popular')}</span><span>💌 메신저 ${who(w.items, 'messenger')}</span></div>
+    </li>`).join('')}</ol>`;
+  }
+
   /** 두 상(동점이면 모두)을 한 장에 나란히 — 넘겨 봐야 하면 첫 장만 보고 닫기 쉽다. */
   function awardCardHtml() {
+    const items = awardShown.items;
     return `<section class="award-card">
       <div class="award-brand">${esc(CONFIG.title)}</div>
       <h3 class="award-title">이번 주 시상</h3>
-      <div class="award-date">${esc(U.shortLabel(awardRange.from))} ~ ${esc(U.shortLabel(awardRange.to))}</div>
-      <div class="award-podium">${awardItems.map((x, i) => `<div class="award-winner">
+      <div class="award-date">${awardShown.no}주차 · ${esc(U.shortLabel(awardShown.from))} ~ ${esc(U.shortLabel(awardShown.to))}</div>
+      <div class="award-podium">${items.map((x, i) => `<div class="award-winner">
         ${awardMedal(x, i)}
         <div class="award-kind-label">${esc(x.title.replace('이번 주 ', ''))}</div>
         <div class="award-who">${CS.Post.avatar(x.nickname)}<span>${esc(x.nickname)}님</span></div>
       </div>`).join('')}</div>
-      <div class="award-msgs">${awardItems.map((x) => `<p class="award-msg"><span class="award-msg-kind">${x.emoji} ${esc(x.title)}</span>${x.text}</p>`).join('')}</div>
+      <div class="award-msgs">${items.map((x) => `<p class="award-msg"><span class="award-msg-kind">${x.emoji} ${esc(x.title)}</span>${x.text}</p>`).join('')}</div>
+      ${seasonOver ? `<h4 class="award-history-title">『${esc(CONFIG.book.name)}』 주간 수상 기록</h4>${awardHistoryHtml()}` : ''}
     </section>`;
   }
 
@@ -1043,7 +1060,7 @@
   function awardKeydown(e) { if (e.key === 'Escape') closeAwardModal(); }
 
   function openAwardModal() {
-    if (!awardItems.length) return;
+    if (!awardShown) return;
     closeAwardModal();
     const m = document.createElement('div');
     m.id = 'awardModal';
@@ -1065,23 +1082,37 @@
   async function paintWeeklyAwards() {
     const box = $('weeklyAwards');
     if (!box) return;
-    awardRange = U.lastAwardWeek();
-    awardItems = awardRange ? awardList(U.weeklyAwards(await loadAllSubs(), awardRange, participants)) : [];
-    box.hidden = !awardItems.length;
-    box.innerHTML = awardItems.length
-      ? `<div class="award-range">${esc(U.shortLabel(awardRange.from))} ~ ${esc(U.shortLabel(awardRange.to))} 이번 주 소식</div>` +
-        awardItems.map((x) => `<div class="award"><div class="award-kind">${x.emoji} ${esc(x.title)}</div><p>${x.text}</p></div>`).join('') +
-        '<div><button type="button" class="small award-open-btn" data-award-open>🎉 축하 카드 보기</button></div>'
-      : '';
+    const today = U.today();
+    const weeks = U.awardWeeks(today);
+    const subs = weeks.length ? await loadAllSubs() : [];
+    awardHistory = weeks.map((w, i) => Object.assign({}, w, { no: i + 1, items: awardList(U.weeklyAwards(subs, w, participants)) }));
+    awardShown = awardHistory.filter((w) => w.items.length).pop() || null;
+    seasonOver = today > CONFIG.endDate;
+
+    let html = '';
+    if (seasonOver && awardHistory.length) {
+      html = `<div class="award-range">『${esc(CONFIG.book.name)}』 주간 수상 기록</div>${awardHistoryHtml()}`;
+    } else if (awardShown) {
+      // 다음 수상자가 나올 때까지 그대로 둔다(수상자 없는 주가 끼어도 지난 수상자를 계속 보여 줌)
+      const line = (x) => x.kind === 'popular'
+        ? `🏆 이번 주 인기 게시자 <strong>${esc(x.nickname)}님</strong> <span class="muted">· 1주일간 ${x.count}분에게 좋아요</span>`
+        : `💌 이번 주 메신저 <strong>${esc(x.nickname)}님</strong> <span class="muted">· 1주일간 ${x.count}분의 글 공유</span>`;
+      html = `<div class="award-range">${awardShown.no}주차 · ${esc(U.shortLabel(awardShown.from))} ~ ${esc(U.shortLabel(awardShown.to))}</div>` +
+        awardShown.items.map((x) => `<div class="award-line">${line(x)}</div>`).join('');
+    }
+    if (html && awardShown) html += '<div><button type="button" class="small award-open-btn" data-award-open>🎉 축하 카드 보기</button></div>';
+    box.innerHTML = html;
+    box.hidden = !html;
     const btn = box.querySelector('[data-award-open]');
     if (btn) btn.addEventListener('click', openAwardModal);
 
-    // 이 기기에서 이번 발표를 처음 보는 거라면 축하 카드를 한 번 띄운다.
-    if (!awardItems.length || READONLY) return;
+    // 발표 당일에만, 이 기기에서 처음 볼 때 한 번 축하 카드를 띄운다.
+    const latest = awardHistory[awardHistory.length - 1];
+    if (!latest || latest !== awardShown || today !== latest.announce || READONLY) return;
     let seen = '';
     try { seen = localStorage.getItem(AWARD_SEEN_KEY) || ''; } catch (e) { /* 저장 불가 환경 */ }
-    if (seen >= awardRange.to) return;
-    try { localStorage.setItem(AWARD_SEEN_KEY, awardRange.to); } catch (e) { /* 저장 불가 환경 */ }
+    if (seen >= latest.to) return;
+    try { localStorage.setItem(AWARD_SEEN_KEY, latest.to); } catch (e) { /* 저장 불가 환경 */ }
     openAwardModal();
   }
 

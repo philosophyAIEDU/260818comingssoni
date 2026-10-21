@@ -248,14 +248,28 @@ CS.U = (function () {
   }
 
   /* ── 이번 주 시상(인기 게시자·메신저) ──────────────
-   * 한 주는 월~토. 일요일 0시(KST)가 되면 막 끝난 주가 발표되고, 다음 일요일까지 그대로 보인다.
-   * 시즌 기간 밖 날짜는 빼고 센다(시즌 첫 주·마지막 주는 며칠짜리일 수 있다). */
-  function lastAwardWeek(todayIso) {
+   * 한 주는 월~토. 그 주가 끝난 다음 날(보통 일요일) 0시(KST)에 발표된다. 시즌 기간 밖 날짜는 빼고
+   * 세므로 첫 주·마지막 주는 며칠짜리일 수 있다 — 시즌이 주 중간에 끝나면 그 마지막 주는 시즌이 끝난
+   * 다음 날 발표된다. awardWeeks()는 오늘까지 발표된 주를 1주차부터 차례로 돌려준다. */
+  function awardWeeks(todayIso) {
     const t = todayIso || today();
-    const sat = addDays(t, -(toDate(t).getUTCDay() + 1)); // 일→어제, 월→그저께 … 토→지난 토요일
-    const from = addDays(sat, -5) < CS.CONFIG.startDate ? CS.CONFIG.startDate : addDays(sat, -5);
-    const to = sat > CS.CONFIG.endDate ? CS.CONFIG.endDate : sat;
-    return from <= to ? { from, to } : null;
+    const { startDate, endDate } = CS.CONFIG;
+    const weeks = [];
+    let mon = addDays(startDate, -((toDate(startDate).getUTCDay() + 6) % 7)); // 시작일이 든 주의 월요일
+    for (let guard = 0; mon <= endDate && guard < 60; guard++, mon = addDays(mon, 7)) {
+      const from = mon < startDate ? startDate : mon;
+      const sat = addDays(mon, 5);
+      const to = sat > endDate ? endDate : sat;
+      if (from > to) continue;       // 시작일이 일요일인 주처럼 셀 날이 없는 주
+      if (to >= t) break;            // 아직 끝나지 않은 주 — 내일 이후 발표
+      weeks.push({ from, to, announce: addDays(to, 1) });
+    }
+    return weeks;
+  }
+
+  function lastAwardWeek(todayIso) {
+    const weeks = awardWeeks(todayIso);
+    return weeks.length ? weeks[weeks.length - 1] : null;
   }
 
   /** 기간 안의 글로 두 상을 뽑는다(동점이면 모두).
@@ -328,6 +342,6 @@ CS.U = (function () {
     weekday, shortLabel, longLabel, challengeDates, dayIndex, phase,
     lastSettledDate, settledDates, hhmmss, stampLabel, nowStamp, uid,
     normalizeNick, deadlineInstant, isLate, statusFor, buildStats, riskTag, pad2,
-    lastAwardWeek, weeklyAwards
+    awardWeeks, lastAwardWeek, weeklyAwards
   };
 })();
