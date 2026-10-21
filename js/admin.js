@@ -1456,24 +1456,38 @@
     btn.disabled = true;
     const old = btn.textContent;
     btn.textContent = '보내는 중…';
+    // 서버 함수는 실행 시간 제한(약 10초) 때문에 한 번에 몇 명씩만 보내고 남은 인원(remaining)을 알려 준다.
+    // 남은 인원이 0이 될 때까지 다시 부른다 — 이미 받은 사람은 서버가 건너뛴다(두 번째부터는 resend를 끈다).
+    let sent = 0, failed = 0, noEmail = 0, already = 0, left = 0, first = true;
+    const total = fresh.length + extra.length;
     try {
-      const token = await Store.getIdToken();
-      const res = await fetch('/.netlify/functions/send-gift-mail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
-        body: JSON.stringify({
-          link, resend, seasonId: CONFIG.seasonId,
-          subject: $('giftMailSubject').value.trim(),
-          body: $('giftMailBody').value.trim()
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      for (let round = 0; round < 30; round++) {
+        const token = await Store.getIdToken();
+        const res = await fetch('/.netlify/functions/send-gift-mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+          body: JSON.stringify({
+            link, resend: resend && first, seasonId: CONFIG.seasonId,
+            subject: $('giftMailSubject').value.trim(),
+            body: $('giftMailBody').value.trim()
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        sent += data.sent || 0; failed += data.failed || 0; noEmail = data.skippedNoEmail || 0; left = data.remaining || 0;
+        if (first) already = data.skippedAlready || 0;
+        first = false;
+        btn.textContent = `보내는 중… ${sent}/${total}`;
+        msg($('giftSendMsg'), `보내는 중 — ${sent}/${total}명 보냄${data.remaining ? `, ${data.remaining}명 남음` : ''}`, 'ok');
+        if (!data.remaining || !data.sent) break; // 다 보냈거나, 이번에 한 명도 못 보냈으면(전부 실패 등) 멈춘다
+      }
       msg($('giftSendMsg'),
-        `${data.sent}명에게 보냈습니다.` +
-        (data.skippedAlready ? ` 이미 받은 ${data.skippedAlready}명은 건너뛰었습니다.` : '') +
-        (data.skippedNoEmail ? ` 이메일이 없는 ${data.skippedNoEmail}명은 못 보냈습니다.` : '') +
-        (data.failed ? ` 실패 ${data.failed}건.` : ''), data.failed ? 'warn' : 'ok');
+        `${sent}명에게 보냈습니다.` +
+        (already ? ` 이미 받은 ${already}명은 건너뛰었습니다.` : '') +
+        (noEmail ? ` 이메일이 없는 ${noEmail}명은 못 보냈습니다.` : '') +
+        (failed ? ` 실패 ${failed}건.` : '') +
+        (left ? ` 아직 ${left}명 남았습니다 — [지금 바로 보내기]를 한 번 더 눌러 주세요(받은 분은 건너뜁니다).` : ''),
+        failed ? 'warn' : 'ok');
       await refresh();
     } catch (e) {
       msg($('giftSendMsg'), `발송 실패: ${esc(e.message)}`, 'bad');
