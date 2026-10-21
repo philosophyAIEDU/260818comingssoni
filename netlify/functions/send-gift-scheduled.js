@@ -19,11 +19,16 @@ async function claimDue(cfg) {
   return getDb().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     let sch = (snap.exists && snap.data().giftSchedule) || null;
+    const g = cfg.giftMail;
+    const fromConfig = g && /^https?:\/\//.test(String(g.link || '')) && g.sendAt
+      ? { link: g.link, subject: g.subject || '', body: g.body || '', at: new Date(g.sendAt + ':00' + KST).toISOString(),
+        seasonId: cfg.seasonId, source: 'config' }
+      : null;
+    // 운영진 화면 예약을 취소했어도, 그 뒤 시각으로 설정(giftMail.sendAt)에 새로 넣었으면 설정대로 보낸다
+    if (sch && sch.status === 'cancelled' && fromConfig && Date.parse(fromConfig.at) > Date.parse(sch.at)) sch = null;
     if (!sch) {
-      const g = cfg.giftMail;
-      if (!g || !/^https?:\/\//.test(String(g.link || '')) || !g.sendAt) return null;
-      sch = { link: g.link, subject: g.subject || '', body: g.body || '', at: new Date(g.sendAt + ':00' + KST).toISOString(),
-        seasonId: cfg.seasonId, source: 'config' };
+      if (!fromConfig) return null;
+      sch = fromConfig;
     } else if (sch.status !== 'scheduled') {
       return null; // 이미 보냄·보내는 중·실패·취소
     }
