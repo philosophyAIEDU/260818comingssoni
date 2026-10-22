@@ -70,7 +70,8 @@
       wrap.className = 'quick-go';
       wrap.innerHTML = '<button type="button" class="primary qg-card" data-card>오늘 인증 카드 만들기</button>'
         + '<button type="button" data-go="feed">다른 분들 글 보기</button>'
-        + '<button type="button" data-go="me">내 현황 보기</button>';
+        + '<button type="button" data-go="me">내 현황 보기</button>'
+        + '<a href="content.html">쏜님의 영상·칼럼 보기 →</a>';
       wrap.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => activate(b.dataset.go)));
       // 인증 직후가 자랑하고 싶은 순간 — 내 현황으로 넘어가 바로 인증 카드를 띄운다
       wrap.querySelector('[data-card]').addEventListener('click', () => {

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>쏜님의 콘텐츠 · 퍼메스 독서</title>
+  <meta name="description" content="읽은 책을 내 삶과 브랜드로 연결하는 커밍쏜의 영상과 뉴스레터">
+  <link rel="icon" type="image/png" href="icons/favicon-64.png?v=blue-logo-2">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=blue-logo-2">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/content.css">
+</head>
+<body class="app content-app">
+  <header class="top"><div class="top-in">
+    <a class="content-back" href="index.html#info" aria-label="독서 멤버십으로 돌아가기">←</a>
+    <div class="brand"><img class="brand-logo" src="icons/icon-192.png?v=blue-logo-2" alt=""><h1>쏜님의 콘텐츠</h1></div>
+    <a class="content-home" href="index.html">독서 인증하기 ↗</a>
+  </div></header>
+  <main class="wrap content-wrap">
+    <section class="content-intro">
+      <span class="content-eyebrow">PERSONAL MAKERS · LIBRARY</span>
+      <h2>책 밖에서도,<br>나를 만드는 시간.</h2>
+      <p>쏜님의 이야기에서 힌트를 찾고,<br class="mobile-break"> 오늘 읽은 책을 나의 실행으로 연결해 보세요.</p>
+      <div class="content-source-links"><a href="https://www.youtube.com/@%EC%BB%A4%EB%B0%8D%EC%8F%9C" target="_blank" rel="noopener noreferrer">유튜브 채널 ↗</a><a href="https://personalmakers.stibee.com/" target="_blank" rel="noopener noreferrer">뉴스레터 구독·전체 글 ↗</a></div>
+    </section>
+    <nav class="content-tabs" aria-label="콘텐츠 종류">
+      <button type="button" data-filter="videos" aria-pressed="true">추천 영상</button>
+      <button type="button" data-filter="columns" aria-pressed="false">쏜님의 칼럼</button>
+      <button type="button" data-filter="saved" aria-pressed="false">보관함 <span id="savedCount">0</span></button>
+    </nav>
+    <section aria-labelledby="contentHeading">
+      <div class="content-section-head"><div><h2 id="contentHeading">읽고, 보고, 한 걸음 더.</h2><p id="contentSubheading">꾸준한 실행부터 나만의 브랜드까지</p></div><span class="content-index" id="contentCount"></span></div>
+      <p class="content-status" id="contentStatus" role="status" hidden></p>
+      <div id="contentGrid" class="content-grid"></div>
+      <noscript><p>콘텐츠 목록을 보려면 자바스크립트를 켜주세요. 위의 유튜브·뉴스레터 링크에서도 바로 볼 수 있습니다.</p></noscript>
+    </section>
+    <aside class="reading-bridge"><span aria-hidden="true">✎</span><div><strong>보고 끝내지 말고, 내 것으로.</strong><p>마음에 남은 한 가지를 오늘의 독서 기록과 연결해 보세요.</p><a href="index.html">오늘의 인증 남기기 →</a></div></aside>
+    <footer class="content-footer">영상·뉴스레터 출처: 커밍쏜 · 보관함은 현재 기기에 저장됩니다.</footer>
+  </main>
+  <dialog id="contentReader" class="content-reader" aria-labelledby="readerTitle">
+    <div class="reader-top"><span id="readerType">커밍쏜</span><div><a id="readerOriginal" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a><button type="button" id="readerClose" aria-label="콘텐츠 닫기">✕</button></div></div>
+    <div class="reader-scroll"><h2 id="readerTitle"></h2><p class="reader-byline">커밍쏜 · 퍼스널메이커스</p>
+      <div id="readerMedia"></div>
+      <div id="readerReflection" class="reader-reflection"></div>
+      <div class="reader-bottom"><button type="button" id="readerSave">나중에 보기</button><button type="button" id="readerNext">다음 콘텐츠 →</button></div>
+    </div>
+  </dialog>
+  <script src="js/content.js"></script>
+</body>
+</html>

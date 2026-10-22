@@ -11,7 +11,9 @@
     "season:render": "node tools/season-render.mjs",
     "roster:diff": "node tools/roster-diff.mjs",
     "roster:upload": "node tools/roster-upload.mjs",
-    "streak:sync": "node tools/streak-sync.mjs"
+    "streak:sync": "node tools/streak-sync.mjs",
+    "test:content": "node test/content-library.test.mjs",
+    "test:content-ui": "node test/content-ui.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",

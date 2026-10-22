@@ -7,10 +7,14 @@ export function parseArchive(html) {
   function add(url, title, date) {
     try {
       const u = new URL(url, NEWSLETTER);
-      if (u.origin !== new URL(NEWSLETTER).origin || !/^\/p\/[^/?#]+\/?$/.test(u.pathname)) return;
+      const pagePost = u.origin === new URL(NEWSLETTER).origin && /^\/p\/[^/?#]+\/?$/.test(u.pathname);
+      const sharedEmail = u.origin === 'https://stibee.com' && /^\/api\/v1\.0\/emails\/share\/[^/?#]+$/.test(u.pathname);
+      if (!pagePost && !sharedEmail) return;
+      if (typeof title !== 'string') return;
       title = text(title).replace(/\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*$/, '');
       if (title.length < 3) return;
-      posts.set(u.pathname, { id: u.pathname, title, url: u.href, date: date || '' });
+      const existing = posts.get(u.pathname);
+      posts.set(u.pathname, { id: u.pathname, title, url: u.href, date: date || existing?.date || '' });
     } catch { /* 외부·잘못된 링크는 제외 */ }
   }
   for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -20,8 +24,8 @@ export function parseArchive(html) {
   function walk(value, depth = 0) {
     if (!value || typeof value !== 'object' || depth > 14) return;
     if (!Array.isArray(value)) {
-      const title = value.title || value.subject || value.emailTitle || value.postTitle;
-      const url = value.url || value.href || value.link || value.postUrl || value.archiveUrl;
+      const title = value.title || value.subject || value.emailTitle || value.postTitle || value.emailSubject;
+      const url = value.url || value.href || value.link || value.postUrl || value.archiveUrl || value.permalink || value.webViewUrl;
       if (title && url) add(url, title, value.publishedAt || value.createdAt);
     }
     for (const child of Object.values(value)) if (child && typeof child === 'object') walk(child, depth + 1);
