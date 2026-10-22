@@ -12,13 +12,13 @@
   <meta name="description" content="퍼스널메이커스 독서 챌린지 프로세스 이코노미 인증 시스템">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/app.css">
-  <link rel="icon" type="image/png" href="icons/favicon-64.png">
+  <link rel="icon" type="image/png" href="icons/favicon-64.png?v=blue-logo-2">
   <!-- 홈 화면에 추가했을 때 아이콘·이름(아이폰은 apple-touch-icon, 안드로이드는 manifest) -->
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=blue-logo-2">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-title" content="퍼메스 독서 멤버십">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes"><text y='.9em' font-size='90'>📖</text></svg>">
+  <meta name="mobile-web-app-capable" content="yes">
 </head>
 
 <body class="app">
@@ -48,6 +48,12 @@
 
     <!-- ── 탭: 공지·안내 ── 이번 책 소개와 멤버십 규칙 -->
     <div class="pane" data-pane="info" id="pane-info">
+
+    <section class="card install-card" id="installCard" hidden>
+      <img src="icons/icon-192.png?v=blue-logo-2" width="48" height="48" alt="퍼스널메이커스">
+      <div><strong>홈 화면에서 바로 만나요</strong><p>파란 아이콘으로 독서 멤버십을 편하게 열어보세요.</p></div>
+      <button type="button" id="installApp">웹앱 설치</button>
+    </section>
 
     <!-- 책 소개 -->
     <section class="card intro">
@@ -410,6 +416,7 @@
   <script src="js/progress-card.js"></script>
   <script src="js/app.js"></script>
   <script src="js/tabs.js"></script>
+  <script src="js/install.js"></script>
 </body>
 
 </html>

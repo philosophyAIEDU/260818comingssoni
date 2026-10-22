@@ -520,3 +520,11 @@ body.app {
 .app .weekly-awards { background: var(--tint); border-color: var(--tint-line); }
 /* 진행 링 바탕선도 연파랑 — 파란 링이 회색 위보다 또렷하게 이어져 보이게 */
 .app .ring-track { stroke: var(--tint-line); }
+
+/* 홈 화면 설치: 공지·안내 탭에서 언제든 다시 찾을 수 있다. */
+.install-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.install-card[hidden] { display: none; }
+.install-card img { border-radius: 12px; flex: none; }
+.install-card div { flex: 1; min-width: 170px; }
+.install-card p { margin: 4px 0 0; font-size: 13px; color: var(--text-dim); }
+.install-card button { margin-left: auto; }
