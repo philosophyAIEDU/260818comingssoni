@@ -80,3 +80,68 @@ body.content-reader-open { overflow: hidden; }
 
 .content-app a.library-open { text-decoration: none; }
 .column-original-label { display: inline-block; margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--brand-ink); }
+
+/* 최신 표시 · 칼럼 화면 읽기 */
+.content-new { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px; background: var(--brand-ink); color: var(--surface); font-size: 9px; letter-spacing: .06em; vertical-align: 1px; }
+.reader-top { position: relative; }
+.reader-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; pointer-events: none; }
+.reader-progress > span { display: block; height: 100%; background: var(--brand-ink); transform: scaleX(0); transform-origin: left; transition: transform .08s linear; }
+.content-reader:not(.is-column) .reader-progress { display: none; }
+.reader-font { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.reader-font[hidden] { display: none; }
+.content-app .reader-font button { border: 0; border-radius: 0; background: transparent; color: var(--text); min-width: 36px; height: 32px; padding: 0 8px; font-size: 13px; font-weight: 600; box-shadow: none; }
+.content-app .reader-font button + button { border-left: 1px solid var(--border); font-size: 15px; }
+.content-app .reader-font button:disabled { color: var(--text-faint); cursor: default; }
+.reader-font sup { font-size: 9px; margin-left: 1px; }
+.is-column .reader-scroll > h2, .is-column .reader-byline, .is-column #readerMedia, .is-column .reader-reflection, .is-column .reader-bottom { max-width: 640px; margin-left: auto; margin-right: auto; }
+.is-column .reader-scroll > h2 { font-size: clamp(22px, 4.6vw, 28px); padding-top: 8px; }
+.newsletter-body { --size: var(--reader-font, 17px); font-size: var(--size); line-height: 1.85; letter-spacing: -.01em; word-break: keep-all; overflow-wrap: break-word; color: var(--text); }
+.newsletter-body p { margin: 0 0 1.15em; }
+.newsletter-body h3 { margin: 1.9em 0 .7em; font-size: 1.18em; line-height: 1.5; letter-spacing: -.03em; }
+.newsletter-body h3:first-child { margin-top: 0; }
+.newsletter-body strong { font-weight: 700; color: var(--text); background: linear-gradient(transparent 62%, var(--tint) 62%); }
+.newsletter-body a { color: var(--brand-ink); text-underline-offset: 3px; }
+.newsletter-body ul { margin: 0 0 1.15em; padding-left: 1.3em; }
+.newsletter-body li { margin: .3em 0; }
+.newsletter-body blockquote { margin: 1.4em 0; padding: .2em 0 .2em 1em; border-left: 3px solid var(--brand-ink); color: var(--text-dim); }
+.newsletter-body figure { margin: 1.4em 0; }
+.newsletter-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 8px; }
+.newsletter-body hr { border: 0; border-top: 1px solid var(--border); margin: 2em auto; width: 40%; }
+.reader-loading { padding: 32px 18px; border-radius: 12px; background: var(--tint); text-align: center; color: var(--text-dim); font-size: 14px; }
+.reader-loading p { margin: 0 0 12px; }
+.reader-loading p:only-child { margin: 0; }
+.reader-loading .reader-original-link { display: inline-block; margin: 0 12px 0 0; font-weight: 600; text-decoration: none; }
+.content-app .reader-loading button { font-size: 13px; }
+
+/* 영상 아래 멤버 인사이트 */
+.reader-comments { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
+.reader-comments[hidden] { display: none; }
+.comments-head h3 { margin: 0; font-size: 17px; letter-spacing: -.025em; }
+#commentCount { color: var(--brand-ink); margin-left: 2px; }
+.comments-lead { margin: 6px 0 16px; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.comment-form { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.comment-form input, .comment-form textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.comment-form textarea { resize: vertical; min-height: 84px; line-height: 1.6; }
+.comment-form input:focus, .comment-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.comment-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; color: var(--text-faint); }
+.comment-msg { margin: 0; min-height: 0; font-size: 12px; color: var(--text-dim); }
+.comment-msg:empty { display: none; }
+.comment-msg[data-kind="error"] { color: var(--bad); }
+.comment-msg[data-kind="ok"] { color: var(--brand-ink); }
+.comment-state { margin: 16px 0 0; font-size: 13px; color: var(--text-dim); }
+.comment-state[hidden] { display: none; }
+.comment-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.comment { position: relative; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.comment:last-child { border-bottom: 0; }
+.comment-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; color: var(--text-faint); padding-right: 44px; }
+.comment-meta strong { font-size: 13px; color: var(--text); }
+.comment-avatar { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--tint); color: var(--brand-ink); font-size: 12px; font-weight: 700; }
+.comment-book { padding: 1px 7px; border-radius: 999px; border: 1px solid var(--tint-line, var(--border)); color: var(--brand-ink); font-size: 10.5px; }
+.comment-text { margin: 8px 0 0 34px; font-size: 14.5px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; word-break: keep-all; }
+.content-app .comment-delete { position: absolute; top: 14px; right: 0; border: 0; background: transparent; color: var(--text-faint); font-size: 11px; padding: 4px 6px; min-height: 0; box-shadow: none; }
+@media(max-width: 540px) {
+  .reader-top { padding: 10px 12px; gap: 8px; }
+  .reader-top > div { gap: 6px; }
+  .comment-text { margin-left: 0; }
+}
+@media(prefers-reduced-motion: reduce) { .reader-progress > span { transition: none; } }

@@ -27,7 +27,7 @@
       <div class="content-source-links"><a href="https://www.youtube.com/@%EC%BB%A4%EB%B0%8D%EC%8F%9C" target="_blank" rel="noopener noreferrer">유튜브 채널 ↗</a><a href="https://personalmakers.stibee.com/" target="_blank" rel="noopener noreferrer">뉴스레터 구독·전체 글 ↗</a></div>
     </section>
     <nav class="content-tabs" aria-label="콘텐츠 종류">
-      <button type="button" data-filter="videos" aria-pressed="true">추천 영상</button>
+      <button type="button" data-filter="videos" aria-pressed="true">최신 영상</button>
       <button type="button" data-filter="columns" aria-pressed="false">쏜님의 칼럼</button>
       <button type="button" data-filter="saved" aria-pressed="false">보관함 <span id="savedCount">0</span></button>
     </nav>
@@ -38,14 +38,32 @@
       <noscript><p>콘텐츠 목록을 보려면 자바스크립트를 켜주세요. 위의 유튜브·뉴스레터 링크에서도 바로 볼 수 있습니다.</p></noscript>
     </section>
     <aside class="reading-bridge"><span aria-hidden="true">✎</span><div><strong>보고 끝내지 말고, 내 것으로.</strong><p>마음에 남은 한 가지를 오늘의 독서 기록과 연결해 보세요.</p><a href="index.html">오늘의 인증 남기기 →</a></div></aside>
-    <footer class="content-footer">영상·뉴스레터 출처: 커밍쏜 · 보관함은 현재 기기에 저장됩니다.</footer>
+    <footer class="content-footer">영상·뉴스레터 출처: 커밍쏜 · 보관함은 현재 기기에, 영상 댓글은 멤버십 서버에 저장됩니다.</footer>
   </main>
   <dialog id="contentReader" class="content-reader" aria-labelledby="readerTitle">
-    <div class="reader-top"><span id="readerType">커밍쏜</span><div><a id="readerOriginal" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a><button type="button" id="readerClose" aria-label="콘텐츠 닫기">✕</button></div></div>
-    <div class="reader-scroll"><h2 id="readerTitle"></h2><p class="reader-byline">커밍쏜 · 퍼스널메이커스</p>
+    <div class="reader-top"><span id="readerType">커밍쏜</span><div>
+      <span id="readerFont" class="reader-font" role="group" aria-label="글자 크기" hidden><button type="button" id="fontDown" aria-label="글자 작게">가<sup>−</sup></button><button type="button" id="fontUp" aria-label="글자 크게">가<sup>+</sup></button></span>
+      <a id="readerOriginal" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a><button type="button" id="readerClose" aria-label="콘텐츠 닫기">✕</button></div>
+      <span class="reader-progress" aria-hidden="true"><span id="readerProgress"></span></span></div>
+    <div class="reader-scroll"><h2 id="readerTitle"></h2><p class="reader-byline" id="readerByline">커밍쏜 · 퍼스널메이커스</p>
       <div id="readerMedia"></div>
       <div id="readerReflection" class="reader-reflection"></div>
       <div class="reader-bottom"><button type="button" id="readerSave">나중에 보기</button><button type="button" id="readerNext">다음 콘텐츠 →</button></div>
+      <section id="readerComments" class="reader-comments" aria-labelledby="commentsTitle" hidden>
+        <div class="comments-head"><h3 id="commentsTitle">멤버 인사이트 <span id="commentCount"></span></h3></div>
+        <p class="comments-lead">이 영상과 지금 읽고 있는 책을 이어 본 생각을 나눠 주세요. 독서 멤버십 멤버만 남길 수 있어요.</p>
+        <form id="commentForm" class="comment-form" novalidate>
+          <label class="sr-only" for="commentName">멤버 이름</label>
+          <input id="commentName" name="nickname" maxlength="40" autocomplete="nickname" placeholder="멤버 이름 (인증할 때 쓰는 이름)">
+          <label class="sr-only" for="commentText">인사이트</label>
+          <textarea id="commentText" name="text" rows="3" maxlength="500"></textarea>
+          <div class="comment-actions"><span id="commentLength">0/500</span><button type="submit" id="commentSubmit">인사이트 남기기</button></div>
+          <p id="commentMsg" class="comment-msg" role="status" aria-live="polite"></p>
+        </form>
+        <p id="commentState" class="comment-state" hidden></p>
+        <p id="commentEmpty" class="comment-state" hidden>아직 남겨진 인사이트가 없어요. 첫 번째로 나눠 주세요.</p>
+        <ol id="commentList" class="comment-list"></ol>
+      </section>
     </div>
   </dialog>
   <script src="js/content.js"></script>
