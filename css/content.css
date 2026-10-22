@@ -56,7 +56,6 @@
 .reader-scroll > h2 { margin: 0; font-size: 24px; line-height: 1.45; letter-spacing: -.035em; }
 .reader-byline { color: var(--text-dim); font-size: 12px; margin-bottom: 22px; }
 .video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; display: block; background: #080808; }
-.column-frame { width: 100%; height: min(70dvh, 800px); border: 1px solid var(--border); border-radius: 8px; display: block; background: #fff; }
 .reader-fallback { color: var(--text-dim); font-size: 12px; margin: 12px 0; }
 .reader-reflection { margin-top: 24px; padding: 18px; background: var(--tint); border-radius: 12px; }
 .reader-reflection strong { font-size: 12px; color: var(--brand-ink); }
@@ -78,3 +77,6 @@ body.content-reader-open { overflow: hidden; }
 
 .content-thumb img[hidden] { display: none; }
 .thumbnail-unavailable::before { content: 'YouTube · 커밍쏜'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--brand-ink); font-size: 15px; font-weight: 600; }
+
+.content-app a.library-open { text-decoration: none; }
+.column-original-label { display: inline-block; margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--brand-ink); }

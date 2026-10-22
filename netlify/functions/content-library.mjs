@@ -54,9 +54,11 @@ export default async function handler(req) {
       return { id, title: data.title, author: data.author_name };
     })
   ]);
+  if (archive.status === 'rejected') console.warn('[content-library] Newsletter unavailable:', archive.reason?.message || 'unknown error');
+  const archiveAvailable = archive.status === 'fulfilled' && archive.value.length > 0;
   return Response.json({
     columns: archive.status === 'fulfilled' ? archive.value : [],
     videos: videos.filter(x => x.status === 'fulfilled').map(x => x.value),
-    archiveAvailable: archive.status === 'fulfilled' && archive.value.length > 0,
-  }, { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' } });
+    archiveAvailable,
+  }, { headers: { 'Cache-Control': archiveAvailable ? 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=60' } });
 }

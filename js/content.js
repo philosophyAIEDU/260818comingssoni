@@ -32,53 +32,40 @@
       status.hidden = false;
       if (filter === 'saved') status.textContent = '마음에 드는 콘텐츠의 ‘나중에 보기’를 눌러보세요. 여기에 모아둘게요.';
       else if (loading) status.textContent = '쏜님의 칼럼을 불러오고 있습니다…';
-      else status.innerHTML = '쏜님의 공식 뉴스레터에서 칼럼을 골라 읽어보세요. 목록이 보이지 않으면 새 창에서 열 수 있습니다.<br><a href="https://personalmakers.stibee.com/" target="_blank" rel="noopener noreferrer">뉴스레터 새 창에서 읽기 ↗</a><br><button type="button" id="retryColumns">목록 다시 불러오기</button>';
+      else status.innerHTML = '지금은 칼럼 목록을 불러오지 못했습니다. 공식 뉴스레터에서 글을 읽으실 수 있어요.<br><a href="https://personalmakers.stibee.com/" target="_blank" rel="noopener noreferrer">뉴스레터 새 창에서 읽기 ↗</a><br><button type="button" id="retryColumns">목록 다시 불러오기</button>';
     } else if (filter === 'columns' && failed) { status.hidden = false; status.textContent = '이전에 불러온 칼럼을 보여드리고 있어요.'; }
-    if (filter === 'columns' && !loading && !items.length) {
-      const frame = document.createElement('iframe');
-      frame.className = 'column-frame archive-frame'; frame.title = '커밍쏜 공식 뉴스레터 칼럼 목록';
-      frame.src = 'https://personalmakers.stibee.com/';
-      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
-      $('contentGrid').replaceChildren(frame);
-      return;
-    }
     $('contentGrid').innerHTML = items.map(item => `<article class="library-item">
-      <button type="button" class="library-open" data-open="${esc(item.id)}" aria-label="${esc(item.title)} ${item.type === 'videos' ? '영상 보기' : '칼럼 읽기'}">
+      <${item.type === 'videos' ? 'button type="button"' : 'a target="_blank" rel="noopener noreferrer" href="' + esc(item.url) + '"'} class="library-open" ${item.type === 'videos' ? 'data-open="' + esc(item.id) + '"' : ''} aria-label="${esc(item.title)} ${item.type === 'videos' ? '영상 보기' : '칼럼 원문 새 창에서 읽기'}">
         ${item.type === 'videos' ? `<div class="content-thumb"><img src="https://i.ytimg.com/vi/${item.id}/hqdefault.jpg" alt="${esc(item.title)} 영상 썸네일" loading="lazy" width="480" height="270"><span class="content-play" aria-hidden="true">▶</span></div>` : ''}
         <span class="content-category">${esc(item.category)}</span><h3>${esc(item.title)}</h3>
         ${item.description ? `<p>${esc(item.description)}</p>` : ''}
-      </button>
-      <div class="content-item-footer"><span>커밍쏜${item.date ? ' · ' + esc(item.date) : ' · YouTube'}</span><button type="button" class="save-content" data-save="${esc(item.id)}" aria-label="${esc(item.title)} ${saved.has(item.id) ? '보관 취소' : '나중에 보기'}" aria-pressed="${saved.has(item.id)}">${saved.has(item.id) ? '✓ 보관 중' : '+ 나중에 보기'}</button></div>
+        ${item.type === 'columns' ? '<span class="column-original-label">공식 뉴스레터에서 읽기 ↗</span>' : ''}
+      </${item.type === 'videos' ? 'button' : 'a'}>
+      <div class="content-item-footer"><span>커밍쏜${item.date ? ' · ' + esc(item.date) : item.type === 'videos' ? ' · YouTube' : ' · 뉴스레터'}</span><button type="button" class="save-content" data-save="${esc(item.id)}" aria-label="${esc(item.title)} ${saved.has(item.id) ? '보관 취소' : '나중에 보기'}" aria-pressed="${saved.has(item.id)}">${saved.has(item.id) ? '✓ 보관 중' : '+ 나중에 보기'}</button></div>
     </article>`).join('');
   }
   function openItem(id) {
     const item = all().find(x => x.id === id);
-    if (!item) return;
+    if (!item || item.type !== 'videos') return;
     active = item;
     $('readerTitle').textContent = item.title;
-    $('readerType').textContent = item.type === 'videos' ? '쏜님의 영상' : '쏜님의 칼럼';
+    $('readerType').textContent = '쏜님의 영상';
     $('readerOriginal').href = item.url;
-    $('readerOriginal').textContent = item.type === 'videos' ? 'YouTube에서 보기 ↗' : '뉴스레터 원문 보기 ↗';
+    $('readerOriginal').textContent = 'YouTube에서 보기 ↗';
     const frame = document.createElement('iframe');
     frame.title = item.title;
     frame.referrerPolicy = 'strict-origin-when-cross-origin';
-    if (item.type === 'videos') {
-      frame.className = 'video-frame';
-      frame.src = `https://www.youtube-nocookie.com/embed/${item.id}?rel=0&playsinline=1`;
-      frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
-      frame.allowFullscreen = true;
-    } else {
-      frame.className = 'column-frame';
-      frame.src = item.url;
-      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
-    }
+    frame.className = 'video-frame';
+    frame.src = `https://www.youtube-nocookie.com/embed/${item.id}?rel=0&playsinline=1`;
+    frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+    frame.allowFullscreen = true;
     $('readerMedia').replaceChildren(frame);
     const hint = document.createElement('p'); hint.className = 'reader-fallback';
-    hint.textContent = item.type === 'videos' ? '재생이 제한되면 위의 ‘YouTube에서 보기’를 눌러주세요.' : '공식 뉴스레터 원문입니다. 본문이 표시되지 않으면 위의 ‘뉴스레터 원문 보기’를 눌러주세요.';
+    hint.textContent = '재생이 제한되면 위의 ‘YouTube에서 보기’를 눌러주세요.';
     $('readerMedia').append(hint);
     $('readerReflection').innerHTML = `<strong>독서와 연결하기 · 멤버십 질문</strong><p>${esc(item.question || '이 글에서 내 삶이나 브랜드에 적용하고 싶은 한 가지는 무엇인가요? 오늘 읽은 책의 문장과 함께 생각해 보세요.')}</p>`;
     syncReaderSave();
-    const siblings = filter === 'saved' ? all().filter(x => saved.has(x.id)) : item.type === 'videos' ? videos : columns;
+    const siblings = filter === 'saved' ? videos.filter(x => saved.has(x.id)) : videos;
     $('readerNext').hidden = siblings.length < 2;
     if (!$('contentReader').open) $('contentReader').showModal();
     document.body.classList.add('content-reader-open');
@@ -101,7 +88,7 @@
   $('contentReader').addEventListener('close', () => { $('readerMedia').replaceChildren(); document.body.classList.remove('content-reader-open'); });
   $('readerSave').addEventListener('click', () => { if (active) toggleSave(active.id); });
   $('readerNext').addEventListener('click', () => {
-    const siblings = filter === 'saved' ? all().filter(x => saved.has(x.id)) : active.type === 'videos' ? videos : columns;
+    const siblings = filter === 'saved' ? videos.filter(x => saved.has(x.id)) : videos;
     if (siblings.length) openItem(siblings[(siblings.findIndex(x => x.id === active.id) + 1) % siblings.length].id);
   });
   async function load() {
