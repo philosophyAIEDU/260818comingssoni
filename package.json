@@ -13,7 +13,8 @@
     "roster:upload": "node tools/roster-upload.mjs",
     "streak:sync": "node tools/streak-sync.mjs",
     "test:content": "node test/content-library.test.mjs",
-    "test:content-ui": "node test/content-ui.test.js"
+    "test:content-ui": "node test/content-ui.test.js",
+    "test:content-comments": "node test/content-comments.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",
