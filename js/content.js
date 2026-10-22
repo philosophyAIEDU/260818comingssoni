@@ -311,10 +311,28 @@
     if (open) openItem(open.dataset.open);
     if (save) toggleSave(save.dataset.save);
   });
-  document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; render(); }));
+  // 주소로 바로 들어오기: content.html#videos · #columns · #saved, #open=<영상 ID 또는 칼럼 경로>
+  const FILTERS = ['videos', 'columns', 'saved'];
+  const setHash = h => { try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch { /* file:// 등 */ } };
+  let pendingOpen = '';
+  function readHash() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (FILTERS.includes(h)) filter = h;
+    else if (h.startsWith('open=')) pendingOpen = h.slice(5);
+  }
+  function openPending() {
+    if (!pendingOpen) return;
+    const item = all().find(x => x.id === pendingOpen);
+    if (!item && loading) return; // 목록을 다 받은 뒤 다시 본다
+    pendingOpen = '';
+    if (!item) return;
+    filter = item.type; render(); openItem(item.id);
+  }
+  window.addEventListener('hashchange', () => { readHash(); render(); openPending(); });
+  document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; setHash(filter); render(); }));
   $('contentStatus').addEventListener('click', e => { if (e.target.id === 'retryColumns') load(); });
   $('readerClose').addEventListener('click', () => $('contentReader').close());
-  $('contentReader').addEventListener('close', () => { $('readerMedia').replaceChildren(); active = null; commentsFor = ''; document.body.classList.remove('content-reader-open'); });
+  $('contentReader').addEventListener('close', () => { $('readerMedia').replaceChildren(); active = null; if (location.hash.startsWith('#open=')) setHash(filter); commentsFor = ''; document.body.classList.remove('content-reader-open'); });
   $('readerSave').addEventListener('click', () => { if (active) toggleSave(active.id); });
   $('readerNext').addEventListener('click', () => {
     if (!active) return;
@@ -349,7 +367,7 @@
       if (safe.length) columns = safe.map(x => ({ ...x, type: 'columns', category: 'NEWSLETTER · 칼럼', date: String(x.date || '').slice(0, 32) }));
       failed = !data.archiveAvailable;
     } catch { failed = true; }
-    loading = false; render();
+    loading = false; render(); openPending();
   }
-  paintPlaceholder(); applyFont(); render(); load();
+  readHash(); paintPlaceholder(); applyFont(); render(); openPending(); load();
 })();

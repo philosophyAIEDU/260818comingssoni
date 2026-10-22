@@ -1,6 +1,9 @@
 // 공개 채널의 최신 목록과 뉴스레터 본문을 가져온다.
 // 외부 HTML은 그대로 내려보내지 않는다 — 문단·제목·이미지 같은 구조만 뽑아 JSON으로 주고, 화면은 그 값을 글자로만 그린다.
 const NEWSLETTER = 'https://personalmakers.stibee.com/';
+// 뉴스레터 페이지는 글 목록을 브라우저에서 이 API로 받아 그린다(HTML에는 목록이 없다). 376164 = 퍼스널메이커스 뉴스레터
+const PAGE_API = 'https://page.stibee.com/api/v1.0/lists/376164';
+const CHANNEL_ID = 'UCUzoht-2qT2sg7mPaZCKHWQ'; // 커밍쏜 채널(뉴스레터 페이지에 걸린 유튜브 링크)
 const CHANNEL_PAGE = 'https://www.youtube.com/@%EC%BB%A4%EB%B0%8D%EC%8F%9C';
 const CHANNEL_NAME = '커밍쏜';
 const VIDEO_IDS = ['xmd2_HKMgCU', 'gQZ6zI3epVo', 'XQSoFje8DKY']; // 피드를 못 읽을 때 보여 줄 추천 영상
@@ -25,6 +28,7 @@ export function postUrl(url, base = NEWSLETTER) {
 /** '2026. 10. 4.' · '2026-10-04T…' · RSS의 'Sun, 04 Oct 2026 …' → '2026-10-04'. 못 읽으면 ''. */
 export function isoDate(value) {
   const s = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:?\d{2})$/.test(s)) { const d = new Date(s); if (!isNaN(d)) return kst(d); } // 시간대가 붙은 시각은 한국 날짜로
   const m = s.match(/(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})/);
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
   if (typeof value === 'number' || /^\d{10,13}$/.test(s)) { const n = Number(s); const d = new Date(n < 1e12 ? n * 1000 : n); return isNaN(d) ? '' : kst(d); }
@@ -63,17 +67,38 @@ export function parseArchive(html) {
   return [...posts.values()].slice(0, 30);
 }
 
-/** RSS 2.0 / Atom 뉴스레터 피드 → 글 목록(허용된 주소만) */
-export function parseNewsletterFeed(xml) {
-  const posts = [];
-  for (const [, item] of String(xml).matchAll(/<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi)) {
-    const tag = (name) => (item.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i')) || [])[1] || '';
-    const link = text(tag('link')) || (item.match(/<link\b[^>]*href=["']([^"']+)/i) || [])[1] || text(tag('guid'));
-    const href = postUrl(decode(link));
-    const title = text(tag('title'));
-    if (href && title.length >= 3) posts.push({ id: new URL(href).pathname, title, url: href, date: isoDate(text(tag('pubDate')) || text(tag('published')) || text(tag('updated'))) });
-  }
-  return posts;
+/** 스티비 페이지 글 목록 API 응답 → 글 목록. 응답 모양이 바뀌어도 버티도록 제목·주소·날짜 필드를 넓게 찾는다.
+ *  share: 같은 글의 스티비 공유 메일 주소(본문을 가장 정확히 읽을 수 있는 곳). 없으면 ''. */
+const TITLE_KEYS = ['title', 'subject', 'emailSubject', 'emailTitle', 'postTitle', 'contentTitle'];
+const DATE_KEYS = ['publishedAt', 'publishDate', 'publishedTime', 'sentTime', 'sendTime', 'sendDate', 'sentAt', 'sendAt', 'reservedTime', 'createdTime', 'createdAt', 'regDate', 'date'];
+const ID_KEYS = ['postId', 'contentId', 'contentsId', 'id', 'emailId'];
+export function parseContents(data) {
+  const posts = new Map();
+  const visit = (v, depth = 0) => {
+    if (!v || typeof v !== 'object' || depth > 8) return;
+    if (Array.isArray(v)) { v.forEach((x) => visit(x, depth + 1)); return; }
+    const titleKey = TITLE_KEYS.find((k) => typeof v[k] === 'string' && text(v[k]).length >= 3);
+    // 안에 목록을 품은 객체(응답 껍데기·뉴스레터 정보)는 글이 아니다
+    if (titleKey && !Object.values(v).some(Array.isArray)) {
+      let page = '', share = '';
+      for (const val of Object.values(v)) {
+        if (typeof val !== 'string') continue;
+        const u = postUrl(decode(val));
+        if (u && u.startsWith(NEWSLETTER)) page = page || u; else if (u) share = share || u;
+      }
+      if (!page) { const k = ID_KEYS.find((k) => /^\d+$/.test(String(v[k] ?? ''))); if (k) page = `${NEWSLETTER}p/${v[k]}/`; }
+      const url = page || share;
+      if (url) {
+        const id = new URL(url).pathname;
+        const dateKey = DATE_KEYS.find((k) => isoDate(v[k]));
+        posts.set(id, { id, title: text(v[titleKey]), url, date: dateKey ? isoDate(v[dateKey]) : '', share: share && share !== url ? share : '' });
+        return;
+      }
+    }
+    for (const child of Object.values(v)) if (child && typeof child === 'object') visit(child, depth + 1);
+  };
+  visit(data);
+  return [...posts.values()];
 }
 
 /** 채널 페이지 HTML에서 채널 ID(UC…)를 찾는다 */
@@ -185,7 +210,18 @@ const blockChars = (blocks) => blocks.reduce((n, b) => n + (b.runs ? b.runs.redu
 /** 글 페이지 HTML에서 본문 후보를 고른다: 공유 메일 주소(가장 정확) → JSON 속 가장 긴 HTML → 페이지의 article/main */
 export function pageCandidates(html) {
   const out = { shareUrl: '', htmls: [] };
-  const share = String(html).match(/https:(?:\\?\/){2}stibee\.com(?:\\?\/)api(?:\\?\/)v1\.0(?:\\?\/)emails(?:\\?\/)share(?:\\?\/)[\w-]+/);
+  // Next.js(app router)는 화면 데이터를 self.__next_f.push([1,"…"]) 조각으로 싣는다. 긴 글은 "id:T길이,본문" 줄로 들어온다.
+  let rsc = '';
+  for (const m of String(html).matchAll(/self\.__next_f\.push\((\[[\s\S]*?\])\)\s*<\/script>/g)) {
+    try { const chunk = JSON.parse(m[1]); if (typeof chunk[1] === 'string') rsc += chunk[1]; } catch { /* 형식이 다른 조각은 건너뛴다 */ }
+  }
+  let rscLongest = '';
+  const keep = (str) => { if (str.length > rscLongest.length && /<(?:p|div|table|br|span|h[1-6])\b/i.test(str)) rscLongest = str; };
+  for (const m of rsc.matchAll(/(?:^|\n)[0-9a-z]+:T([0-9a-f]+),/g)) {
+    keep(Buffer.from(rsc.slice(m.index + m[0].length)).subarray(0, parseInt(m[1], 16)).toString());
+  }
+  for (const m of rsc.matchAll(/"((?:[^"\\]|\\.){200,})"/g)) { try { keep(JSON.parse(`"${m[1]}"`)); } catch { /* 문자열이 아니면 무시 */ } }
+  const share = (String(html) + rsc).match(/https:(?:\\?\/){2}stibee\.com(?:\\?\/)api(?:\\?\/)v1\.0(?:\\?\/)emails(?:\\?\/)share(?:\\?\/)[\w-]+/);
   if (share) out.shareUrl = postUrl(share[0].replace(/\\\//g, '/')) || '';
   let longest = '';
   const visit = (v, d = 0) => {
@@ -196,6 +232,7 @@ export function pageCandidates(html) {
   for (const script of String(html).matchAll(/<script\b[^>]*(?:type=["']application\/(?:ld\+)?json["']|id=["']__NEXT_DATA__["'])[^>]*>([\s\S]*?)<\/script>/gi)) {
     try { visit(JSON.parse(script[1])); } catch { /* 일반 스크립트 제외 */ }
   }
+  if (rscLongest) out.htmls.push(rscLongest);
   if (longest) out.htmls.push(longest);
   const region = String(html).match(/<article\b[\s\S]*<\/article>/i) || String(html).match(/<main\b[\s\S]*<\/main>/i);
   out.htmls.push(region ? region[0] : String(html));
@@ -217,19 +254,40 @@ async function getStibee(url) {
 }
 
 export async function readPost(url) {
-  const html = await getStibee(url);
-  const found = pageCandidates(html);
-  let best = [];
+  let best = [], title = '';
   const consider = (blocks) => { if (blockChars(blocks) > blockChars(best)) best = blocks; };
-  if (found.shareUrl && found.shareUrl !== url) {
-    try { consider(emailBlocks(await getStibee(found.shareUrl))); } catch (e) { console.warn('[content-library] Shared email unavailable:', e.message); }
+  const enough = () => blockChars(best) >= 200;
+  // 1) 목록 API가 알려 준 공유 메일 주소 — 메일 본문 그대로라 가장 정확하다
+  const known = url.startsWith(NEWSLETTER) ? (await newsletterIndex().catch(() => [])).find((p) => p.url === url) : null;
+  if (known) title = known.title;
+  if (known?.share) { try { consider(emailBlocks(await getStibee(known.share))); } catch (e) { console.warn('[content-library] Shared email unavailable:', e.message); } }
+  // 2) 글 페이지(HTML·Next.js 데이터 속 본문이나 공유 메일 주소)
+  if (!enough()) {
+    try {
+      const html = await getStibee(url);
+      title = title || metaTitle(html);
+      const found = pageCandidates(html);
+      if (found.shareUrl && found.shareUrl !== url && found.shareUrl !== known?.share) {
+        try { consider(emailBlocks(await getStibee(found.shareUrl))); } catch (e) { console.warn('[content-library] Shared email unavailable:', e.message); }
+      }
+      if (!enough()) for (const h of found.htmls) consider(emailBlocks(h));
+    } catch (e) { console.warn('[content-library] Post page unavailable:', e.message); }
   }
-  if (blockChars(best) < 200) for (const h of found.htmls) consider(emailBlocks(h));
+  // 3) 글 하나를 주는 API(있으면) — 응답 속 가장 긴 HTML을 본문으로 본다
+  const postId = (url.match(/\/p\/(\d+)\/?$/) || [])[1];
+  if (!enough() && postId) {
+    try {
+      let longest = '';
+      const visit = (v, d = 0) => { if (d > 10 || v == null) return; if (typeof v === 'string') { if (v.length > longest.length && /<(?:p|div|table|br|span)\b/i.test(v)) longest = v; return; } if (typeof v === 'object') Object.values(v).forEach((c) => visit(c, d + 1)); };
+      visit(await get(`${PAGE_API}/contents/${postId}`, 'application/json').then((r) => r.json()));
+      if (longest) consider(emailBlocks(longest));
+    } catch (e) { console.warn('[content-library] Post API unavailable:', e.message); }
+  }
   if (blockChars(best) < 40) throw Error('Post body not recognized');
-  return { url, title: metaTitle(html), blocks: best };
+  return { url, title, blocks: best };
 }
 
-let channelId = process.env.YOUTUBE_CHANNEL_ID || '';
+let channelId = process.env.YOUTUBE_CHANNEL_ID || CHANNEL_ID;
 async function latestVideos() {
   if (!channelId) channelId = channelIdFrom(await get(CHANNEL_PAGE, 'text/html').then((r) => r.text()));
   if (!channelId) throw Error('Channel id not found');
@@ -245,20 +303,36 @@ async function curatedVideos() {
   }));
   return results.filter((x) => x.status === 'fulfilled').map((x) => x.value);
 }
+let indexCache = null;
+export function resetCaches() { indexCache = null; } // 테스트용 // { at, promise } — 목록과 본문 요청이 같은 목록 API 응답을 잠시 같이 쓴다
+function newsletterIndex() {
+  if (indexCache && Date.now() - indexCache.at < 10 * 60e3) return indexCache.promise;
+  const promise = get(`${PAGE_API}/contents`, 'application/json').then((r) => r.json()).then((data) => {
+    const posts = parseContents(data);
+    if (!posts.length) { console.warn('[content-library] Contents API format not recognized', JSON.stringify(describe(data)).slice(0, 1500)); indexCache = null; }
+    return posts;
+  });
+  indexCache = { at: Date.now(), promise };
+  promise.catch(() => { indexCache = null; });
+  return promise;
+}
+/** 응답 모양만 요약한다(값은 앞부분만) — 형식이 바뀌었을 때 로그와 ?debug=newsletter로 확인 */
+function describe(v, depth = 0) {
+  if (Array.isArray(v)) return depth > 3 ? `[${v.length}]` : [v.length, describe(v[0], depth + 1)];
+  if (v && typeof v === 'object') return depth > 3 ? '{…}' : Object.fromEntries(Object.entries(v).slice(0, 40).map(([k, x]) => [k, describe(x, depth + 1)]));
+  return typeof v === 'string' ? v.slice(0, 60) : v;
+}
 async function newsletterPosts() {
-  const [feed, archive] = await Promise.allSettled([
-    get(NEWSLETTER + 'rss').then((r) => r.text()).then(parseNewsletterFeed),
-    get(NEWSLETTER).then((r) => r.text()).then((html) => {
-      const posts = parseArchive(html);
-      if (!posts.length) console.warn('[content-library] Archive format not recognized', { bytes: html.length, scripts: [...html.matchAll(/<script[^>]+src=["']([^"']+)/g)].map((m) => m[1]).slice(0, 6) });
-      return posts;
-    })
-  ]);
-  if (feed.status === 'rejected' && archive.status === 'rejected') throw archive.reason;
-  const byId = new Map();
-  for (const p of [...(archive.value || []), ...(feed.value || [])]) byId.set(p.id, { ...byId.get(p.id), ...p, date: p.date || byId.get(p.id)?.date || '' });
-  // 날짜가 있는 글은 최신순, 날짜를 못 읽은 글은 아카이브에 나온 순서대로 뒤에
-  return [...byId.values()].map((p, i) => ({ p, i })).sort((a, b) => (b.p.date || '').localeCompare(a.p.date || '') || a.i - b.i).map((x) => x.p).slice(0, 20);
+  let posts = await newsletterIndex().catch((e) => { console.warn('[content-library] Contents API unavailable:', e.message); return []; });
+  if (!posts.length) {
+    // 목록 API가 막히거나 바뀌면 페이지 HTML에 남은 링크라도 읽는다
+    const html = await get(NEWSLETTER).then((r) => r.text());
+    posts = parseArchive(html);
+    if (!posts.length) console.warn('[content-library] Archive format not recognized', { bytes: html.length });
+  }
+  // 날짜가 있는 글은 최신순, 날짜를 못 읽은 글은 받은 순서대로 뒤에
+  return posts.map((p, i) => ({ p, i })).sort((a, b) => (b.p.date || '').localeCompare(a.p.date || '') || a.i - b.i)
+    .map(({ p }) => ({ id: p.id, title: p.title, url: p.url, date: p.date })).slice(0, 20);
 }
 
 const CACHE_OK = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
@@ -266,7 +340,15 @@ const CACHE_SHORT = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
 
 export default async function handler(req) {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET' } });
-  const requested = new URL(req.url).searchParams.get('post');
+  const params = new URL(req.url).searchParams;
+  if (params.get('debug') === 'newsletter') {
+    const [api, page] = await Promise.allSettled([get(`${PAGE_API}/contents`, 'application/json').then((r) => r.json()), get(NEWSLETTER).then((r) => r.text())]);
+    return Response.json({
+      api: api.status === 'fulfilled' ? { shape: describe(api.value), parsed: parseContents(api.value).slice(0, 5) } : { error: api.reason?.message },
+      page: page.status === 'fulfilled' ? { bytes: page.value.length, parsed: parseArchive(page.value).length } : { error: page.reason?.message },
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+  const requested = params.get('post');
   if (requested != null) {
     const url = postUrl(requested);
     if (!url) return Response.json({ error: '허용되지 않은 글 주소입니다.' }, { status: 400 });

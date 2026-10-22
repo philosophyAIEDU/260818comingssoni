@@ -28,7 +28,7 @@ await context.route('https://personalmakers.stibee.com/**',r=>r.fulfill({body:'<
 const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await page.goto(BASE + '/content.html');
 await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);
 // 최신 영상이 먼저, 피드에 없는 추천 영상은 뒤에. 최근 2주 안 영상엔 NEW
-assert.equal(await page.locator('[data-filter="videos"]').textContent(),'최신 영상');
+assert.equal(await page.locator('[data-filter="videos"]').textContent(),'추천 유튜브');assert.equal(await page.locator('[data-filter="columns"]').textContent(),'뉴스레터 칼럼');
 assert.deepEqual(await page.locator('[data-open]').evaluateAll(a=>a.map(x=>x.dataset.open)),['NEWVIDEO001','xmd2_HKMgCU','gQZ6zI3epVo','XQSoFje8DKY']);
 assert.equal(await page.locator('.library-item').first().locator('.content-new').count(),1);assert.equal(await page.locator('.library-item').nth(1).locator('.content-new').count(),0);
 assert.match(await page.locator('.library-item').nth(1).textContent(),/꾸준한 실행/);
@@ -59,7 +59,7 @@ assert.equal(await page.locator('#commentName').inputValue(),'박지민','멤버
 await page.locator('#readerSave').click();assert.equal(await page.locator('#savedCount').textContent(),'1');
 await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('#readerMedia iframe'));assert.equal(await page.locator('#readerMedia iframe').count(),0);
 await page.locator('[data-filter="saved"]').click();assert.equal(await page.locator('.library-item').count(),1);
-await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);assert.equal(await page.locator('#savedCount').textContent(),'1');
+await page.reload();await page.waitForFunction(()=>document.querySelector('[data-filter="saved"]').getAttribute('aria-pressed')==='true'&&document.querySelectorAll('.library-item').length===1);assert.equal(await page.locator('#savedCount').textContent(),'1');
 // 칼럼: 화면 안에서 읽기
 await page.locator('[data-filter="columns"]').click();assert.equal(await page.locator('.library-item').count(),2);
 assert.match(await page.locator('.content-item-footer').first().textContent(),/2026\. 10\. 4\./);
@@ -86,15 +86,37 @@ assert.equal(await page.locator('.reader-original-link').getAttribute('href'),'h
 await page.locator('#readerNext').click();await page.waitForSelector('.newsletter-body');
 assert.equal(postRequests.filter(p=>p===post.url).length,1,'읽은 본문은 다시 받지 않음');
 await page.keyboard.press('Escape');
-await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);assert.equal(await page.locator('#savedCount').textContent(),'1');
-await page.locator('[data-filter="columns"]').click();await page.locator('.library-open').first().click();await page.waitForSelector('.newsletter-body');assert.equal(await size(),'19px','글자 크기 기억');
+await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===2);assert.equal(await page.locator('[data-filter="columns"]').getAttribute('aria-pressed'),'true','새로고침해도 보던 탭');assert.equal(await page.locator('#savedCount').textContent(),'1');
+await page.locator('.library-open').first().click();await page.waitForSelector('.newsletter-body');assert.equal(await size(),'19px','글자 크기 기억');
 await page.keyboard.press('Escape');
 offline=true;await page.reload();await page.locator('[data-filter="columns"]').click();await page.waitForFunction(()=>/불러오지 못했습니다/.test(document.querySelector('#contentStatus').textContent));assert.equal(await page.locator('iframe').count(),0);assert(await page.locator('#contentStatus a').isVisible());if(process.env.SHOT_DIR)await page.screenshot({path:process.env.SHOT_DIR+'/newsletter-unavailable.png',fullPage:true});
 assert.equal(await page.locator('[data-filter="videos"]').evaluate(b=>{b.click();return document.querySelectorAll('.library-item').length;}),3,'목록을 못 받으면 추천 영상');
 await page.locator('[data-filter="saved"]').click();await page.locator('[data-save]').click();assert.match(await page.locator('#contentStatus').textContent(),/나중에 보기/);
-offline=false;await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);
+offline=false;await page.goto(BASE+'/content.html#videos');await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);
 for(const width of [360,1280]){await page.setViewportSize({width,height:900});await page.locator('[data-filter="videos"]').click();assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth));
   await page.locator('[data-open]').first().click();await page.waitForSelector('#commentList .comment');assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth));await page.keyboard.press('Escape');}
 await page.emulateMedia({colorScheme:'dark'});assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth));
 if(process.env.SHOT_DIR){await page.setViewportSize({width:390,height:844});await page.locator('[data-filter="columns"]').click();await page.locator('.library-open').first().click();await page.waitForSelector('.newsletter-body');await page.screenshot({path:process.env.SHOT_DIR+'/column-reader-dark.png'});await page.keyboard.press('Escape');}
-assert.deepEqual(errors,[]);console.log('최신 영상 순서·NEW 표시, 영상 재생·멤버 인사이트(불러오기·이름 확인·작성·삭제·이름 기억), 칼럼 화면 읽기(정제된 본문·글자 크기·진행 표시·원문 대체·본문 캐시), 다음 콘텐츠, 보관·재방문·삭제, 닫을 때 재생 해제, 외부 장애 안내, 360/390/1280px·다크 모드 검증 통과');await browser.close();})().catch(e=>{console.error(e);process.exit(1);});
+// 주소로 바로 들어오기: #columns는 칼럼 탭, #open=은 그 콘텐츠를 바로 연다
+await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'light'});
+await page.goto(BASE+'/content.html#columns');await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===2);
+assert.equal(await page.locator('[data-filter="columns"]').getAttribute('aria-pressed'),'true');
+await page.goto(BASE+'/content.html#open='+encodeURIComponent('/p/fixture'));await page.waitForSelector('.newsletter-body');
+assert(await page.locator('#contentReader').evaluate(e=>e.open));assert.equal(await page.locator('#readerTitle').textContent(),'테스트용 칼럼 제목');
+await page.keyboard.press('Escape');await page.waitForFunction(()=>location.hash==='#columns');
+await page.goto(BASE+'/content.html#open=NEWVIDEO001');await page.waitForSelector('#readerMedia iframe');assert.match(await page.locator('#readerMedia iframe').getAttribute('src'),/NEWVIDEO001/);
+await page.keyboard.press('Escape');await page.goto(BASE+'/content.html#open=nothing-here');await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);assert(!(await page.locator('#contentReader').evaluate(e=>e.open)));
+// 인증 앱 첫 화면의 "커밍쏜의 추천 콘텐츠" 카드: 두 버튼 + 최신 영상·칼럼 바로가기
+await context.route('**/js/config.js',async r=>{const res=await r.fetch();r.fulfill({response:res,body:(await res.text()).replace(/backend: '[^']+'/,"backend: 'local'"),headers:{...res.headers(),'content-type':'application/javascript'}});});
+const home=await context.newPage();home.on('pageerror',e=>errors.push('home: '+e.message));await home.goto(BASE+'/index.html');await home.locator('#tabbar [data-go="info"]').click();
+await home.waitForSelector('#contentInviteLatest .invite-latest');
+assert.equal(await home.locator('#contentInvite h2').textContent(),'커밍쏜의 추천 콘텐츠');
+assert.match(await home.locator('#contentInvite p').first().textContent(),/책에서 얻은 인사이트를 커밍쏜의 영상과 칼럼으로 적용해보세요!/);
+assert.deepEqual(await home.locator('.invite-btn').evaluateAll(a=>a.map(x=>[x.textContent.trim(),x.getAttribute('href')])),[['▶추천 유튜브','content.html#videos'],['✉뉴스레터 칼럼','content.html#columns']]);
+assert.deepEqual(await home.locator('.invite-latest').evaluateAll(a=>a.map(x=>x.getAttribute('href'))),['content.html#open=NEWVIDEO001','content.html#open='+encodeURIComponent('/p/fixture')]);
+assert.match(await home.locator('.invite-latest.video').textContent(),/최신 영상.*새로 올라온 영상/);
+assert(await home.evaluate(()=>document.documentElement.scrollWidth===innerWidth));
+if(process.env.SHOT_DIR){await home.locator('#contentInvite').scrollIntoViewIfNeeded();await home.locator('#contentInvite').screenshot({path:process.env.SHOT_DIR+'/home-invite.png'});}
+await home.locator('.invite-latest.column').click();await home.waitForSelector('.newsletter-body');assert.equal(await home.locator('#readerTitle').textContent(),'테스트용 칼럼 제목');
+await home.goto(BASE+'/index.html');await home.locator('#tabbar [data-go="info"]').click();await home.locator('.invite-btn').first().click();await home.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);assert.equal(await home.locator('[data-filter="videos"]').getAttribute('aria-pressed'),'true');
+assert.deepEqual(errors,[]);console.log('추천 콘텐츠 카드(두 버튼·최신 영상/칼럼 바로 열기)·주소로 바로 들어오기, '+'최신 영상 순서·NEW 표시, 영상 재생·멤버 인사이트(불러오기·이름 확인·작성·삭제·이름 기억), 칼럼 화면 읽기(정제된 본문·글자 크기·진행 표시·원문 대체·본문 캐시), 다음 콘텐츠, 보관·재방문·삭제, 닫을 때 재생 해제, 외부 장애 안내, 360/390/1280px·다크 모드 검증 통과');await browser.close();})().catch(e=>{console.error(e);process.exit(1);});

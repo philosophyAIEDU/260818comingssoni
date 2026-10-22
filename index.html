@@ -33,7 +33,7 @@
       </div>
       <nav class="navlinks">
         <a href="index.html" aria-current="page">인증하기</a>
-        <a href="content.html">영상·칼럼</a>
+        <a href="content.html">추천 콘텐츠</a>
         <a href="admin.html">운영진</a>
       </nav>
     </div>
@@ -76,9 +76,17 @@
       </div>
     </section>
 
-    <section class="card content-invite">
-      <div><span class="content-invite-label">쏜님의 콘텐츠</span><h2>독서의 다음 한 걸음</h2><p>책에서 얻은 생각을 넓혀줄 쏜님의 영상과 칼럼을 만나보세요.</p></div>
-      <a href="content.html">영상·칼럼 둘러보기 →</a>
+    <!-- 커밍쏜의 추천 콘텐츠 — 누르면 바로 그 탭·그 글로 들어간다(content.html#videos · #columns · #open=…).
+         최신 영상·칼럼 한 편씩은 js/content-invite.js가 채운다(못 받으면 버튼만). -->
+    <section class="card content-invite" id="contentInvite">
+      <span class="content-invite-label">COMINGSSON PICK</span>
+      <h2>커밍쏜의 추천 콘텐츠</h2>
+      <p>책에서 얻은 인사이트를 커밍쏜의 영상과 칼럼으로 적용해보세요!</p>
+      <div class="content-invite-actions">
+        <a class="invite-btn" href="content.html#videos"><span class="invite-icon" aria-hidden="true">▶</span>추천 유튜브</a>
+        <a class="invite-btn" href="content.html#columns"><span class="invite-icon" aria-hidden="true">✉</span>뉴스레터 칼럼</a>
+      </div>
+      <div class="content-invite-latest" id="contentInviteLatest" hidden></div>
     </section>
 
     <!-- 안내 -->
@@ -193,7 +201,7 @@
           <span class="muted" id="draftNote"></span>
         </div>
       </form>
-      <a class="content-after-certify" href="content.html">인증을 마쳤다면, 쏜님의 영상·칼럼 보기 →</a>
+      <a class="content-after-certify" href="content.html">인증을 마쳤다면, 커밍쏜의 추천 콘텐츠 보기 →</a>
     </section>
 
     </div><!-- /pane-certify -->
@@ -424,6 +432,7 @@
   <script src="js/app.js"></script>
   <script src="js/tabs.js"></script>
   <script src="js/install.js"></script>
+  <script src="js/content-invite.js"></script>
 </body>
 
 </html>
