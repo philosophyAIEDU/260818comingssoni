@@ -245,7 +245,7 @@
 
     // 실시간 동기화(로컬 저장 백엔드일 때 다른 탭에서 바뀐 내용 반영)
     window.addEventListener('storage', (e) => {
-      if (!e.key || !e.key.startsWith(CS.CONFIG.storagePrefix)) return;
+      if (!e.key || !e.key.startsWith(CS.CONFIG.storagePrefix) || e.key.endsWith('.subsCache.v1')) return; // 인증 화면의 글 저장본은 무시
       // 새 날짜의 인증이 올라올 수 있으니 날짜 목록도 함께 다시 채운다
       populateDateOptions().then(refreshAllFeed).catch(console.error);
     });

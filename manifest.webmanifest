@@ -1,0 +1,16 @@
+{
+  "name": "퍼스널메이커스 독서 멤버십",
+  "short_name": "퍼메스 독서",
+  "description": "퍼스널메이커스 독서 멤버십 인증 앱",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b3aa8",
+  "theme_color": "#102d84",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

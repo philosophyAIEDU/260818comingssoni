@@ -853,10 +853,11 @@
           }
         };
         apply(!wasVoted, after);
+        saveSubsCache();
         btn.dataset.busy = '1';
         (wasVoted ? Store.unvoteSubmission(id, clientId) : Store.upvoteSubmission(id, clientId))
           .then(() => scheduleFameRefresh())
-          .catch((err) => { apply(wasVoted, before); alert(err.message); })
+          .catch((err) => { apply(wasVoted, before); saveSubsCache(); alert(err.message); })
           .finally(() => { delete btn.dataset.busy; });
       });
     });
@@ -1320,15 +1321,73 @@
    * 보여준다. 다른 사람의 새 기록까지 보려면 [🔄 새로고침] 버튼으로 명시적으로 다시 읽는다. */
   let allSubsCache = null;
 
+  /* ── 인증글 전체 — 휴대폰에 저장해 두고, 다음에 열 때는 저장본으로 바로 그린 뒤 바뀐 것만 받아 온다 ──
+   * 예전엔 앱을 열 때마다 이번 시즌 인증글 전체(천여 건)를 서버에서 새로 읽어, 첫 화면이 늦고 읽기 비용도 컸다.
+   *  - 저장본이 있으면: 그걸로 바로 그리고, 뒤에서 어제·오늘 글만 다시 받아 덮는다(지난 날짜 글은 거의 안 바뀐다).
+   *  - 저장본이 3시간보다 오래됐으면: 뒤에서 전체를 한 번 다시 받는다(지운 글·지난 날짜 추천 수까지 맞춤).
+   *  - 피드의 새로고침 버튼은 언제나 전체를 다시 받는다.
+   * Firebase로 운영할 때만 쓴다(로컬 저장 백엔드는 이미 이 기기 안에 있다). 저장이 안 되는 브라우저면 예전처럼 매번 받는다. */
+  const SUBS_CACHE_KEY = `${CONFIG.storagePrefix}.subsCache.v1`;
+  const SUBS_FULL_EVERY = 3 * 3600 * 1000;
+  const subsCacheOn = CONFIG.backend === 'firebase';
+  let subsFullAt = 0;     // 전체를 마지막으로 서버에서 받은 시각
+  let subsSaveTimer = null;
+  let subsRevalidating = null;
+
+  function readSubsCache() {
+    if (!subsCacheOn) return null;
+    try {
+      const c = JSON.parse(localStorage.getItem(SUBS_CACHE_KEY) || 'null');
+      return c && Array.isArray(c.subs) ? c : null;
+    } catch (e) { return null; }
+  }
+  function saveSubsCache() {
+    if (!subsCacheOn || !allSubsCache) return;
+    clearTimeout(subsSaveTimer);
+    subsSaveTimer = setTimeout(() => {
+      try { localStorage.setItem(SUBS_CACHE_KEY, JSON.stringify({ at: subsFullAt, subs: allSubsCache })); }
+      catch (e) { try { localStorage.removeItem(SUBS_CACHE_KEY); } catch (_) { /* 저장 불가 */ } }
+    }, 400);
+  }
+
   async function loadAllSubs(force) {
-    if (force || !allSubsCache) allSubsCache = await Store.listSubmissions();
+    if (!force && allSubsCache) return allSubsCache;
+    if (!force) {
+      const c = readSubsCache();
+      if (c) {
+        allSubsCache = c.subs;
+        subsFullAt = c.at || 0;
+        revalidateSubs(); // 기다리지 않는다 — 저장본으로 먼저 그리고, 받아 오면 다시 그린다
+        return allSubsCache;
+      }
+    }
+    allSubsCache = await Store.listSubmissions();
+    subsFullAt = Date.now();
+    saveSubsCache();
     return allSubsCache;
+  }
+
+  function revalidateSubs() {
+    if (subsRevalidating) return subsRevalidating;
+    const full = Date.now() - subsFullAt > SUBS_FULL_EVERY;
+    subsRevalidating = (full ? Store.listSubmissions() : Store.listSubmissions({ from: U.addDays(U.today(), -1) }))
+      .then(async (fresh) => {
+        if (full) { allSubsCache = fresh; subsFullAt = Date.now(); saveSubsCache(); }
+        else fresh.forEach(upsertAllSubsCache);
+        await refreshSocialFeed();
+        await paintWeeklyAwards();
+        if (!READONLY) await paintOverall();
+      })
+      .catch(console.error)
+      .finally(() => { subsRevalidating = null; });
+    return subsRevalidating;
   }
 
   function upsertAllSubsCache(sub) {
     if (!allSubsCache) return;
     const idx = allSubsCache.findIndex((s) => s.participantId === sub.participantId && s.date === sub.date);
     if (idx >= 0) allSubsCache[idx] = sub; else allSubsCache.push(sub);
+    saveSubsCache();
   }
 
   function sortOverallStats(stats, sort) {
@@ -1685,7 +1744,8 @@
 
     // 실시간 동기화
     window.addEventListener('storage', async (e) => {
-      if (e.key && e.key.startsWith(CONFIG.storagePrefix)) {
+      // 인증글 저장본(subsCache)은 다른 탭이 써도 무시한다 — 서로 다시 받아 오며 끝없이 도는 것을 막는다
+      if (e.key && e.key.startsWith(CONFIG.storagePrefix) && e.key !== SUBS_CACHE_KEY) {
         const keep = $('participant').value;
         await loadParticipants();
         if (keep) { $('participant').value = keep; await onSelect(); }
