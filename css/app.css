@@ -554,6 +554,11 @@ body.app {
   .app .pane > .card, .app .pane > .banner, .app main > .card, .app main > .banner {
     margin: 0 0 12px; border: 1px solid var(--border); border-radius: 16px; padding: 20px 16px;
   }
+  /* 피드는 화면 폭을 넓게 써서 긴 독서 후기를 편하게 읽게 한다. */
+  .app .pane > .feed-card {
+    margin: 0 -13px 12px; border-left: 0; border-right: 0; border-radius: 0;
+    padding: 20px 16px 4px;
+  }
   .app .pane > .intro { border-top: 5px solid var(--yellow); }
   .app #pane-certify > .banner { padding: 0; border-color: var(--yellow); }
   .app .pane > .note { background: var(--surface); border-radius: 12px; padding: 14px; }
