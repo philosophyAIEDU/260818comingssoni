@@ -58,7 +58,8 @@
   /** 본문(인상 깊은 내용 + 느낀 점). id가 있으면 '더 보기'로 펼친 상태를 기억할 수 있다. */
   function body(s, open) {
     const book = (CS.CONFIG && CS.CONFIG.book && CS.CONFIG.book.name) || '';
-    return `<div class="post-body${open ? ' open' : ''}" data-subid="${esc(s.id)}">
+    // 처음부터 접힌 채로 그린다 — fit()이 접었다 재는 사이 화면 배치를 한 번 더 계산하지 않게
+    return `<div class="post-body${open ? ' open' : ' clamp'}" data-subid="${esc(s.id)}">
         <figure class="post-quote">
           <figcaption class="quote-src">${book ? `『${esc(book)}』에서` : '인상 깊은 내용'}</figcaption>
           <blockquote class="feed-quote">${esc(stripQuotes(s.sentence))}</blockquote>
@@ -75,6 +76,10 @@
    */
   function fit(container, openIds) {
     if (!container) return;
+    if (!container.getClientRects().length) return; // 지금 안 보이는 탭 — 열릴 때 다시 잰다
+    // 이미 이 폭으로 잰 글은 다시 재지 않는다 — 탭을 옮길 때마다 글마다 높이를 다시 재느라 화면 전환이 굼떴다
+    const w = String(container.clientWidth);
+    const todo = [];
     container.querySelectorAll('.post-body').forEach((el) => {
       const btn = el.nextElementSibling;
       if (!btn || !btn.classList.contains('post-more')) return;
@@ -91,13 +96,20 @@
         el.classList.add('open'); el.classList.remove('clamp'); btn.hidden = true;
         return;
       }
-      if (!el.getClientRects().length) return; // 지금 안 보이는 탭 — 열릴 때 다시 잰다
-      el.classList.add('clamp');
-      // 한두 줄 넘치는 정도면 접지 않는다 — 그 몇 줄을 보려고 [더 보기]를 누르게 하는 건 손해
-      const lh = parseFloat(getComputedStyle(el).lineHeight) || 26;
-      const over = el.scrollHeight > el.clientHeight + lh * 2.5;
-      if (!over) el.classList.remove('clamp');
-      btn.hidden = !over;
+      if (el.dataset.fitW === w) return;
+      todo.push({ el, btn });
+    });
+    if (!todo.length) return;
+    // 쓰기(접기) → 읽기(높이) → 쓰기(결과)를 글마다 번갈아 하면 글 수만큼 화면 배치를 다시 계산한다.
+    // 한꺼번에 접고, 한꺼번에 재고, 한꺼번에 반영한다(배치 계산 한 번).
+    todo.forEach(({ el }) => el.classList.add('clamp'));
+    const lh = parseFloat(getComputedStyle(todo[0].el).lineHeight) || 26;
+    // 한두 줄 넘치는 정도면 접지 않는다 — 그 몇 줄을 보려고 [더 보기]를 누르게 하는 건 손해
+    const over = todo.map(({ el }) => el.scrollHeight > el.clientHeight + lh * 2.5);
+    todo.forEach(({ el, btn }, i) => {
+      el.dataset.fitW = w;
+      if (!over[i]) el.classList.remove('clamp');
+      btn.hidden = !over[i];
     });
   }
 

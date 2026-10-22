@@ -813,32 +813,51 @@
   const feedOpenIds = new Set();
   // 긴 글 접기는 화면에 보이는 폭으로 재므로, 피드 탭이 열리거나 화면 폭이 바뀌면 다시 잰다.
   const refitFeed = () => CS.Post.fit($('socialFeedList'), feedOpenIds);
-  document.addEventListener('cs:tab', refitFeed);
+  document.addEventListener('cs:tab', (e) => { if (!e.detail || e.detail.tab === 'feed') refitFeed(); });
   let refitTimer = null;
   window.addEventListener('resize', () => { clearTimeout(refitTimer); refitTimer = setTimeout(refitFeed, 150); });
+
+  /* 엄지척 — 누르는 순간 화면부터 바꾸고(낙관적 반영), 저장은 뒤에서 한다.
+   * 예전엔 저장 → 그날 기록 다시 읽기 → 피드 전체 다시 그리기 → 명예의 전당 다시 읽기를 다 기다린 뒤에야
+   * 숫자가 바뀌어 휴대폰에서 2~3초씩 걸렸다. 저장이 실패하면 되돌리고 알린다.
+   * 명예의 전당은 마지막으로 누른 뒤 잠깐 있다가 한 번만 다시 센다. */
+  let fameRefreshTimer = null;
+  const scheduleFameRefresh = () => {
+    clearTimeout(fameRefreshTimer);
+    fameRefreshTimer = setTimeout(() => calculateRanksAndFame().catch(console.error), 1500);
+  };
+
+  function paintVote(btn, voted, count) {
+    btn.classList.toggle('voted', voted);
+    btn.innerHTML = `${U.icon('thumb')}${count}`;
+    btn.setAttribute('aria-label', `엄지척 ${count}개, ${voted ? '눌러서 취소' : '눌러서 추천'}`);
+  }
 
   function bindUpvoteButtons(container) {
     if (READONLY) return; // 지난 시즌을 들여다보는 중 — 기록을 바꾸지 않는다
     container.querySelectorAll('.upvote-btn').forEach((btn) => {
       if (btn.classList.contains('self')) return; // 본인 글: 클릭 자체를 막는다
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        try {
-          if (btn.classList.contains('voted')) {
-            await Store.unvoteSubmission(btn.dataset.id, clientId);
-          } else {
-            await Store.upvoteSubmission(btn.dataset.id, clientId);
+      btn.addEventListener('click', () => {
+        if (btn.dataset.busy) return; // 저장이 끝나기 전 연타는 무시
+        const id = btn.dataset.id;
+        const sub = feedById.get(id);
+        const wasVoted = btn.classList.contains('voted');
+        const before = sub ? (sub.upvotes || 0) : parseInt(btn.textContent, 10) || 0;
+        const after = Math.max(0, before + (wasVoted ? -1 : 1));
+        const apply = (voted, count) => {
+          paintVote(btn, voted, count);
+          if (sub) {
+            sub.upvotes = count;
+            const by = (sub.upvotedBy || []).filter((c) => c !== clientId);
+            sub.upvotedBy = voted ? by.concat(clientId) : by;
           }
-          // 전체 날짜로 보는 중 지난 날짜 글을 추천했다면 그날 기록만 새로 읽어 캐시에 반영한다
-          if (btn.dataset.date && btn.dataset.date !== U.today() && allSubsCache) {
-            (await Store.listSubmissions({ date: btn.dataset.date })).forEach(upsertAllSubsCache);
-          }
-          await refreshSocialFeed();
-          await calculateRanksAndFame();
-        } catch (err) {
-          btn.disabled = false;
-          alert(err.message);
-        }
+        };
+        apply(!wasVoted, after);
+        btn.dataset.busy = '1';
+        (wasVoted ? Store.unvoteSubmission(id, clientId) : Store.upvoteSubmission(id, clientId))
+          .then(() => scheduleFameRefresh())
+          .catch((err) => { apply(wasVoted, before); alert(err.message); })
+          .finally(() => { delete btn.dataset.busy; });
       });
     });
   }
@@ -884,9 +903,11 @@
       String(a.createdAt).localeCompare(String(b.createdAt)));
   }
 
+  let feedById = new Map(); // 지금 피드에 그린 글 — 엄지척을 누르면 이 객체(캐시와 같은 것)를 바로 고친다
   async function refreshSocialFeed() {
     const date = feedDate;
     const subs = await feedSubs(date);
+    feedById = new Map(subs.map((x) => [x.id, x]));
     const today = U.today();
     paintFeedDateSelect();
 
