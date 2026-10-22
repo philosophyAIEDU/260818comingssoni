@@ -18,3 +18,9 @@
 # 기본 예약 시각은 시즌이 끝난 뒤 월요일 09:00(KST) = 월요일 00:00(UTC).
 [functions."send-gift-scheduled"]
   schedule = "*/10 * * * *"
+
+# 홈 화면 설치용 manifest — 기본값(octet-stream) 대신 제 형식으로 보낸다
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
