@@ -1,6 +1,6 @@
 {
   "name": "퍼스널메이커스 독서 멤버십",
-  "short_name": "퍼메스 독서",
+  "short_name": "퍼메스 독서 멤버십",
   "description": "퍼스널메이커스 독서 멤버십 인증 앱",
   "start_url": "/index.html",
   "scope": "/",
