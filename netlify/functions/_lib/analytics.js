@@ -1,12 +1,16 @@
 /* 이용 통계 — 사이트에 머문 시간, 영상 시청 시간, 뉴스레터 읽은 시간을 하루 단위로 모은다.
  *
- * 누가 봤는지는 남기지 않는다. 기기마다 무작위 ID를 만들고(브라우저 저장), 서버는 그 ID의 해시 앞부분만
- * "오늘 다녀간 기기 수"를 세는 데 쓴다. 이름·이메일·인증 기록과는 잇지 않는다.
+ * 기기마다 무작위 ID를 만들고(브라우저 저장), 서버는 그 해시 앞부분으로 "오늘 다녀간 기기 수"를 센다.
+ * 그 기기에서 인증(또는 댓글)한 멤버를 알면 브라우저가 참여자 ID와 시즌을 함께 보내고, 서버가 그 시즌 명단에서
+ * 실제로 있는 사람인지 확인한 뒤 인증 이름으로 멤버별 이용량(members.{시즌_참여자ID})에 더한다.
+ * 이메일·전화번호는 남기지 않는다. 보고서는 운영진만 본다.
  *
  * 저장: analyticsDaily/{YYYY-MM-DD(KST)}
  *   visits, activeSec, pages.{index|content|feed}, hours.{0..23}, devices.{해시}: 그 기기의 그날 이용 초,
  *   video.{openSec, playSec, opens}, column.{readSec, opens, completes},
  *   items.{v_영상ID | c_칼럼}: { title, kind, open, play, read, n, done }
+ *   members.{시즌_참여자ID}: { name, season, active, play, read } — 멤버별로는 시간 합계만 둔다
+ *     (언제 들어왔는지·몇 번 왔는지·무엇을 봤는지 같은 개인 행동 기록은 남기지 않는다)
  * 브라우저가 30~60초마다 그동안 쌓인 양을 보내고(track 함수), 서버는 숫자를 더하기만 한다.
  * 보고서(analytics-report 함수)는 운영진 로그인으로만 읽는다. */
 const crypto = require('crypto');
@@ -49,12 +53,15 @@ function sanitizeBeacon(body) {
     else Object.assign(it, { read: clampSec(v.read), done: clampCount(v.done) });
     if (it.n || it.open || it.play || it.read || it.done) items.push(it);
   }
-  const out = { device: crypto.createHash('sha256').update(body.d).digest('hex').slice(0, 16), page: body.p, visit: body.visit ? 1 : 0, active: clampSec(body.active), items };
+  const m = body.m && typeof body.m === 'object' && /^[\w-]{1,40}$/.test(String(body.m.p || '')) && /^[\w-]{1,10}$/.test(String(body.m.s || ''))
+    ? { pid: String(body.m.p), season: String(body.m.s) } : null;
+  const out = { device: crypto.createHash('sha256').update(body.d).digest('hex').slice(0, 16), page: body.p, visit: body.visit ? 1 : 0, active: clampSec(body.active), items, member: m };
   return out.visit || out.active || items.length ? out : null;
 }
 
-/** 묶음 하나를 그날 문서에 더할 값으로 바꾼다. inc: FieldValue.increment */
-function toUpdate(b, inc, now = new Date()) {
+/** 묶음 하나를 그날 문서에 더할 값으로 바꾼다. inc: FieldValue.increment
+ *  member: 서버가 명단에서 확인한 { pid, season, name } — 없으면 익명으로만 더한다. */
+function toUpdate(b, inc, now = new Date(), member = null) {
   const { date, hour } = kstParts(now);
   const sum = (kind, field) => b.items.filter((i) => i.kind === kind).reduce((n, i) => n + (i[field] || 0), 0);
   const data = {
@@ -68,12 +75,18 @@ function toUpdate(b, inc, now = new Date()) {
     column: { readSec: inc(sum('column', 'read')), opens: inc(sum('column', 'n')), completes: inc(sum('column', 'done')) },
     items: {}
   };
+  if (member) {
+    data.members = { [memberKey(member)]: { name: String(member.name).slice(0, 40), season: member.season,
+      active: inc(b.active), play: inc(sum('video', 'play')), read: inc(sum('column', 'read')) } };
+  }
   for (const i of b.items) {
     data.items[i.key] = Object.assign({ kind: i.kind, n: inc(i.n) }, i.title ? { title: i.title } : {},
       i.kind === 'video' ? { open: inc(i.open), play: inc(i.play) } : { read: inc(i.read), done: inc(i.done) });
   }
   return { date, data };
 }
+
+const memberKey = (m) => `${m.season}_${m.pid}`.replace(/[^\w-]/g, '_');
 
 const DIST_BUCKETS = [
   { label: '1분 미만', max: 60 },
@@ -98,6 +111,7 @@ function buildReport(docs, dates, comments = []) {
   const devicesAll = new Set();
   const dist = DIST_BUCKETS.map((b) => ({ label: b.label, count: 0 }));
   const items = new Map();
+  const members = new Map();
   const commentsByDay = {};
   for (const c of comments) {
     const d = kstParts(new Date(c.createdAt)).date;
@@ -118,6 +132,15 @@ function buildReport(docs, dates, comments = []) {
       if (v.title) cur.title = String(v.title);
       cur.opens += n(v.n); cur.openSec += n(v.open); cur.playSec += n(v.play); cur.readSec += n(v.read); cur.completes += n(v.done);
       items.set(key, cur);
+    }
+    for (const [key, v] of Object.entries(d.members || {})) {
+      if (!v || typeof v !== 'object') continue;
+      // 멤버별로는 기간 합계만 돌려준다(날짜별 기록은 넘기지 않는다)
+      const cur = members.get(key) || { key, name: '', season: '', activeSec: 0, videoPlaySec: 0, columnReadSec: 0 };
+      if (v.name) cur.name = String(v.name);
+      if (v.season) cur.season = String(v.season);
+      cur.activeSec += n(v.active); cur.videoPlaySec += n(v.play); cur.columnReadSec += n(v.read);
+      members.set(key, cur);
     }
     const video = d.video || {}, column = d.column || {};
     return {
@@ -147,12 +170,18 @@ function buildReport(docs, dates, comments = []) {
     columnOpens: total('columnOpens'),
     columnCompletes: total('columnCompletes'),
     comments: total('comments'),
-    perDeviceDaySec: deviceDays ? Math.round(total('activeSec') / deviceDays) : 0
+    perDeviceDaySec: deviceDays ? Math.round(total('activeSec') / deviceDays) : 0,
+    members: 0,
+    memberSec: 0
   };
+  const memberList = [...members.values()].filter((m) => m.activeSec > 0 || m.videoPlaySec > 0 || m.columnReadSec > 0)
+    .sort((a, b) => b.activeSec - a.activeSec || a.name.localeCompare(b.name, 'ko'));
+  totals.members = memberList.length;
+  totals.memberSec = memberList.reduce((s, m) => s + m.activeSec, 0);
   const top = (kind, field) => [...items.values()].filter((i) => i.kind === kind)
     .map((i) => Object.assign(i, { sec: kind === 'video' ? i.playSec : i.readSec }))
     .sort((a, b) => b[field] - a[field] || b.opens - a.opens).slice(0, 10);
-  return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
+  return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, members: memberList, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
 }
 
-module.exports = { PAGES, kstParts, itemKey, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };
+module.exports = { PAGES, kstParts, itemKey, memberKey, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { buildReport, dateRange } = require('../netlify/functions/_lib/analytics');
 const BASE = process.env.BASE || 'http://127.0.0.1:8765';
 
+const NAMES = ['김현우', '박지민', '이유진(1362)', '최서연', '정다은', '한지수', '오세훈', '윤아름', '강현숙', '조민재', '서하늘', '임도윤', '배수아', '신예린', '문태호', '홍가람', '유채원', '남궁민', '장서진', '권나래', '송하은', '전우진', '황보람', '안소희', '류지안', '김정은'];
 function sample(days) {
   const dates = dateRange(days);
   const docs = {};
@@ -18,7 +19,8 @@ function sample(days) {
       video: { playSec: active * 0.22, openSec: active * 0.27, opens: 6 }, column: { readSec: active * 0.12, opens: 4, completes: 2 },
       items: { v_xmd2_HKMgCU: { kind: 'video', title: '성과가 더딜 때, 꾸준히 쌓아가는 법', n: 3, play: active * 0.15, open: active * 0.17 },
         v_gQZ6zI3epVo: { kind: 'video', title: '나의 경험을 브랜드와 수익으로 연결하기', n: 2, play: active * 0.07, open: active * 0.1 },
-        c_p_50: { kind: 'column', title: '1인 브랜드가 지치지 않는 법', n: 3, read: active * 0.09, done: 2 }, c_p_49: { kind: 'column', title: '퍼스널메이커스 10월 둘째 주', n: 1, read: active * 0.03 } }
+        c_p_50: { kind: 'column', title: '1인 브랜드가 지치지 않는 법', n: 3, read: active * 0.09, done: 2 }, c_p_49: { kind: 'column', title: '퍼스널메이커스 10월 둘째 주', n: 1, read: active * 0.03 } },
+      members: Object.fromEntries(NAMES.map((name, k) => [k, name]).filter(([k]) => (k + i) % 3 !== 0).map(([k, name]) => [`s3_p${k}`, { name, season: 's3', active: 120 + ((k * 137 + i * 53) % 1500), play: (k * 41) % 400, read: (k * 29 + i * 7) % 300 }]))
     };
   });
   return buildReport(docs, dates, [{ createdAt: new Date().toISOString() }]);
@@ -38,12 +40,41 @@ function sample(days) {
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(BASE + '/admin.html');
   assert.equal(asked.length, 0, '탭을 열기 전엔 부르지 않음');
+  // 운영진 로그인 전(대시보드가 닫혀 있으면) 탭이 열려도 부르지 않는다
+  await page.evaluate(() => { document.getElementById('adminDashboard').style.display = 'none'; document.querySelector('[data-panel="usage"]').hidden = false; });
+  await page.waitForTimeout(200);
+  assert.equal(asked.length, 0, '로그인 전엔 통계를 부르지 않음');
+  await page.evaluate(() => { document.querySelector('[data-panel="usage"]').hidden = true; document.getElementById('adminDashboard').style.display = 'block'; });
   await page.locator('[data-tab="usage"]').click();
   await page.waitForSelector('#usageDaily svg');
+  assert.equal(await page.locator('[data-tab="usage"]').textContent(), '이용현황');
   assert.deepEqual(asked, [14]);
   assert.match(await page.locator('.usage-hero-value').textContent(), /시간|분/);
-  assert.equal(await page.locator('.usage-tile').count(), 5);
-  assert.match(await page.locator('.usage-tile').nth(4).textContent(), /인사이트 댓글1개/);
+  assert.equal(await page.locator('.usage-tile').count(), 6);
+  assert.match(await page.locator('.usage-tile').nth(0).textContent(), /이용한 멤버26명/);
+  assert.match(await page.locator('.usage-tile').nth(5).textContent(), /인사이트 댓글1개/);
+  // 멤버별 이용 시간: 이름·쌓은 막대·추이, 20명까지 보이고 더 보기, 이름 찾기·정렬, 툴팁, 표
+  assert.equal(await page.locator('#usageMembers .member-row').count(), 20);
+  assert.equal(await page.locator('#usageMembers .member-more').textContent(), '6명 더 보기');
+  const totals = await page.locator('#usageMembers .member-row').evaluateAll((rows) => rows.map((r) => r.querySelector('.member-total').textContent));
+  assert(totals.length === 20 && totals[0] !== '0초');
+  await page.locator('#usageMembers .member-more').click();
+  assert.equal(await page.locator('#usageMembers .member-row').count(), 26);
+  assert.doesNotMatch(await page.locator('#usageMembers .member-list').textContent(), /접속|마지막|방문|\d+\/\d+/, '멤버별로는 합계 시간만(날짜·방문 없음)');
+  await page.fill('#memberSearch', '김');
+  assert.deepEqual((await page.locator('#usageMembers .member-name strong').allTextContents()).sort(), ['김정은', '김현우']);
+  await page.fill('#memberSearch', '없는이름'); assert.match(await page.locator('#usageMembers .usage-empty').textContent(), /없는이름/);
+  await page.fill('#memberSearch', '');
+  await page.selectOption('#memberSort', 'name');
+  const byName = await page.locator('#usageMembers .member-name strong').allTextContents();
+  assert.deepEqual(byName, [...byName].sort((a, b) => a.localeCompare(b, 'ko')), '이름 순');
+  await page.locator('#usageMembers .member-row').first().hover();
+  assert.deepEqual(await page.locator('.usage-tip-row span:not(.usage-tip-key)').allTextContents(), ['영상 시청', '뉴스레터 읽기', '그 밖의 이용', '합계']);
+  await page.locator('#usageMembers summary').click();
+  assert.equal(await page.locator('#usageMembers tbody tr').count(), 26);
+  assert.deepEqual(await page.locator('#usageMembers thead th').allTextContents(), ['멤버', '총 이용', '영상 시청', '뉴스레터 읽기', '그 밖의 이용']);
+  await page.locator('#usageMembers summary').click();
+  await page.selectOption('#memberSort', 'active');
   assert.deepEqual(await page.locator('#usageDaily .usage-legend-item').allTextContents(), ['영상 시청', '뉴스레터 읽기', '그 밖의 이용']);
   assert.equal(await page.locator('#usageVisitors .usage-legend').count(), 0, '한 계열엔 범례 없음');
   assert.equal(await page.locator('#usageDaily .usage-hit').count(), 14);
@@ -83,8 +114,11 @@ function sample(days) {
   mode = 'empty'; await page.locator('[data-days="7"]').click(); await page.waitForSelector('.usage-empty');
   assert.equal(await page.locator('#usageDaily').count(), 0);
   mode = 'error'; await page.locator('#usageRefresh').click(); await page.waitForFunction(() => /로그인/.test(document.querySelector('#usageMsg').textContent));
-  assert.equal(await page.locator('.usage-tile').count(), 5, '오류여도 앞의 그림은 남김');
+  assert.equal(await page.locator('.usage-tile').count(), 6, '오류여도 앞의 그림은 남김');
+  // 로그아웃하면(대시보드가 닫히면) 보던 통계를 지운다
+  await page.evaluate(() => { document.getElementById('adminDashboard').style.display = 'none'; });
+  await page.waitForFunction(() => !document.querySelector('#usageBody').children.length);
   assert.deepEqual(errors, []);
-  console.log('이용 통계 탭: 열 때만 불러오기·대표 숫자/지표·쌓은 막대(범례·폭 24px 이하)·선(십자선·키보드)·툴팁·표로 보기·많이 본 콘텐츠·기간 바꾸기·빈/오류 상태·390px·다크 모드 통과');
+  console.log('이용 통계 탭: 운영진 로그인 전엔 안 부르고 로그아웃하면 지움·멤버별 이용 시간(기간 합계만·20명+더 보기·이름 찾기·정렬·툴팁·표)·열 때만 불러오기·대표 숫자/지표·쌓은 막대(범례·폭 24px 이하)·선(십자선·키보드)·툴팁·표로 보기·많이 본 콘텐츠·기간 바꾸기·빈/오류 상태·390px·다크 모드 통과');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

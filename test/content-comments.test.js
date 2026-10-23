@@ -52,6 +52,7 @@ const { handler } = require('../netlify/functions/content-comments.js');
 
   r = await call('POST', { body: { videoId: VIDEO, nickname: '  김현우 ', text: '책의 ‘작은 실행’과 영상 이야기가 겹쳤어요.\n저도 오늘부터 기록합니다.' } });
   assert.equal(r.status, 201); assert.equal(r.body.comment.nickname, '김현우'); assert(r.body.token.length >= 20);
+  assert.deepEqual(r.body.member, { p: 'p1', s: global.CS.pickSeason(global.CS.seasonNowKST()).id }, '쓴 사람 기기에 멤버 정보(이용 통계 연결용)');
   assert.equal(r.body.comment.book, r.body.comment.book.trim()); assert(!('tokenHash' in r.body.comment) && !('participantId' in r.body.comment));
   const first = r.body;
   const stored = db.coll('contentComments').get(first.comment.id);

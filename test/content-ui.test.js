@@ -25,7 +25,7 @@ await context.route(u=>u.pathname==='/.netlify/functions/content-comments',async
   if(req.method()==='GET')return r.fulfill({contentType:'application/json',body:JSON.stringify({comments:new URL(req.url()).searchParams.get('video')==='NEWVIDEO001'?comments:[],book:'혁명의 팡파르'})});
   const body=JSON.parse(req.postData()||'{}');
   if(req.method()==='POST'){posted.push(body);if(body.nickname!=='박지민')return r.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:`'${body.nickname}' 이름이 이번 독서 멤버십 명단에 없어요.`})});
-    return r.fulfill({status:201,contentType:'application/json',body:JSON.stringify({comment:{id:'c2',nickname:'박지민',text:body.text,book:'혁명의 팡파르',createdAt:new Date().toISOString()},token:'tok-c2'})});}
+    return r.fulfill({status:201,contentType:'application/json',body:JSON.stringify({comment:{id:'c2',nickname:'박지민',text:body.text,book:'혁명의 팡파르',createdAt:new Date().toISOString()},token:'tok-c2',member:{p:'pJimin',s:'s3'}})});}
   if(req.method()==='DELETE'){assert.deepEqual(body,{id:'c2',token:'tok-c2'});return r.fulfill({contentType:'application/json',body:'{"ok":true}'});}});
 await context.route('https://www.youtube-nocookie.com/**',r=>r.fulfill({body:'<!doctype html><title>테스트 영상</title><p>영상 플레이어 테스트</p>',contentType:'text/html'}));
 await context.route('https://i.ytimg.com/**',r=>r.fulfill({status:404}));
@@ -59,6 +59,10 @@ await page.fill('#commentName','박지민');await page.fill('#commentText','오�
 await page.locator('#commentSubmit').click();await page.waitForFunction(()=>document.querySelectorAll('#commentList .comment').length===2);
 assert.equal(await page.locator('#commentList .comment strong').first().textContent(),'박지민','새 댓글이 맨 위');
 assert.equal(await page.locator('#commentText').inputValue(),'');assert.equal(await page.locator('#commentCount').textContent(),'2');
+// 댓글을 남기면 이 기기의 이용 통계가 그 멤버로 이어진다(앞서 쌓인 시간은 먼저 이름 없이 보냄)
+await page.waitForFunction(()=>JSON.parse(localStorage.getItem('personalmakers.analytics.member')||'null')?.p==='pJimin');
+await page.waitForTimeout(1600);await page.evaluate(()=>PMTrack._flush(false));await page.waitForTimeout(100);
+assert.deepEqual(beacons.at(-1).m,{p:'pJimin',s:'s3'});assert(beacons.slice(0,1).every(b=>!b.m));
 if(process.env.SHOT_DIR) await page.screenshot({path:process.env.SHOT_DIR + '/video-comments.png',fullPage:true});
 await page.locator('.comment-delete').click();await page.waitForFunction(()=>document.querySelectorAll('#commentList .comment').length===1);
 await page.locator('#readerNext').click();assert.match(await page.locator('#readerMedia iframe').getAttribute('src'),/xmd2_HKMgCU/);

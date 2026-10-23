@@ -70,7 +70,7 @@
   }
   const siblingsOf = item => { const list = item.type === 'videos' ? videos : columns; return filter === 'saved' ? list.filter(x => saved.has(x.id)) : list; };
   // 이용 통계(js/analytics.js). 없으면 아무 일도 하지 않는다.
-  const track = () => window.PMTrack || { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {} };
+  const track = () => window.PMTrack || { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {}, setMember() {} };
   // 실제 재생 시간은 유튜브 플레이어 API의 재생 상태로 센다. API를 못 불러와도 영상은 그대로 나온다.
   let ytApi = null;
   function youtubeApi() {
@@ -307,6 +307,7 @@
       if (!response.ok || !data.comment) throw Error(data.error || '댓글을 남기지 못했어요. 잠시 뒤 다시 시도해 주세요.');
       store.set(NAME_KEY, nickname);
       tokens[data.comment.id] = data.token; store.set(TOKENS_KEY, tokens);
+      if (data.member) track().setMember(data.member.p, data.member.s);
       if (commentsFor === target.id) {
         commentCache.push(data.comment); paintComments(commentCache); $('commentState').hidden = true;
         $('commentText').value = ''; paintLength();

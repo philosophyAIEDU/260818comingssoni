@@ -1,7 +1,10 @@
-/* 이용 통계(익명) — 화면을 실제로 보고 있는 시간, 영상이 재생된 시간, 칼럼을 읽은 시간을 모아
- * 30~60초마다 서버(/.netlify/functions/track)에 보낸다. 운영진 화면 [이용 통계]에서 본다.
+/* 이용 통계 — 화면을 실제로 보고 있는 시간, 영상이 재생된 시간, 칼럼을 읽은 시간을 모아
+ * 45초마다 서버(/.netlify/functions/track)에 보낸다. 운영진 화면 [이용 통계]에서만 본다.
  *
- * - 이름·이메일은 보내지 않는다. 기기마다 무작위 ID 하나만 쓴다(이 브라우저에만 저장).
+ * - 기기마다 무작위 ID 하나(이 브라우저에 저장)로 방문 기기 수를 센다.
+ * - 이 기기에서 인증한(또는 댓글을 남긴) 멤버를 기억해 참여자 ID·시즌을 함께 보낸다 → 서버가 명단에서 확인해
+ *   인증 이름으로 멤버별 이용량을 쌓는다. 한 기기를 여럿이 쓰면 마지막으로 인증한 사람으로 센다.
+ *   이전에 인증 화면에서 이름을 골라 둔 기기(시즌별 .me)는 그 사람으로 바로 잇는다.
  * - "보고 있는 시간": 창이 보이고, 최근 1분 안에 누르거나·스크롤하거나·타이핑했거나, 영상이 재생 중인 동안.
  * - 칼럼은 읽기 창이 열려 있는 동안의 "보고 있는 시간", 끝까지(90%) 내려 읽었는지.
  * - 영상은 창이 열려 있던 시간과 실제 재생 시간(유튜브 플레이어가 알려 주는 재생 상태)을 따로 센다.
@@ -10,9 +13,10 @@
   const ENDPOINT = '/.netlify/functions/track';
   const DEVICE_KEY = 'personalmakers.analytics.device';
   const VISIT_KEY = 'personalmakers.analytics.lastSeen';
+  const MEMBER_KEY = 'personalmakers.analytics.member';
   const IDLE_MS = 60 * 1000, VISIT_GAP_MS = 30 * 60 * 1000, FLUSH_MS = 45 * 1000;
   const page = (document.currentScript && document.currentScript.dataset.page) || 'index';
-  const noop = { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {} };
+  const noop = { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {}, setMember() {} };
   if (!window.fetch || /[?&]notrack\b/.test(location.search)) { window.PMTrack = noop; return; }
 
   const store = {
@@ -25,6 +29,17 @@
     (window.crypto || {}).getRandomValues ? crypto.getRandomValues(bytes) : bytes.forEach((_, i) => { bytes[i] = Math.random() * 256; });
     device = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
     store.set(DEVICE_KEY, device);
+  }
+
+  // 이 기기의 멤버 { p: 참여자 ID, s: 시즌 ID }
+  const validMember = (m) => m && /^[\w-]{1,40}$/.test(String(m.p || '')) && /^[\w-]{1,10}$/.test(String(m.s || ''));
+  let member = null;
+  try { member = JSON.parse(store.get(MEMBER_KEY) || 'null'); } catch { member = null; }
+  if (!validMember(member)) {
+    member = null;
+    const cfg = window.CS && window.CS.CONFIG;
+    const me = cfg && store.get(`${cfg.storagePrefix}.me`);
+    if (me && validMember({ p: me, s: cfg.seasonId })) { member = { p: me, s: cfg.seasonId }; store.set(MEMBER_KEY, JSON.stringify(member)); }
   }
 
   // 30분 넘게 쉬었다 오면 새 방문
@@ -72,7 +87,7 @@
     }
     const active = Math.round(pending.active);
     if (!visit && !active && !Object.keys(items).length) return null;
-    return { d: device, p: page, visit, active, items };
+    return Object.assign({ d: device, p: page, visit, active, items }, member ? { m: { p: member.p, s: member.s } } : {});
   }
   function reset(sent) {
     visit = 0;
@@ -114,6 +129,12 @@
     columnOpen(id, title) { tick(); column = { key: 'c:' + id, done: false }; add(item(column.key, title), 'n', 1); },
     columnDepth(ratio) { if (column && !column.done && ratio >= 0.9) { column.done = true; add(item(column.key), 'done', 1); } },
     columnClose() { tick(); column = null; },
+    /** 인증·댓글로 누구인지 확인됐을 때. 그 전까지 쌓인 시간은 이전 사람(또는 익명)으로 먼저 보낸다. */
+    setMember(pid, season) {
+      const next = { p: String(pid || ''), s: String(season || '') };
+      if (!validMember(next) || (member && member.p === next.p && member.s === next.s)) return;
+      flush(false).finally(() => { member = next; store.set(MEMBER_KEY, JSON.stringify(member)); });
+    },
     _flush: flush // 테스트용
   };
 })();
