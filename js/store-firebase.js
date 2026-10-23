@@ -16,6 +16,14 @@ CS.FirebaseStore = (function () {
 
   let db = null;
   let fs = null;
+  const readMeter = { docs: 0 };
+  // 운영진 화면은 명단을 이 화면 안에서 15분 기억하고, 고칠 때마다 기억해 둔 명단을 바로 맞춘다 —
+  // 고칠 때마다 명단 전체(수백 건)를 다시 읽지 않으려는 것(Firebase 무료 읽기 한도).
+  const ROSTER_TTL = 15 * 60 * 1000;
+  let rosterCache = null; // { key: 컬렉션 이름, at, rows }
+  const cloneRows = (rows) => JSON.parse(JSON.stringify(rows));
+  const sortRoster = (rows) => rows.sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
+  const patchRoster = (fn) => { if (rosterCache) { fn(rosterCache.rows); sortRoster(rosterCache.rows); } };
   let authModule = null;
   let auth = null;
   let currentUser = null;
@@ -32,7 +40,11 @@ CS.FirebaseStore = (function () {
       import(SDK),
       import(AUTH)
     ]);
-    fs = firestore;
+    // 이 화면이 Firestore에서 직접 읽은 문서 수를 센다(운영진 화면 아래에 표시 — 무료 읽기 한도를 눈으로 확인하는 용도)
+    fs = Object.assign({}, firestore, {
+      getDocs: async (...a) => { const snap = await firestore.getDocs(...a); readMeter.docs += snap.size != null ? snap.size : snap.docs.length; return snap; },
+      getDoc: async (...a) => { readMeter.docs++; return firestore.getDoc(...a); }
+    });
     authModule = authMod;
     
     const app = initializeApp(cfg);
@@ -123,14 +135,18 @@ CS.FirebaseStore = (function () {
   }
   const feedTodayAt = () => (CS.FeedClient ? CS.FeedClient.todayAt() : 0);
 
-  async function listParticipants() {
+  /** opts.fresh: 기억해 둔 명단을 쓰지 않고 Firestore에서 바로 읽는다(서버 함수가 고친 값(발송 기록 등)을 봐야 할 때) */
+  async function listParticipants(opts) {
     if (rosterViaApi()) {
       try { return await CS.FeedClient.roster(); } catch (e) { console.warn('[feed] 명단 스냅샷을 못 받아 직접 읽습니다:', e.message); }
     }
     await init();
+    const key = CS.collectionName('participants');
+    if (!(opts && opts.fresh) && rosterCache && rosterCache.key === key && Date.now() - rosterCache.at < ROSTER_TTL) return cloneRows(rosterCache.rows);
     const snap = await fs.getDocs(col('participants'));
-    return snap.docs.map(withId)
-      .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
+    const rows = sortRoster(snap.docs.map(withId));
+    rosterCache = { key, at: Date.now(), rows: cloneRows(rows) };
+    return rows;
   }
 
   /** 다른 시즌의 명단(읽기만) — 연속 참여 배지 계산용. season: CS.SEASONS 항목 */
@@ -159,12 +175,13 @@ CS.FirebaseStore = (function () {
       createdAt: CS.U.nowStamp()
     }, patch || {});
     const ref = await fs.addDoc(col('participants'), body);
+    patchRoster((rows) => rows.push(Object.assign({ id: ref.id }, cloneRows(body))));
     scheduleInvalidate({ roster: true });
     return Object.assign({ id: ref.id }, body);
   }
 
   async function addParticipants(nicknames) {
-    const existing = new Set((await listParticipants()).map((p) => p.nickname));
+    const existing = new Set((await listParticipants({ fresh: true })).map((p) => p.nickname));
     const added = [];
     const skipped = [];
     for (const raw of nicknames) {
@@ -196,7 +213,9 @@ CS.FirebaseStore = (function () {
       scheduleInvalidate({ dates: subs.docs.map((d) => d.data().date) });
     }
     const snap = await fs.getDoc(docRef('participants', id));
-    return withId(snap);
+    const updated = withId(snap);
+    patchRoster((rows) => { const i = rows.findIndex((r) => r.id === id); if (i >= 0) rows[i] = cloneRows(updated); });
+    return updated;
   }
 
   async function removeParticipant(id) {
@@ -204,6 +223,7 @@ CS.FirebaseStore = (function () {
     const subs = await fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', id)));
     await Promise.all(subs.docs.map((d) => fs.deleteDoc(docRef('submissions', d.id))));
     await fs.deleteDoc(docRef('participants', id));
+    patchRoster((rows) => { const i = rows.findIndex((r) => r.id === id); if (i >= 0) rows.splice(i, 1); });
     scheduleInvalidate({ roster: true, dates: subs.docs.map((d) => d.data().date) });
   }
 
@@ -381,16 +401,25 @@ CS.FirebaseStore = (function () {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  async function getMeta() {
+  // 운영진 화면이 화면을 다시 그릴 때마다 meta를 몇 번씩 읽지 않도록 10분 기억한다. 고치면(setMeta) 바로 새로 읽고,
+  // 운영진 화면의 전체 새로 읽기(refresh)는 invalidateMeta()로 비운다(서버 함수가 고친 발송 기록 등을 봐야 해서).
+  const META_TTL = 10 * 60 * 1000;
+  let metaCache = null; // { key, at, data }
+  const invalidateMeta = () => { metaCache = null; };
+  async function getMeta(opts) {
     await init();
+    const key = CS.collectionName('meta');
+    if (!(opts && opts.fresh) && metaCache && metaCache.key === key && Date.now() - metaCache.at < META_TTL) return cloneRows(metaCache.data);
     const snap = await fs.getDoc(docRef('meta', 'app'));
-    return snap.exists() ? snap.data() : {};
+    const data = snap.exists() ? snap.data() : {};
+    metaCache = { key, at: Date.now(), data: cloneRows(data) };
+    return data;
   }
 
   async function setMeta(patch) {
     await init();
     await fs.setDoc(docRef('meta', 'app'), patch, { merge: true });
-    return getMeta();
+    return getMeta({ fresh: true });
   }
 
   /* 시즌 공용 설정. collectionName()을 거치지 않고 항상 같은 문서를 본다 —
@@ -431,6 +460,7 @@ CS.FirebaseStore = (function () {
       await fs.setDoc(docRef('submissions', id), body);
     }
     if (obj.meta) await setMeta(obj.meta);
+    rosterCache = null;
     scheduleInvalidate({ roster: true, dates: obj.submissions.map((x) => x.date) });
   }
 
@@ -439,6 +469,7 @@ CS.FirebaseStore = (function () {
     for (const name of ['participants', 'submissions']) {
       const snap = await fs.getDocs(col(name));
       await Promise.all(snap.docs.map((d) => fs.deleteDoc(docRef(name, d.id))));
+      if (name === 'participants') rosterCache = null;
       scheduleInvalidate(name === 'participants' ? { roster: true } : { dates: snap.docs.map((d) => d.data().date) });
     }
   }
@@ -448,6 +479,7 @@ CS.FirebaseStore = (function () {
     init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
     removeSubmission, upvoteSubmission, unvoteSubmission, recordCopy, getMeta, setMeta, refreshFeedNow, feedTodayAt,
+    readCount: () => readMeter.docs, invalidateMeta,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser, getIdToken,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,

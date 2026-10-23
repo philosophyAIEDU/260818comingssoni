@@ -366,18 +366,35 @@
   /* ── 불러오기: 다시 받는 동안 앞의 그림을 흐리게 둔다(깜빡임 없이) ── */
   // 운영진 로그인으로 대시보드가 열린 뒤에만 부른다(서버도 운영진 토큰이 없으면 거절한다).
   const dashboardOpen = () => { const d = $('adminDashboard'); return !d || d.style.display !== 'none'; };
-  async function load() {
+  // 읽기 아끼기(Firebase 무료 한도): 본 기간은 이 화면 안에서 5분 기억하고(7일→14일→7일로 오가도 다시 안 부름),
+  // [새로고침]은 오늘·어제만 새로 읽게 하되 30초에 한 번만 받는다. 서버도 지난 날 기록은 기억해 두고 있다(_lib/usageData.js).
+  const REPORT_TTL = 5 * 60 * 1000, REFRESH_GAP = 30 * 1000;
+  const reports = new Map(); // 기간 → { at, data }
+  let lastForce = 0;
+  async function load(force) {
     if (loading || !dashboardOpen()) return;
+    const hit = reports.get(days);
+    if (!force && hit && Date.now() - hit.at < REPORT_TTL) {
+      report = hit.data; loadedOnce = true; $('usageMsg').textContent = ''; render();
+      $('usageUpdated').textContent = `${new Date(hit.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 기준`;
+      return;
+    }
+    if (force) {
+      const wait = REFRESH_GAP - (Date.now() - lastForce);
+      if (wait > 0) { $('usageMsg').textContent = `방금 새로고침했어요. ${Math.ceil(wait / 1000)}초 뒤에 다시 눌러 주세요.`; return; }
+      lastForce = Date.now();
+    }
     loading = true;
     $('usageBody').classList.add('is-loading');
     $('usageMsg').textContent = report ? '' : '불러오는 중…';
     try {
       const Store = window.CS && CS.Store;
       const token = Store && Store.getIdToken ? await Store.getIdToken() : null;
-      const res = await fetch(`/.netlify/functions/analytics-report?days=${days}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(`/.netlify/functions/analytics-report?days=${days}${force ? '&fresh=1' : ''}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Error(data.error || `통계를 불러오지 못했습니다(${res.status}).`);
       report = data; loadedOnce = true;
+      reports.set(days, { at: Date.now(), data });
       $('usageMsg').textContent = '';
       render();
       $('usageUpdated').textContent = `${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 기준`;
@@ -394,12 +411,12 @@
     panel.querySelectorAll('[data-days]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     load();
   }));
-  $('usageRefresh').addEventListener('click', load);
+  $('usageRefresh').addEventListener('click', () => load(true));
   // 탭이 열릴 때 처음 한 번 불러온다(일일현황만 보는 운영진에게 매번 부담을 주지 않게)
   const maybeLoad = () => { if (!panel.hidden && !loadedOnce && dashboardOpen()) load(); };
   new MutationObserver(maybeLoad).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   if ($('adminDashboard')) new MutationObserver(() => {
-    if (!dashboardOpen()) { report = null; loadedOnce = false; $('usageBody').replaceChildren(); } // 로그아웃하면 보던 통계도 지운다
+    if (!dashboardOpen()) { report = null; loadedOnce = false; reports.clear(); $('usageBody').replaceChildren(); } // 로그아웃하면 보던 통계도 지운다
     else maybeLoad();
   }).observe($('adminDashboard'), { attributes: true, attributeFilter: ['style'] });
   maybeLoad();

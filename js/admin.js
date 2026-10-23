@@ -36,26 +36,40 @@ CS.FEED_API = 'submissions';
     paintParticipantFilter();
     paintEntries();
     paintPrompts();
-    try {
-      // 공지문(notices) 컬렉션은 새로 추가된 기능이라, Firestore 보안 규칙에서 아직 읽기·쓰기가
-      // 막혀 있는 환경도 있을 수 있다. 여기서 실패해도 알림 메일 등 나머지 탭은 정상 동작해야
-      // 하므로, 이 섹션만 격리해서 실패가 refresh() 전체를 중단시키지 않게 한다.
-      await refreshNotices();
+    // 공지문·알림 메일 목록은 화면을 열 때(refresh) 한 번만 읽고, 명단·인증 기록만 바뀐 뒤(refreshLite 등)에는
+    // 이미 읽어 둔 걸로 다시 그리기만 한다 — 예전엔 명단을 한 건 고칠 때마다 공지문 수십 건 + 알림 메일 수백 건을
+    // 다시 읽어서 Firebase 무료 읽기 한도를 크게 썼다. 공지문·알림 메일을 직접 고치는 동작은 각자 다시 읽는다(refreshNotices/refreshNotify).
+    if (!secondaryLoaded) {
+      try {
+        // 공지문(notices) 컬렉션은 새로 추가된 기능이라, Firestore 보안 규칙에서 아직 읽기·쓰기가
+        // 막혀 있는 환경도 있을 수 있다. 여기서 실패해도 알림 메일 등 나머지 탭은 정상 동작해야
+        // 하므로, 이 섹션만 격리해서 실패가 refresh() 전체를 중단시키지 않게 한다.
+        await refreshNotices();
+        loadNoticeForDate();
+      } catch (e) {
+        console.error('[공지문] 불러오기 실패', e);
+        msg($('noticeMsg'),
+          `공지문을 불러오지 못했습니다: ${esc(e.message)}. Firestore 보안 규칙에서 notices 컬렉션의 ` +
+          '읽기·쓰기를 허용해 두었는지 확인해 주세요. (README 참고)', 'bad');
+      }
+      await refreshNotify();
+      secondaryLoaded = true;
+    } else {
       loadNoticeForDate();
-    } catch (e) {
-      console.error('[공지문] 불러오기 실패', e);
-      msg($('noticeMsg'),
-        `공지문을 불러오지 못했습니다: ${esc(e.message)}. Firestore 보안 규칙에서 notices 컬렉션의 ` +
-        '읽기·쓰기를 허용해 두었는지 확인해 주세요. (README 참고)', 'bad');
+      await paintNotifyViews();
     }
-    await refreshNotify();
+    paintReadMeter();
   }
 
   /** participants + submissions를 모두 다시 읽는다. 인증 기록(submissions) 자체가 바뀌었을 때만
    *  쓴다 — 챌린지가 진행될수록 submissions는 계속 쌓여서, 필요 없을 때도 매번 전체를 다시 읽으면
    *  Firestore 읽기 비용이 커진다(무료 요금제 한도를 넘길 수 있다). */
+  let secondaryLoaded = false; // 공지문·알림 메일 목록을 한 번 읽었는지(repaint 참고)
   async function refresh(opts) {
-    participants = await Store.listParticipants();
+    secondaryLoaded = false;
+    if (Store.invalidateMeta) Store.invalidateMeta(); // 전체 새로 읽기: 서버 함수가 고친 발송 기록 등도 새로
+    // 전체 새로 읽기라 명단도 Firestore에서 바로(서버 함수가 고친 발송 기록 등을 봐야 해서). 명단만 고친 뒤의 refreshLite()는 기억해 둔 명단을 쓴다.
+    participants = await Store.listParticipants({ fresh: true });
     // fresh: 백업 복원·전체 삭제 직후처럼 방금 쓴 것을 그대로 봐야 할 때만 Firestore에서 전부 직접 읽는다
     submissions = await Store.listSubmissions(opts && opts.fresh ? { fresh: true } : undefined);
     paintFeedAsOf();
@@ -178,6 +192,13 @@ CS.FEED_API = 'submissions';
   }
 
   function tick() { $('countdown').textContent = U.hhmmss(U.secondsToMidnight()); }
+
+  /** 이 화면이 Firestore에서 직접 읽은 문서 수 — 무료 한도(하루 5만 건)를 눈으로 확인하는 용도.
+   *  인증 기록·이용현황은 서버가 읽어 주므로 여기에 안 잡힌다. */
+  function paintReadMeter() {
+    const el = $('readMeter');
+    if (el && Store.readCount) el.textContent = `· 이 화면이 직접 읽은 Firestore 문서 ${Store.readCount().toLocaleString('ko-KR')}건 (무료 하루 5만 건)`;
+  }
 
   /* ── 일일현황 매트릭스 ───────────────── */
   function paintMatrix() {
@@ -1098,6 +1119,11 @@ CS.FEED_API = 'submissions';
 
   async function refreshNotify() {
     notifyEmails = await Store.listNotifyEmails();
+    await paintNotifyViews();
+  }
+
+  /** 알림 메일 탭들을 이미 읽어 둔 notifyEmails(와 기억해 둔 meta)로 다시 그린다 — 새로 읽는 건 없다. */
+  async function paintNotifyViews() {
     paintNotify();
     paintCustomMailResults();
     // 미인증 경고 메일·킥아웃 통보 메일의 이메일(참여자 이메일이 비어 있을 때의 대체 조회)은
@@ -2206,6 +2232,7 @@ CS.FEED_API = 'submissions';
     await Store.init();
     tick();
     setInterval(tick, 1000);
+    setInterval(paintReadMeter, 2000);
     initTabs();
 
     $('adminBrandSub').textContent = `${CONFIG.title} · ${CONFIG.book.name}`;

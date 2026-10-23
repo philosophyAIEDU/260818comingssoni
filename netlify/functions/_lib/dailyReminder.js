@@ -12,6 +12,7 @@
 const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
 const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+const { readSeasonSubmissions } = require('./feedSnapshot');
 
 const col = (name) => getDb().collection(collectionName(name));
 const metaDoc = () => getDb().collection(collectionName('meta')).doc('app');
@@ -32,6 +33,19 @@ function resolveEmailFor(participant, notifyEmails) {
   if (email) return email;
   const byName = notifyEmails.find((e) => e.name === participant.nickname);
   return byName ? byName.email : '';
+}
+
+/** 인증글 전체 대신 날짜별 스냅샷으로 읽는다(Firebase 무료 읽기 한도 절약). 오늘·어제만 새로 읽어 "오늘 아직 안 낸 사람"이 정확하다.
+ *  스냅샷을 못 읽으면 예전처럼 전부 읽는다. */
+async function fetchSubmissionsCheap() {
+  try {
+    const season = global.CS.SEASONS.find((x) => x.id === CONFIG.seasonId);
+    const today = U.today();
+    return await readSeasonSubmissions(getDb(), season, CONFIG, U, { freshDates: [today, U.addDays(today, -1)] });
+  } catch (err) {
+    console.warn('[daily-reminder] 스냅샷으로 못 읽어 전부 읽습니다:', err.message);
+    return fetchAll('submissions');
+  }
 }
 
 function reminderTemplate(meta) {
@@ -72,7 +86,7 @@ async function runDailyReminder() {
   }
 
   const [participants, submissions, notifyEmails, meta] = await Promise.all([
-    fetchAll('participants'), fetchAll('submissions'), fetchAll('notifyEmails'), fetchMeta()
+    fetchAll('participants'), fetchSubmissionsCheap(), fetchAll('notifyEmails'), fetchMeta()
   ]);
 
   const stats = U.buildStats(participants, submissions, todayISO);

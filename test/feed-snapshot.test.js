@@ -81,8 +81,12 @@ const today = U.today(), yesterday = U.addDays(today, -1), old = U.addDays(today
   clock.t += 9 * 60e3; assert(await reads(today) <= 2, '9분: 그대로');
   snap._memory.clear(); clock.t += 2 * 60e3; assert(await reads(today) >= 120, '11분: 다시 읽는다');
   snap._memory.clear(); clock.t += 60 * 60e3; assert(await reads(old) >= 1 && (await reads(old)) <= 2, '지난 글은 1시간 뒤에도 그대로');
-  snap._memory.clear(); clock.t += 13 * 3600e3; assert(await reads(old) <= 2, '13시간 뒤에도 지난 글은 그대로(24시간)');
-  snap._memory.clear(); clock.t += 12 * 3600e3; assert(await reads(old) >= 1, '25시간 뒤 다시 읽는다');
+  snap._memory.clear(); clock.t += 10 * 3600e3; assert(await reads(old) <= 2, '12시간 안엔 2~6일 전 글도 그대로');
+  snap._memory.clear(); clock.t += 2 * 3600e3; assert(await reads(old) >= 1, '13시간 뒤 2~6일 전 글은 다시 읽는다(12시간)');
+  const longAgo = U.addDays(today, -12);
+  col(prefix + 'submissions').set('l1', { participantId: 'p1', date: longAgo, sentence: '오래전', createdAt: 'x' });
+  snap._memory.clear(); await reads(longAgo); snap._memory.clear(); clock.t += 60 * 3600e3; assert(await reads(longAgo) <= 2, '일주일 넘은 글은 3일 안엔 그대로');
+  snap._memory.clear(); clock.t += 13 * 3600e3; assert(await reads(longAgo) >= 1, '3일(72시간) 뒤엔 다시 읽는다');
 
   // 동시에 오래된 스냅샷을 받으면 다시 읽는 건 한 명(리스) — 나머지는 직전 스냅샷
   snap._memory.clear(); clock.t += 11 * 60e3; stats.reads = 0;
@@ -126,5 +130,5 @@ const today = U.today(), yesterday = U.addDays(today, -1), old = U.addDays(today
   stats.reads = 0; snap._memory.clear();
   const big = await snap.readThrough(db, 'big', 1000, async () => Array.from({ length: 4000 }, (_, i) => ({ id: i, t: require('crypto').randomBytes(300).toString('hex') })), now);
   assert.equal(big.rows.length, 4000); assert.equal(col('feedSnapshots').get('big').z, undefined, '너무 커서 저장하지 않음');
-  console.log('읽기 줄이기: 명단 개인정보 제외·목록은 한 번만 읽고 300번 요청해도 읽기 0건·TTL(명단 30분/오늘 10분/어제 45분/그 이전 24시간)·리스·읽기 실패 시 직전 스냅샷·범위 밖 날짜 무시·운영진 갱신·큰 스냅샷 통과');
+  console.log('읽기 줄이기: 명단 개인정보 제외·목록은 한 번만 읽고 300번 요청해도 읽기 0건·TTL(명단 30분/오늘 10분/어제 45분/2~6일 전 12시간/그 이전 3일)·리스·읽기 실패 시 직전 스냅샷·범위 밖 날짜 무시·운영진 갱신·큰 스냅샷 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

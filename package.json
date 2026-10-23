@@ -18,7 +18,7 @@
     "test:analytics": "node test/analytics.test.js && node test/track.test.js && node test/analytics-report.test.js",
     "test:admin-usage": "node test/admin-usage.test.js",
     "test:install": "node test/sw.test.js && node test/install.test.js",
-    "test:feed": "node test/feed-snapshot.test.js && node test/feed-client.test.js && node test/feed-api.test.js && node test/admin-feed.test.js"
+    "test:feed": "node test/feed-snapshot.test.js && node test/feed-client.test.js && node test/feed-api.test.js && node test/admin-feed.test.js && node test/mail-reads.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",
