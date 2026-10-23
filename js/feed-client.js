@@ -14,7 +14,9 @@ CS.FeedClient = (function () {
   const SKEW_MS = 2 * 60 * 1000;
   const recentKey = () => `${CS.CONFIG.storagePrefix}.recentWrites.v1`;
 
-  const enabled = () => CS.FEED_API === true && typeof fetch === 'function';
+  // CS.FEED_API: true = 멤버 화면(명단·글 목록 모두), 'submissions' = 운영진 화면(글 목록만 — 명단은 이메일·전화번호가 필요해 직접 읽는다)
+  const enabled = () => !!CS.FEED_API && typeof fetch === 'function';
+  const rosterEnabled = () => CS.FEED_API === true && typeof fetch === 'function';
 
   /* ── 최근에 내가 쓴 글(덧씌움) ── */
   function loadRecent() {
@@ -69,8 +71,11 @@ CS.FeedClient = (function () {
     const body = await get({ kind: 'roster', season: seasonId() });
     return body.rows.slice().sort((a, b) => String(a.nickname).localeCompare(String(b.nickname), 'ko'));
   }
-  async function dayRows(date) {
-    const body = await get({ kind: 'day', season: seasonId(), date });
+  const snapshotAt = {}; // 날짜 → 그 날짜 목록 스냅샷을 서버가 만든 시각(ms). 운영진 화면이 "몇 시 기준"인지 보여 주는 데 쓴다.
+  /** bust: 브라우저·CDN이 들고 있는 옛 응답을 건너뛰고 서버 스냅샷을 새로 받는다(운영진이 [최신으로 새로고침]을 눌렀을 때) */
+  async function dayRows(date, bust) {
+    const body = await get(Object.assign({ kind: 'day', season: seasonId(), date }, bust ? { bust: String(Date.now()) } : {}));
+    snapshotAt[date] = body.at;
     return overlay(body.rows, (s) => s.date === date, body.at);
   }
 
@@ -103,8 +108,10 @@ CS.FeedClient = (function () {
   async function submissions(filter) {
     const f = filter || {};
     if (f.participantId && f.date) return null;
+    if (f.fresh) return null; // 백업 복원·전체 삭제 직후처럼 방금 쓴 것을 그대로 봐야 할 때는 Firestore에서 바로
     const dates = datesFor(f);
-    const days = await mapLimit(dates, PARALLEL, dayRows);
+    const today = CS.U.today(), yesterday = CS.U.addDays(today, -1);
+    const days = await mapLimit(dates, PARALLEL, (d) => dayRows(d, f.bust && (d === today || d === yesterday)));
     let rows = days.flat();
     if (f.participantId) rows = rows.filter((r) => r.participantId === f.participantId);
     return rows.sort((a, b) => (a.date === b.date
@@ -112,5 +119,8 @@ CS.FeedClient = (function () {
       : a.date.localeCompare(b.date)));
   }
 
-  return { enabled, roster, submissions, remember, overlay, datesFor, _loadRecent: loadRecent };
+  /** 오늘 목록 스냅샷을 만든 시각(ms). 아직 못 받았으면 0 */
+  const todayAt = () => snapshotAt[CS.U.today()] || 0;
+
+  return { enabled, rosterEnabled, todayAt, roster, submissions, remember, overlay, datesFor, _loadRecent: loadRecent };
 })();

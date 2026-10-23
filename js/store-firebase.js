@@ -91,6 +91,7 @@ CS.FirebaseStore = (function () {
   /* 멤버 화면(CS.FEED_API)은 명단·그날 글 목록을 서버 스냅샷으로 받는다(js/feed-client.js) — Firestore 읽기를 아끼려는 것.
    * 못 받으면 아래처럼 예전 방식(Firestore에서 직접)으로 읽는다. */
   const viaApi = () => !!(CS.FeedClient && CS.FeedClient.enabled());
+  const rosterViaApi = () => !!(CS.FeedClient && CS.FeedClient.rosterEnabled());
 
   /** 운영진이 명단·글을 고친 뒤: 서버 스냅샷을 오래된 것으로 표시해 멤버 화면이 곧바로 새 내용을 받게 한다(실패해도 무시). */
   async function invalidateFeed(opts) {
@@ -115,8 +116,15 @@ CS.FirebaseStore = (function () {
     invTimer = setTimeout(() => { const o = pendingInv; pendingInv = null; invalidateFeed({ roster: o.roster, dates: [...o.dates] }); }, 800);
   }
 
+  /** 운영진 [최신으로 새로고침]: 오늘·어제 글 목록 스냅샷을 오래된 것으로 표시해 다음에 읽을 때 새로 만들게 한다(운영진 토큰 필요). */
+  async function refreshFeedNow() {
+    const today = CS.U.today();
+    await invalidateFeed({ dates: [today, CS.U.addDays(today, -1)] });
+  }
+  const feedTodayAt = () => (CS.FeedClient ? CS.FeedClient.todayAt() : 0);
+
   async function listParticipants() {
-    if (viaApi()) {
+    if (rosterViaApi()) {
       try { return await CS.FeedClient.roster(); } catch (e) { console.warn('[feed] 명단 스냅샷을 못 받아 직접 읽습니다:', e.message); }
     }
     await init();
@@ -439,7 +447,7 @@ CS.FirebaseStore = (function () {
     name: 'firebase',
     init, listParticipants, listParticipantsOf, addParticipant, addParticipants, updateParticipant,
     removeParticipant, listSubmissions, getSubmission, saveSubmission,
-    removeSubmission, upvoteSubmission, unvoteSubmission, recordCopy, getMeta, setMeta,
+    removeSubmission, upvoteSubmission, unvoteSubmission, recordCopy, getMeta, setMeta, refreshFeedNow, feedTodayAt,
     getSeasonFlags, setSeasonFlags, exportAll, importAll, clearAll,
     onAuthStateChanged, signInWithGoogle, signOut, getCurrentUser, getIdToken,
     listNotifyEmails, addNotifyEmail, addNotifyEmails, removeNotifyEmail,
