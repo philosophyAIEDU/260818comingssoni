@@ -30,12 +30,13 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
 (async () => {
   const browser = await chromium.launch();
-  // 공지·안내의 추천 콘텐츠 카드는 Netlify 함수에서 최신 목록을 받는다. 정적 테스트 서버엔 함수가 없으니
-  // 모든 컨텍스트에서 빈 목록으로 답해 둔다(카드 자체는 test/content-ui.test.js가 검증).
+  // 공지·안내의 추천 콘텐츠 카드(최신 목록)와 이용 통계 전송은 Netlify 함수를 부른다. 정적 테스트 서버엔 함수가 없으니
+  // 모든 컨텍스트에서 대신 답해 둔다(각 기능은 test/content-ui·analytics 테스트가 검증).
   const rawNewContext = browser.newContext.bind(browser);
   browser.newContext = async (opts) => {
     const c = await rawNewContext(opts);
     await c.route((u) => u.pathname === '/.netlify/functions/content-library', (r) => r.fulfill({ json: { videos: [], columns: [] } }));
+    await c.route((u) => u.pathname === '/.netlify/functions/track', (r) => r.fulfill({ status: 204 })); // 이용 통계(test/content-ui·analytics가 검증)
     return c;
   };
   const ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });

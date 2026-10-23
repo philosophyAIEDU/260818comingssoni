@@ -1,7 +1,8 @@
-/* 쏜님의 영상 아래 멤버 댓글 — 읽고 있는 책과 영상을 이어 본 인사이트를 나눈다.
+/* 쏜님의 영상·뉴스레터 칼럼 아래 멤버 댓글 — 읽고 있는 책과 콘텐츠를 이어 본 인사이트를 나눈다.
  *
- * 저장: contentComments/{id} { videoId, participantId, nickname, seasonId, book, text, createdAt, tokenHash }
- *   영상은 시즌이 바뀌어도 그대로라 시즌 접두사를 붙이지 않는다. 대신 쓸 때의 시즌·책을 함께 남겨
+ * 저장: contentComments/{id} { videoId | columnId, participantId, nickname, seasonId, book, text, createdAt, tokenHash }
+ *   videoId: 유튜브 영상 ID / columnId: 칼럼 경로(/p/50/ 또는 스티비 공유 메일 경로)
+ *   콘텐츠는 시즌이 바뀌어도 그대로라 시즌 접두사를 붙이지 않는다. 대신 쓸 때의 시즌·책을 함께 남겨
  *   "『혁명의 팡파르』 읽는 중"처럼 보여 준다.
  *
  * 쓰기는 Admin SDK로만 한다(브라우저가 Firestore에 직접 쓰지 않는다). 그래서 보안 규칙을 고치지 않아도 되고,
@@ -18,6 +19,14 @@ const MAX_LIST = 200;
 const MIN_INTERVAL_MS = 15 * 1000;
 const DAILY_LIMIT = 30;
 const VIDEO_ID = /^[\w-]{11}$/;
+const COLUMN_ID = /^(?:\/p\/\d+\/?|\/api\/v1\.0\/emails\/share\/[\w-]{1,80})$/;
+/** 요청의 대상 → 저장 필드 { field, value }. 영상과 칼럼 중 정확히 하나. 이상하면 null. */
+function targetOf(src) {
+  const video = src.videoId ?? src.video, column = src.columnId ?? src.column;
+  if (video != null && column == null && VIDEO_ID.test(String(video))) return { field: 'videoId', value: String(video) };
+  if (column != null && video == null && COLUMN_ID.test(String(column))) return { field: 'columnId', value: String(column) };
+  return null;
+}
 
 const sha256 = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 const normalizeNick = (s) => String(s || '').trim().replace(/\s+/g, ' ');
@@ -36,9 +45,10 @@ function publicComment(id, d) {
   return { id, nickname: d.nickname, text: d.text, book: d.book || '', createdAt: d.createdAt };
 }
 
-async function listComments(db, videoId) {
-  if (!VIDEO_ID.test(String(videoId || ''))) return { error: [400, '영상 정보가 올바르지 않습니다.'] };
-  const snap = await db.collection(COLLECTION).where('videoId', '==', videoId).get();
+async function listComments(db, query) {
+  const target = targetOf(query || {});
+  if (!target) return { error: [400, '콘텐츠 정보가 올바르지 않습니다.'] };
+  const snap = await db.collection(COLLECTION).where(target.field, '==', target.value).get();
   const comments = snap.docs.map((d) => publicComment(d.id, d.data()))
     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
     .slice(-MAX_LIST);
@@ -57,10 +67,10 @@ async function findMember(db, nickname, seasons) {
 }
 
 async function addComment(db, payload, seasons, now = new Date()) {
-  const videoId = String(payload.videoId || '');
+  const target = targetOf(payload);
   const nickname = normalizeNick(payload.nickname);
   const text = cleanText(payload.text);
-  if (!VIDEO_ID.test(videoId)) return { error: [400, '영상 정보가 올바르지 않습니다.'] };
+  if (!target) return { error: [400, '콘텐츠 정보가 올바르지 않습니다.'] };
   if (!nickname) return { error: [400, '멤버 이름을 입력해 주세요.'] };
   if (text.length < 2) return { error: [400, '나누고 싶은 생각을 두 글자 이상 적어 주세요.'] };
   if (text.length > MAX_TEXT) return { error: [400, `댓글은 ${MAX_TEXT}자까지 쓸 수 있어요.`] };
@@ -76,7 +86,7 @@ async function addComment(db, payload, seasons, now = new Date()) {
 
   const token = crypto.randomBytes(18).toString('base64url');
   const doc = {
-    videoId,
+    [target.field]: target.value,
     participantId: found.participant.id,
     nickname: found.participant.nickname,
     seasonId: found.season.id,

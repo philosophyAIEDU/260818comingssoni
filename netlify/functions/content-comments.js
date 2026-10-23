@@ -1,7 +1,7 @@
-/* 쏜님의 영상 댓글 — content.html의 영상 보기 창 아래에서 부른다.
+/* 쏜님의 영상·칼럼 댓글 — content.html의 영상 보기·칼럼 읽기 창 아래에서 부른다.
  *
- *   GET    ?video={id}                      → { comments: [{ id, nickname, text, book, createdAt }], book }
- *   POST   { videoId, nickname, text }      → { comment, token }   (token: 이 기기에서 지울 때 쓰는 값)
+ *   GET    ?video={id} | ?column={/p/50/}   → { comments: [{ id, nickname, text, book, createdAt }], book }
+ *   POST   { videoId | columnId, nickname, text } → { comment, token }   (token: 이 기기에서 지울 때 쓰는 값)
  *   DELETE { id, token }                    → { ok }               (운영진은 Authorization 헤더로 token 없이)
  *
  * 멤버 확인·저장 규칙은 _lib/contentComments.js. 이름은 활성 시즌 명단에서 먼저, 없으면 바로 앞 시즌에서 찾는다
@@ -29,7 +29,7 @@ const reply = (result, okStatus = 200, headers) => (result.error
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === 'GET') {
-      const result = await comments.listComments(getDb(), (event.queryStringParameters || {}).video);
+      const result = await comments.listComments(getDb(), event.queryStringParameters || {});
       if (!result.error) result.book = memberSeasons()[0].book; // 입력 칸 안내에 쓰는 지금 읽는 책
       return reply(result, 200, { 'Cache-Control': 'no-store' });
     }

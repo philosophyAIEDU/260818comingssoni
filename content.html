@@ -38,7 +38,7 @@
       <noscript><p>콘텐츠 목록을 보려면 자바스크립트를 켜주세요. 위의 유튜브·뉴스레터 링크에서도 바로 볼 수 있습니다.</p></noscript>
     </section>
     <aside class="reading-bridge"><span aria-hidden="true">✎</span><div><strong>보고 끝내지 말고, 내 것으로.</strong><p>마음에 남은 한 가지를 오늘의 독서 기록과 연결해 보세요.</p><a href="index.html">오늘의 인증 남기기 →</a></div></aside>
-    <footer class="content-footer">영상·뉴스레터 출처: 커밍쏜 · 보관함은 현재 기기에, 영상 댓글은 멤버십 서버에 저장됩니다.</footer>
+    <footer class="content-footer">영상·뉴스레터 출처: 커밍쏜 · 보관함은 현재 기기에, 영상·칼럼 댓글은 멤버십 서버에 저장됩니다.</footer>
   </main>
   <dialog id="contentReader" class="content-reader" aria-labelledby="readerTitle">
     <div class="reader-top"><span id="readerType">커밍쏜</span><div>
@@ -49,9 +49,9 @@
       <div id="readerMedia"></div>
       <div id="readerReflection" class="reader-reflection"></div>
       <div class="reader-bottom"><button type="button" id="readerSave">나중에 보기</button><button type="button" id="readerNext">다음 콘텐츠 →</button></div>
-      <section id="readerComments" class="reader-comments" aria-labelledby="commentsTitle" hidden>
+      <section id="readerComments" class="reader-comments" aria-labelledby="commentsTitle">
         <div class="comments-head"><h3 id="commentsTitle">멤버 인사이트 <span id="commentCount"></span></h3></div>
-        <p class="comments-lead">이 영상과 지금 읽고 있는 책을 이어 본 생각을 나눠 주세요. 독서 멤버십 멤버만 남길 수 있어요.</p>
+        <p class="comments-lead" id="commentsLead">이 영상과 지금 읽고 있는 책을 이어 본 생각을 나눠 주세요. 독서 멤버십 멤버만 남길 수 있어요.</p>
         <form id="commentForm" class="comment-form" novalidate>
           <label class="sr-only" for="commentName">멤버 이름</label>
           <input id="commentName" name="nickname" maxlength="40" autocomplete="nickname" placeholder="멤버 이름 (인증할 때 쓰는 이름)">
@@ -66,6 +66,7 @@
       </section>
     </div>
   </dialog>
+  <script src="js/analytics.js" data-page="content"></script>
   <script src="js/content.js"></script>
 </body>
 </html>

@@ -69,11 +69,35 @@
     }).join('');
   }
   const siblingsOf = item => { const list = item.type === 'videos' ? videos : columns; return filter === 'saved' ? list.filter(x => saved.has(x.id)) : list; };
+  // 이용 통계(js/analytics.js). 없으면 아무 일도 하지 않는다.
+  const track = () => window.PMTrack || { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {} };
+  // 실제 재생 시간은 유튜브 플레이어 API의 재생 상태로 센다. API를 못 불러와도 영상은 그대로 나온다.
+  let ytApi = null;
+  function youtubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+    if (!ytApi) ytApi = new Promise((resolve, reject) => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); resolve(window.YT); };
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api'; script.async = true;
+      script.onerror = () => { ytApi = null; reject(Error('YouTube API unavailable')); };
+      document.head.append(script);
+    });
+    return ytApi;
+  }
+  function watchPlayback(frame) {
+    youtubeApi().then(YT => {
+      if (!frame.isConnected) return;
+      new YT.Player(frame, { events: { onStateChange: e => { if (frame.isConnected) track().videoPlaying(e.data === 1); } } });
+    }).catch(() => { /* 재생 시간만 빠진다 */ });
+  }
   function openItem(id) {
     const item = all().find(x => x.id === id);
     if (!item) return;
+    track().videoClose(); track().columnClose();
     active = item;
     const video = item.type === 'videos';
+    if (video) track().videoOpen(item.id, item.title); else track().columnOpen(item.id, item.title);
     $('contentReader').classList.toggle('is-column', !video);
     $('readerTitle').textContent = item.title;
     $('readerType').textContent = video ? '쏜님의 영상' : '쏜님의 칼럼';
@@ -86,19 +110,19 @@
       frame.title = item.title;
       frame.referrerPolicy = 'strict-origin-when-cross-origin';
       frame.className = 'video-frame';
-      frame.src = `https://www.youtube-nocookie.com/embed/${item.id}?rel=0&playsinline=1`;
+      frame.src = `https://www.youtube-nocookie.com/embed/${item.id}?rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
       frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
       frame.allowFullscreen = true;
       $('readerMedia').replaceChildren(frame);
       const hint = document.createElement('p'); hint.className = 'reader-fallback';
       hint.textContent = '재생이 제한되면 위의 ‘YouTube에서 보기’를 눌러주세요.';
       $('readerMedia').append(hint);
+      watchPlayback(frame);
     } else {
       openColumn(item);
     }
     $('readerReflection').innerHTML = `<strong>독서와 연결하기 · 멤버십 질문</strong><p>${esc(item.question || (video ? '이 영상에서 내 삶이나 브랜드에 적용하고 싶은 한 가지는 무엇인가요? 오늘 읽은 책의 문장과 함께 생각해 보세요.' : '이 글에서 내 삶이나 브랜드에 적용하고 싶은 한 가지는 무엇인가요? 오늘 읽은 책의 문장과 함께 생각해 보세요.'))}</p>`;
-    $('readerComments').hidden = !video;
-    if (video) openComments(item);
+    openComments(item);
     syncReaderSave();
     $('readerNext').hidden = siblingsOf(item).length < 2;
     $('readerNext').textContent = video ? '다음 영상 →' : '다음 칼럼 →';
@@ -192,6 +216,7 @@
     const s = document.querySelector('.reader-scroll');
     const max = s.scrollHeight - s.clientHeight;
     $('readerProgress').style.transform = `scaleX(${max > 0 ? Math.min(1, s.scrollTop / max) : 0})`;
+    if (active && active.type === 'columns' && $('readerMedia').querySelector('.newsletter-body')) track().columnDepth(max > 0 ? s.scrollTop / max : 1);
   }
 
   /* ── 영상 댓글: 멤버끼리 책과 영상을 이어 본 인사이트 ─────────────── */
@@ -228,8 +253,13 @@
     $('commentEmpty').hidden = list.length > 0;
   }
   let commentCache = [];
+  // 영상은 videoId, 칼럼은 columnId(글 경로)로 댓글을 묶는다
+  const commentTarget = item => item.type === 'videos' ? { query: 'video', field: 'videoId' } : { query: 'column', field: 'columnId' };
   async function openComments(item) {
     commentsFor = item.id;
+    const video = item.type === 'videos';
+    $('commentsLead').textContent = `이 ${video ? '영상' : '글'}과 지금 읽고 있는 책을 이어 본 생각을 나눠 주세요. 독서 멤버십 멤버만 남길 수 있어요.`;
+    paintPlaceholder();
     commentCache = [];
     $('commentList').replaceChildren();
     $('commentCount').textContent = '';
@@ -240,7 +270,7 @@
     $('commentState').hidden = false;
     $('commentState').textContent = '멤버들의 인사이트를 불러오는 중…';
     try {
-      const response = await fetch(`${COMMENTS}?video=${encodeURIComponent(item.id)}`, { signal: AbortSignal.timeout(10000) });
+      const response = await fetch(`${COMMENTS}?${commentTarget(item).query}=${encodeURIComponent(item.id)}`, { signal: AbortSignal.timeout(10000) });
       if (!response.ok) throw Error('unavailable');
       const data = await response.json();
       if (commentsFor !== item.id) return;
@@ -254,29 +284,30 @@
     }
   }
   function paintPlaceholder() {
+    const what = active && active.type === 'columns' ? '칼럼' : '영상';
     $('commentText').placeholder = book
-      ? `예) 『${book}』에서 밑줄 친 문장이 영상의 이 이야기와 이어졌어요…`
-      : '예) 지금 읽는 책의 한 문장이 영상의 이 이야기와 이어졌어요…';
+      ? `예) 『${book}』에서 밑줄 친 문장이 ${what}의 이 이야기와 이어졌어요…`
+      : `예) 지금 읽는 책의 한 문장이 ${what}의 이 이야기와 이어졌어요…`;
   }
   function paintLength() { $('commentLength').textContent = `${$('commentText').value.length}/500`; }
   $('commentText').addEventListener('input', paintLength);
   $('commentName').value = typeof store.get(NAME_KEY, '') === 'string' ? store.get(NAME_KEY, '') : '';
   $('commentForm').addEventListener('submit', async event => {
     event.preventDefault();
-    if (!active || active.type !== 'videos') return;
+    if (!active) return;
     const nickname = $('commentName').value.trim(), text = $('commentText').value.trim();
     const say = (t, kind) => { $('commentMsg').textContent = t; $('commentMsg').dataset.kind = kind || ''; };
     if (!nickname) { say('멤버 이름을 적어 주세요. 인증할 때 쓰는 이름 그대로요.', 'error'); $('commentName').focus(); return; }
     if (text.length < 2) { say('나누고 싶은 생각을 적어 주세요.', 'error'); $('commentText').focus(); return; }
-    const video = active, button = $('commentSubmit');
+    const target = active, button = $('commentSubmit');
     button.disabled = true; say('남기는 중…');
     try {
-      const response = await fetch(COMMENTS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoId: video.id, nickname, text }), signal: AbortSignal.timeout(12000) });
+      const response = await fetch(COMMENTS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [commentTarget(target).field]: target.id, nickname, text }), signal: AbortSignal.timeout(12000) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.comment) throw Error(data.error || '댓글을 남기지 못했어요. 잠시 뒤 다시 시도해 주세요.');
       store.set(NAME_KEY, nickname);
       tokens[data.comment.id] = data.token; store.set(TOKENS_KEY, tokens);
-      if (commentsFor === video.id) {
+      if (commentsFor === target.id) {
         commentCache.push(data.comment); paintComments(commentCache); $('commentState').hidden = true;
         $('commentText').value = ''; paintLength();
       }
@@ -332,7 +363,7 @@
   document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; setHash(filter); render(); }));
   $('contentStatus').addEventListener('click', e => { if (e.target.id === 'retryColumns') load(); });
   $('readerClose').addEventListener('click', () => $('contentReader').close());
-  $('contentReader').addEventListener('close', () => { $('readerMedia').replaceChildren(); active = null; if (location.hash.startsWith('#open=')) setHash(filter); commentsFor = ''; document.body.classList.remove('content-reader-open'); });
+  $('contentReader').addEventListener('close', () => { track().videoClose(); track().columnClose(); $('readerMedia').replaceChildren(); active = null; if (location.hash.startsWith('#open=')) setHash(filter); commentsFor = ''; document.body.classList.remove('content-reader-open'); });
   $('readerSave').addEventListener('click', () => { if (active) toggleSave(active.id); });
   $('readerNext').addEventListener('click', () => {
     if (!active) return;
