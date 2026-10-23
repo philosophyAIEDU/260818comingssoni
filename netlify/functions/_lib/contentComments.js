@@ -96,7 +96,8 @@ async function addComment(db, payload, seasons, now = new Date()) {
     tokenHash: sha256(token)
   };
   const ref = await db.collection(COLLECTION).add(doc);
-  return { comment: publicComment(ref.id, doc), token };
+  // member: 쓴 사람 기기가 이용 통계를 이 멤버로 잇는 데 쓴다(본인에게만 돌려준다)
+  return { comment: publicComment(ref.id, doc), token, member: { p: found.participant.id, s: found.season.id } };
 }
 
 /** isAdmin이면 토큰 없이 지운다. 아니면 쓸 때 받은 토큰이 맞아야 한다. */

@@ -95,7 +95,7 @@
     <button data-tab="report">공지문</button>
     <button data-tab="entries">제출 기록</button>
     <button data-tab="notify">알림 메일</button>
-    <button data-tab="usage">이용 통계</button>
+    <button data-tab="usage">이용현황</button>
     <button data-tab="data">데이터</button>
   </div>
 
@@ -577,10 +577,10 @@
   </section>
 
   <!-- ── 데이터 ───────────────────────── -->
-  <!-- ── 이용 통계 ─────────────────────── 그리기는 js/admin-usage.js -->
+  <!-- ── 이용현황 ─────────────────────── 그리기는 js/admin-usage.js -->
   <section class="card panel usage" data-panel="usage" hidden>
     <div class="usage-head">
-      <h2>이용 통계</h2>
+      <h2>이용현황</h2>
       <div class="usage-filters">
         <div class="usage-range" role="group" aria-label="기간">
           <button type="button" data-days="7" aria-pressed="false">7일</button>
@@ -592,7 +592,8 @@
         <span class="usage-updated" id="usageUpdated"></span>
       </div>
     </div>
-    <p class="hint">멤버들이 사이트에서 보낸 시간입니다. <strong>익명 기기 단위</strong>로만 세고(이름과 잇지 않음), 운영진 화면 이용은 빠집니다.
+    <p class="hint">멤버들이 사이트에서 보낸 시간입니다(<strong>운영진만</strong> 볼 수 있음). 멤버별로는 <strong>인증 이름 기준의 기간 합계 시간</strong>만 보여 주고,
+      언제 들어왔는지·무엇을 봤는지 같은 개인 행동 기록은 남기지 않습니다. 날짜·시간대·콘텐츠별 숫자는 전체 합계입니다. 운영진 화면 이용은 빠집니다.
       화면이 보이고 1분 안에 움직임이 있을 때(영상은 재생 중일 때)만 시간이 쌓여, 창만 열어 둔 시간은 들어가지 않습니다.</p>
     <p class="usage-msg" id="usageMsg" role="status"></p>
     <div id="usageBody" class="usage-body"></div>

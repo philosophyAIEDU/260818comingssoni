@@ -173,6 +173,10 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.click('#submitBtn');
   await page.waitForTimeout(500);
   t('제출 성공 메시지', /인증이 저장되었습니다/.test(await page.textContent('#formMsg')));
+  t('인증하면 이 기기의 이용현황이 그 멤버(참여자 ID·시즌)로 이어짐', await page.evaluate(() => {
+    const m = JSON.parse(localStorage.getItem('personalmakers.analytics.member') || 'null');
+    return !!m && m.p === document.getElementById('participant').value && m.s === CS.CONFIG.seasonId;
+  }));
   t('버튼이 수정 모드로', (await page.textContent('#submitBtn')).includes('수정'));
   t('나의 현황 노출', await page.isVisible('#myCard'));
   t('인증 1건', (await page.textContent('#stVerified')) === '1');

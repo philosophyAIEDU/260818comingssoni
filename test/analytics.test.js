@@ -47,4 +47,19 @@ assert.deepEqual(report.pages, { index: 700, content: 2300, feed: 0 });
 assert.deepEqual(report.distribution.map((x) => x.count), [1, 0, 0, 1, 1], '30초·16분10초·33분20초');
 assert.deepEqual(report.topVideos.map((v) => [v.title, v.sec, v.opens]), [['영상 B', 1500, 1], ['영상 A', 200, 2]]);
 assert.deepEqual(report.topColumns.map((c) => [c.title, c.sec, c.opens, c.completes]), [['칼럼 50', 400, 3, 1]]);
+// 멤버 연결: 브라우저는 참여자 ID·시즌만 보내고, 이름은 서버가 명단에서 확인한 값만 쓴다
+const bm = sanitizeBeacon({ d: DEV, p: 'index', active: 30, m: { p: 'abc123', s: 's3' } });
+assert.deepEqual(bm.member, { pid: 'abc123', season: 's3' });
+assert.equal(sanitizeBeacon({ d: DEV, p: 'index', active: 30, m: { p: '../x', s: 's3' } }).member, null);
+assert.equal(toUpdate(bm, inc).data.members, undefined, '확인 전엔 멤버로 더하지 않음');
+const withMember = toUpdate(bm, inc, new Date(), { pid: 'abc123', season: 's3', name: '김현우' }).data.members;
+assert.deepEqual(withMember, { s3_abc123: { name: '김현우', season: 's3', active: inc(30), play: inc(0), read: inc(0) } }, '멤버별로는 시간 합계만');
+const mr = buildReport({
+  '2026-10-21': { activeSec: 900, members: { s3_a: { name: '김현우', season: 's3', active: 600, play: 300, read: 60, visits: 2 }, s3_b: { name: '박지민', season: 's3', active: 100, visits: 1 } } },
+  '2026-10-23': { activeSec: 2000, members: { s3_a: { name: '김현우', active: 400, play: 100, read: 200, visits: 1 }, s3_c: { name: '없는시간', active: 0 } } }
+}, ['2026-10-21', '2026-10-22', '2026-10-23']);
+assert.deepEqual(mr.members, [
+  { key: 's3_a', name: '김현우', season: 's3', activeSec: 1000, videoPlaySec: 400, columnReadSec: 260 },
+  { key: 's3_b', name: '박지민', season: 's3', activeSec: 100, videoPlaySec: 0, columnReadSec: 0 }], '기간 합계만(날짜별·방문 기록 없음)');
+assert.equal(mr.totals.members, 2); assert.equal(mr.totals.memberSec, 1100);
 console.log('이용 통계: 묶음 검사(익명·상한·허용 화면)·KST 날짜/시각·하루 문서 증가값·기간 보고서 집계 통과');

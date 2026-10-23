@@ -1,4 +1,4 @@
-/* 운영진 [이용 통계] 탭 — 사이트 체류·영상 시청·뉴스레터 읽기 시간을 기간별로 보여 준다.
+/* 운영진 [이용현황] 탭 — 사이트 체류·영상 시청·뉴스레터 읽기 시간을 기간별로 보여 준다.
  * 데이터: /.netlify/functions/analytics-report (운영진 로그인 토큰 필요). 모으는 쪽은 js/analytics.js.
  * 차트는 라이브러리 없이 SVG로 그린다 — 막대·선은 가늘게, 격자는 옅은 실선, 2개 이상 계열엔 범례,
  * 모든 차트에 마우스·키보드 툴팁과 "표로 보기"가 있다. 계열 색은 고정 순서(영상·뉴스레터·그 밖의 이용). */
@@ -203,6 +203,7 @@
       el('span', 'usage-hero-sub', `${shortDate(r.from)} ~ ${shortDate(r.to)} · 화면을 실제로 보고 있던 시간`));
     const tiles = el('div', 'usage-tiles');
     [
+      ['이용한 멤버', `${fmtNum(t.members || 0)}명`, '인증한 이름 기준'],
       ['다녀간 기기', `${fmtNum(t.uniqueDevices)}대`, `방문 ${fmtNum(t.visits)}회`],
       ['1인 하루 평균', fmtDur(t.perDeviceDaySec), '그날 들어온 기기 기준'],
       ['영상 시청', fmtDur(t.videoPlaySec), `영상 연 횟수 ${fmtNum(t.videoOpens)}회`],
@@ -216,6 +217,9 @@
       body.replaceChildren(...nodes);
       return;
     }
+
+    // 0) 멤버별 이용 시간
+    nodes.push(memberSection(r));
 
     // 1) 날짜별 이용 시간 — 영상 시청 / 뉴스레터 읽기 / 그 밖의 이용(인증·피드 등)
     const series = [
@@ -287,9 +291,83 @@
     lastWidth = panel.clientWidth; // 이 너비로 그렸다 — 같은 너비의 크기 변화 알림엔 다시 그리지 않는다
   }
 
+  /* ── 멤버별 이용 시간: 이름 찾기·정렬, 한 줄에 영상/뉴스레터/그 밖의 이용을 쌓은 막대 ──
+   * 멤버별로는 기간 합계만 보여 준다(언제 들어왔는지·날짜별 기록·방문 횟수는 개인 행동 기록이라 두지 않는다). */
+  const SORTS = {
+    active: ['총 이용 시간', (m) => m.activeSec],
+    video: ['영상 시청', (m) => m.videoPlaySec],
+    column: ['뉴스레터 읽기', (m) => m.columnReadSec],
+    name: ['이름', null]
+  };
+  let memberSort = 'active', memberQuery = '', memberAll = false;
+  const parts = (m) => {
+    const video = m.videoPlaySec, column = m.columnReadSec;
+    return [video, column, Math.max(0, m.activeSec - video - column)];
+  };
+  function memberSection(r) {
+    const t = r.totals;
+    const share = t.activeSec ? Math.min(100, Math.round((t.memberSec / t.activeSec) * 100)) : 0;
+    const fig = figure('멤버별 이용 시간', `인증한 이름 기준 · ${fmtNum(t.members || 0)}명 · 기간 합계 · 전체 이용 시간의 ${share}%가 이름이 확인된 이용`);
+    fig.f.id = 'usageMembers';
+    const names = ['영상 시청', '뉴스레터 읽기', '그 밖의 이용'];
+    const legendEl = legend(names.map((name, i) => ({ name, color: color(i + 1) })));
+    const tools = el('div', 'member-tools');
+    const search = el('input'); search.type = 'search'; search.placeholder = '이름 찾기'; search.id = 'memberSearch'; search.value = memberQuery; search.setAttribute('aria-label', '멤버 이름 찾기');
+    const sort = el('select'); sort.id = 'memberSort'; sort.setAttribute('aria-label', '정렬');
+    for (const [k, [label]] of Object.entries(SORTS)) { const o = el('option', '', label + ' 순'); o.value = k; sort.append(o); }
+    sort.value = memberSort;
+    tools.append(search, sort);
+    fig.f.insertBefore(tools, fig.plot);
+    if (legendEl) fig.f.insertBefore(legendEl, fig.plot);
+    const list = el('div', 'member-list');
+    const more = el('button', 'member-more'); more.type = 'button';
+    fig.plot.append(list, more);
+    const members = r.members || [];
+    const max = Math.max(...members.map((m) => parts(m).reduce((a, b) => a + b, 0)), 1);
+    function paint() {
+      const q = memberQuery.trim();
+      const key = SORTS[memberSort][1];
+      const rows = members.filter((m) => !q || m.name.includes(q))
+        .sort((a, b) => (key ? key(b) - key(a) || b.activeSec - a.activeSec : a.name.localeCompare(b.name, 'ko')));
+      const shown = memberAll ? rows : rows.slice(0, 20);
+      list.replaceChildren(...shown.map((m) => {
+        const row = el('div', 'member-row'); row.tabIndex = 0;
+        const [v, c, o] = parts(m);
+        row.setAttribute('aria-label', `${m.name}: 총 ${fmtDur(m.activeSec)}, 영상 ${fmtDur(v)}, 뉴스레터 ${fmtDur(c)}, 그 밖의 이용 ${fmtDur(o)}`);
+        const name = el('div', 'member-name'); name.append(el('strong', '', m.name || '(이름 없음)'));
+        const bar = el('div', 'member-bar');
+        const stack = el('div', 'member-stack');
+        [v, c, o].forEach((sec, i) => { if (sec <= 0) return; const seg = el('span', 'member-seg'); seg.style.width = (sec / max) * 100 + '%'; seg.style.background = color(i + 1); stack.append(seg); });
+        bar.append(stack, el('span', 'member-total', fmtDur(m.activeSec)));
+        row.append(name, bar);
+        const show = () => {
+          const box = row.getBoundingClientRect(), host = fig.plot.getBoundingClientRect();
+          showTip(fig.plot, box.left - host.left + Math.min(box.width / 2, 260), box.top - host.top, m.name, [
+            { color: color(1), value: fmtDur(v), name: '영상 시청' }, { color: color(2), value: fmtDur(c), name: '뉴스레터 읽기' },
+            { color: color(3), value: fmtDur(o), name: '그 밖의 이용' }, { value: fmtDur(m.activeSec), name: '합계' }]);
+        };
+        row.addEventListener('pointerenter', show); row.addEventListener('focus', show);
+        row.addEventListener('pointerleave', hideTip); row.addEventListener('blur', hideTip);
+        return row;
+      }));
+      if (!rows.length) list.append(el('p', 'usage-empty', members.length ? `'${q}' 이름의 이용 기록이 없습니다.` : '아직 이름이 확인된 이용 기록이 없습니다. 멤버가 인증하거나 댓글을 남긴 기기부터 이름으로 쌓입니다.'));
+      more.hidden = memberAll || rows.length <= 20;
+      more.textContent = `${rows.length - 20}명 더 보기`;
+    }
+    search.addEventListener('input', () => { memberQuery = search.value; paint(); });
+    sort.addEventListener('change', () => { memberSort = sort.value; paint(); });
+    more.addEventListener('click', () => { memberAll = true; paint(); });
+    paint();
+    fig.f.append(tableView(['멤버', '총 이용', '영상 시청', '뉴스레터 읽기', '그 밖의 이용'],
+      members.map((m) => { const [v, c, o] = parts(m); return [m.name, fmtDur(m.activeSec), fmtDur(v), fmtDur(c), fmtDur(o)]; })));
+    return fig.f;
+  }
+
   /* ── 불러오기: 다시 받는 동안 앞의 그림을 흐리게 둔다(깜빡임 없이) ── */
+  // 운영진 로그인으로 대시보드가 열린 뒤에만 부른다(서버도 운영진 토큰이 없으면 거절한다).
+  const dashboardOpen = () => { const d = $('adminDashboard'); return !d || d.style.display !== 'none'; };
   async function load() {
-    if (loading) return;
+    if (loading || !dashboardOpen()) return;
     loading = true;
     $('usageBody').classList.add('is-loading');
     $('usageMsg').textContent = report ? '' : '불러오는 중…';
@@ -318,8 +396,13 @@
   }));
   $('usageRefresh').addEventListener('click', load);
   // 탭이 열릴 때 처음 한 번 불러온다(일일현황만 보는 운영진에게 매번 부담을 주지 않게)
-  new MutationObserver(() => { if (!panel.hidden && !loadedOnce) load(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
-  if (!panel.hidden) load();
+  const maybeLoad = () => { if (!panel.hidden && !loadedOnce && dashboardOpen()) load(); };
+  new MutationObserver(maybeLoad).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  if ($('adminDashboard')) new MutationObserver(() => {
+    if (!dashboardOpen()) { report = null; loadedOnce = false; $('usageBody').replaceChildren(); } // 로그아웃하면 보던 통계도 지운다
+    else maybeLoad();
+  }).observe($('adminDashboard'), { attributes: true, attributeFilter: ['style'] });
+  maybeLoad();
   let resizeTimer = 0;
   new ResizeObserver(() => {
     clearTimeout(resizeTimer);

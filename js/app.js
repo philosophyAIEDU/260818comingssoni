@@ -1542,6 +1542,7 @@
     try {
       const saved = await Store.saveSubmission(payload);
       clearDraft(pid, date);
+      if (window.PMTrack) window.PMTrack.setMember(pid, CONFIG.seasonId); // 이용 통계를 이 멤버 이름으로(운영진만 봄)
       const late = U.isLate(date, saved.createdAt);
       msg($('formMsg'),
         `<strong>${esc(payload.nickname)}</strong> 님, ${U.shortLabel(payload.date)} 인증이 저장되었습니다.` +
