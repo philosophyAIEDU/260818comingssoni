@@ -83,5 +83,16 @@ const { handler } = require('../netlify/functions/content-comments.js');
   adminOk = true;
   assert.equal((await call('DELETE', { headers: { authorization: 'Bearer x' }, body: { id: second.comment.id } })).status, 200);
   assert.deepEqual((await call('GET', { query: { video: VIDEO } })).body.comments, []);
+  // 칼럼 댓글: columnId(글 경로)로 따로 묶인다
+  participants.set('p6', { nickname: '최서연', status: 'active' });
+  r = await call('POST', { body: { columnId: '/p/50/', nickname: '최서연', text: '칼럼의 이 대목이 책과 이어졌어요' } });
+  assert.equal(r.status, 201);
+  assert.equal(db.coll('contentComments').get(r.body.comment.id).columnId, '/p/50/'); assert(!('videoId' in db.coll('contentComments').get(r.body.comment.id)));
+  assert.deepEqual((await call('GET', { query: { column: '/p/50/' } })).body.comments.map((c) => c.nickname), ['최서연']);
+  assert.deepEqual((await call('GET', { query: { video: VIDEO } })).body.comments, [], '영상 댓글과 섞이지 않음');
+  assert.equal((await call('GET', { query: { column: '/p/../etc' } })).status, 400);
+  assert.equal((await call('GET', { query: { column: '/p/50/', video: VIDEO } })).status, 400, '둘 다 주면 거절');
+  assert.equal((await call('POST', { body: { columnId: 'https://evil.example/p/1', nickname: '최서연', text: '외부 주소' } })).status, 400);
+  console.log('칼럼 댓글(글 경로별·영상과 분리·주소 검사) 통과');
   console.log('영상 댓글: 멤버 이름 확인(아웃·동명이인·비멤버 거절)·글 정리·길이·연속 작성 제한·본인/운영진 삭제 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

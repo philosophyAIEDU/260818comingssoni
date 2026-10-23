@@ -14,7 +14,9 @@
     "streak:sync": "node tools/streak-sync.mjs",
     "test:content": "node test/content-library.test.mjs",
     "test:content-ui": "node test/content-ui.test.js",
-    "test:content-comments": "node test/content-comments.test.js"
+    "test:content-comments": "node test/content-comments.test.js",
+    "test:analytics": "node test/analytics.test.js",
+    "test:admin-usage": "node test/admin-usage.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",

@@ -16,10 +16,15 @@ const postRequests=[];
 await context.route(u=>u.pathname==='/.netlify/functions/content-library',r=>{const u=new URL(r.request().url());const p=u.searchParams.get('post');
   if(p){postRequests.push(p);return postOffline||p!==post.url?r.fulfill({status:502,contentType:'application/json',body:'{"error":"x"}'}):r.fulfill({contentType:'application/json',body:JSON.stringify({post})});}
   return r.fulfill({status:offline?503:200,contentType:'application/json',body:JSON.stringify(library)});});
+// 이용 통계: 보낸 묶음을 모아 두고, 유튜브 플레이어 API는 '재생 중'을 바로 알리는 가짜로 대신한다
+const beacons=[];await context.route(u=>u.pathname==='/.netlify/functions/track',r=>{beacons.push(JSON.parse(r.request().postData()||'{}'));return r.fulfill({status:204});});
+await context.route('https://www.youtube.com/iframe_api',r=>r.fulfill({contentType:'text/javascript',body:'window.YT={Player:function(f,o){setTimeout(function(){o.events.onStateChange({data:1})},50)}};window.onYouTubeIframeAPIReady&&window.onYouTubeIframeAPIReady();'}));
+const sum=(key,f)=>beacons.reduce((n,b)=>n+((b.items||{})[key]?.[f]||0),0);
+const posted=[];
 await context.route(u=>u.pathname==='/.netlify/functions/content-comments',async r=>{const req=r.request();
   if(req.method()==='GET')return r.fulfill({contentType:'application/json',body:JSON.stringify({comments:new URL(req.url()).searchParams.get('video')==='NEWVIDEO001'?comments:[],book:'혁명의 팡파르'})});
   const body=JSON.parse(req.postData()||'{}');
-  if(req.method()==='POST'){if(body.nickname!=='박지민')return r.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:`'${body.nickname}' 이름이 이번 독서 멤버십 명단에 없어요.`})});
+  if(req.method()==='POST'){posted.push(body);if(body.nickname!=='박지민')return r.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:`'${body.nickname}' 이름이 이번 독서 멤버십 명단에 없어요.`})});
     return r.fulfill({status:201,contentType:'application/json',body:JSON.stringify({comment:{id:'c2',nickname:'박지민',text:body.text,book:'혁명의 팡파르',createdAt:new Date().toISOString()},token:'tok-c2'})});}
   if(req.method()==='DELETE'){assert.deepEqual(body,{id:'c2',token:'tok-c2'});return r.fulfill({contentType:'application/json',body:'{"ok":true}'});}});
 await context.route('https://www.youtube-nocookie.com/**',r=>r.fulfill({body:'<!doctype html><title>테스트 영상</title><p>영상 플레이어 테스트</p>',contentType:'text/html'}));
@@ -37,6 +42,9 @@ if(process.env.SHOT_DIR) await page.screenshot({path:process.env.SHOT_DIR + '/li
 // 영상 보기 + 멤버 인사이트
 await page.locator('[data-open]').first().click();assert(await page.locator('#contentReader').evaluate(e=>e.open));
 assert.match(await page.locator('#readerMedia iframe').getAttribute('src'),/youtube-nocookie.com\/embed\/NEWVIDEO001/);
+await page.waitForTimeout(2600);await page.evaluate(()=>PMTrack._flush(false));await page.waitForFunction(()=>true);
+assert.equal(sum('v:NEWVIDEO001','n'),1,'영상 연 횟수');assert(sum('v:NEWVIDEO001','play')>=2,'재생 시간: '+sum('v:NEWVIDEO001','play'));
+assert(beacons.every(b=>/^[a-f0-9]{32}$/.test(b.d)&&b.p==='content'&&!('nickname' in b)),'익명 기기 ID만');assert.equal(beacons[0].visit,1);
 assert(await page.locator('#readerComments').isVisible());assert(await page.locator('#readerFont').isHidden());
 await page.waitForFunction(()=>document.querySelectorAll('#commentList .comment').length===1);
 assert.equal(await page.locator('#commentList .comment-text').first().textContent(),'책의 문장과 영상이 겹쳤어요.\n<b>태그는 글자로</b>');
@@ -72,12 +80,19 @@ assert.equal(await page.locator('.newsletter-body a[href="https://example.com/a"
 assert.equal(await page.locator('.newsletter-body a[href^="javascript"]').count(),0);assert.equal(await page.locator('.newsletter-body img').count(),0);
 assert.equal(await page.locator('.newsletter-body li').count(),2);assert.equal(await page.locator('.newsletter-body blockquote').count(),1);
 assert.equal(await page.locator('#readerOriginal').getAttribute('href'),'https://personalmakers.stibee.com/p/fixture');
-assert(await page.locator('#readerComments').isHidden());assert.equal(await page.locator('iframe').count(),0);
+assert.equal(await page.locator('iframe').count(),0);
+// 칼럼에도 멤버 인사이트 댓글
+assert(await page.locator('#readerComments').isVisible());assert.match(await page.locator('#commentsLead').textContent(),/이 글과/);assert.match(await page.locator('#commentText').getAttribute('placeholder'),/칼럼의/);
+await page.waitForFunction(()=>!document.querySelector('#commentEmpty').hidden);
+await page.fill('#commentName','박지민');await page.fill('#commentText','칼럼과 책이 이어져요');await page.locator('#commentSubmit').click();
+await page.waitForFunction(()=>document.querySelectorAll('#commentList .comment').length===1);
+assert.deepEqual(posted.at(-1),{columnId:'/p/fixture',nickname:'박지민',text:'칼럼과 책이 이어져요'});
 assert(await page.locator('#readerFont').isVisible());
 const size=()=>page.locator('.newsletter-body').evaluate(e=>getComputedStyle(e).fontSize);
 assert.equal(await size(),'17px');await page.locator('#fontUp').click();assert.equal(await size(),'19px');
 await page.locator('.reader-scroll').evaluate(e=>{e.scrollTop=e.scrollHeight;e.dispatchEvent(new Event('scroll'));});
 assert.match(await page.locator('#readerProgress').evaluate(e=>e.style.transform),/scaleX\(1\)/);
+await page.evaluate(()=>PMTrack._flush(false));await page.waitForTimeout(100);assert.equal(sum('c:/p/fixture','n'),1);assert.equal(sum('c:/p/fixture','done'),1,'끝까지 읽음');
 assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth));
 if(process.env.SHOT_DIR) await page.screenshot({path:process.env.SHOT_DIR + '/column-reader.png'});
 // 다음 칼럼은 본문을 못 읽으면 원문 링크로 안내
@@ -119,4 +134,4 @@ assert(await home.evaluate(()=>document.documentElement.scrollWidth===innerWidth
 if(process.env.SHOT_DIR){await home.locator('#contentInvite').scrollIntoViewIfNeeded();await home.locator('#contentInvite').screenshot({path:process.env.SHOT_DIR+'/home-invite.png'});}
 await home.locator('.invite-latest.column').click();await home.waitForSelector('.newsletter-body');assert.equal(await home.locator('#readerTitle').textContent(),'테스트용 칼럼 제목');
 await home.goto(BASE+'/index.html');await home.locator('#tabbar [data-go="info"]').click();await home.locator('.invite-btn').first().click();await home.waitForFunction(()=>document.querySelectorAll('.library-item').length===4);assert.equal(await home.locator('[data-filter="videos"]').getAttribute('aria-pressed'),'true');
-assert.deepEqual(errors,[]);console.log('추천 콘텐츠 카드(두 버튼·최신 영상/칼럼 바로 열기)·주소로 바로 들어오기, '+'최신 영상 순서·NEW 표시, 영상 재생·멤버 인사이트(불러오기·이름 확인·작성·삭제·이름 기억), 칼럼 화면 읽기(정제된 본문·글자 크기·진행 표시·원문 대체·본문 캐시), 다음 콘텐츠, 보관·재방문·삭제, 닫을 때 재생 해제, 외부 장애 안내, 360/390/1280px·다크 모드 검증 통과');await browser.close();})().catch(e=>{console.error(e);process.exit(1);});
+assert.deepEqual(errors,[]);console.log('추천 콘텐츠 카드(두 버튼·최신 영상/칼럼 바로 열기)·주소로 바로 들어오기, '+'최신 영상 순서·NEW 표시, 영상 재생·멤버 인사이트(불러오기·이름 확인·작성·삭제·이름 기억)·칼럼 댓글·이용 통계(재생 시간·끝까지 읽음·익명), 칼럼 화면 읽기(정제된 본문·글자 크기·진행 표시·원문 대체·본문 캐시), 다음 콘텐츠, 보관·재방문·삭제, 닫을 때 재생 해제, 외부 장애 안내, 360/390/1280px·다크 모드 검증 통과');await browser.close();})().catch(e=>{console.error(e);process.exit(1);});

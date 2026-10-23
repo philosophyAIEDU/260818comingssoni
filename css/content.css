@@ -93,7 +93,7 @@ body.content-reader-open { overflow: hidden; }
 .content-app .reader-font button + button { border-left: 1px solid var(--border); font-size: 15px; }
 .content-app .reader-font button:disabled { color: var(--text-faint); cursor: default; }
 .reader-font sup { font-size: 9px; margin-left: 1px; }
-.is-column .reader-scroll > h2, .is-column .reader-byline, .is-column #readerMedia, .is-column .reader-reflection, .is-column .reader-bottom { max-width: 640px; margin-left: auto; margin-right: auto; }
+.is-column .reader-scroll > h2, .is-column .reader-byline, .is-column #readerMedia, .is-column .reader-reflection, .is-column .reader-bottom, .is-column .reader-comments { max-width: 640px; margin-left: auto; margin-right: auto; }
 .is-column .reader-scroll > h2 { font-size: clamp(22px, 4.6vw, 28px); padding-top: 8px; }
 .newsletter-body { --size: var(--reader-font, 17px); font-size: var(--size); line-height: 1.85; letter-spacing: -.01em; word-break: keep-all; overflow-wrap: break-word; color: var(--text); }
 .newsletter-body p { margin: 0 0 1.15em; }

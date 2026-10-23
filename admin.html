@@ -7,6 +7,7 @@
 <title>운영진 대시보드</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/admin-usage.css">
 <link rel="icon" type="image/png" href="icons/favicon-64.png?v=blue-logo-2">
 <!-- 홈 화면에 추가했을 때 아이콘·이름(아이폰은 apple-touch-icon, 안드로이드는 manifest) -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=blue-logo-2">
@@ -94,6 +95,7 @@
     <button data-tab="report">공지문</button>
     <button data-tab="entries">제출 기록</button>
     <button data-tab="notify">알림 메일</button>
+    <button data-tab="usage">이용 통계</button>
     <button data-tab="data">데이터</button>
   </div>
 
@@ -575,6 +577,27 @@
   </section>
 
   <!-- ── 데이터 ───────────────────────── -->
+  <!-- ── 이용 통계 ─────────────────────── 그리기는 js/admin-usage.js -->
+  <section class="card panel usage" data-panel="usage" hidden>
+    <div class="usage-head">
+      <h2>이용 통계</h2>
+      <div class="usage-filters">
+        <div class="usage-range" role="group" aria-label="기간">
+          <button type="button" data-days="7" aria-pressed="false">7일</button>
+          <button type="button" data-days="14" aria-pressed="true">14일</button>
+          <button type="button" data-days="30" aria-pressed="false">30일</button>
+          <button type="button" data-days="90" aria-pressed="false">90일</button>
+        </div>
+        <button type="button" class="usage-refresh" id="usageRefresh">새로고침</button>
+        <span class="usage-updated" id="usageUpdated"></span>
+      </div>
+    </div>
+    <p class="hint">멤버들이 사이트에서 보낸 시간입니다. <strong>익명 기기 단위</strong>로만 세고(이름과 잇지 않음), 운영진 화면 이용은 빠집니다.
+      화면이 보이고 1분 안에 움직임이 있을 때(영상은 재생 중일 때)만 시간이 쌓여, 창만 열어 둔 시간은 들어가지 않습니다.</p>
+    <p class="usage-msg" id="usageMsg" role="status"></p>
+    <div id="usageBody" class="usage-body"></div>
+  </section>
+
   <section class="card panel" data-panel="data" hidden>
     <h2>데이터 관리</h2>
     <p class="hint">
@@ -622,6 +645,7 @@
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-usage.js"></script>
 <!-- 명단 시트 업로드에서 엑셀(.xlsx/.xls) 파일을 직접 읽기 위한 SheetJS는 여기서 미리 불러오지 않는다.
      대부분의 방문에서는 쓰지 않는 수백 KB짜리 라이브러리라, 엑셀 업로드를 실제로 시도할 때만
      js/admin.js의 loadXlsxLib()가 CDN에서 그때그때 불러온다(버전 고정: xlsx@0.18.5).
