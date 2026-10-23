@@ -1,4 +1,7 @@
 /* 운영진 대시보드 */
+// 인증 기록은 멤버 화면과 같은 서버 스냅샷을 함께 쓴다(Firebase 무료 읽기 한도 절약 — 시즌 막바지엔 인증글이 수천 건이라
+// 열 때마다 전부 읽으면 한도를 금방 넘는다). 명단은 이메일·전화번호가 필요해 Firestore에서 직접 읽는다. js/feed-client.js 참고.
+CS.FEED_API = 'submissions';
 (function () {
   const { CONFIG, U, Store, MailTemplates } = CS;
   const $ = (id) => document.getElementById(id);
@@ -51,10 +54,43 @@
   /** participants + submissions를 모두 다시 읽는다. 인증 기록(submissions) 자체가 바뀌었을 때만
    *  쓴다 — 챌린지가 진행될수록 submissions는 계속 쌓여서, 필요 없을 때도 매번 전체를 다시 읽으면
    *  Firestore 읽기 비용이 커진다(무료 요금제 한도를 넘길 수 있다). */
-  async function refresh() {
+  async function refresh(opts) {
     participants = await Store.listParticipants();
-    submissions = await Store.listSubmissions();
+    // fresh: 백업 복원·전체 삭제 직후처럼 방금 쓴 것을 그대로 봐야 할 때만 Firestore에서 전부 직접 읽는다
+    submissions = await Store.listSubmissions(opts && opts.fresh ? { fresh: true } : undefined);
+    paintFeedAsOf();
     await repaint();
+  }
+
+  /** 인증 기록이 몇 시 기준인지 보여 준다(서버 스냅샷은 오늘 글이 최대 10분 늦을 수 있다) */
+  function paintFeedAsOf() {
+    const el = $('feedAsOf');
+    if (!el) return;
+    const at = Store.feedTodayAt ? Store.feedTodayAt() : 0;
+    el.textContent = at
+      ? `인증 기록 ${new Date(at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 기준`
+      : '인증 기록을 방금 불러왔습니다';
+  }
+
+  /** [최신으로 새로고침]: 오늘·어제 글만 서버가 새로 읽게 한다(약 200건). 너무 자주 누르지 않도록 30초에 한 번. */
+  let lastFeedRefresh = 0;
+  async function refreshFeedNow() {
+    const btn = $('feedRefresh');
+    if (!Store.refreshFeedNow) { msg($('feedRefreshMsg'), '이 저장소(로컬)에서는 항상 최신입니다.', 'info'); return; }
+    const wait = 30000 - (Date.now() - lastFeedRefresh);
+    if (wait > 0) { msg($('feedRefreshMsg'), `방금 새로고침했어요. ${Math.ceil(wait / 1000)}초 뒤에 다시 눌러 주세요.`, 'info'); return; }
+    lastFeedRefresh = Date.now();
+    btn.disabled = true;
+    msg($('feedRefreshMsg'), '새로 불러오는 중…', 'info');
+    try {
+      await Store.refreshFeedNow();
+      submissions = await Store.listSubmissions({ bust: true });
+      paintFeedAsOf();
+      await repaint();
+      msg($('feedRefreshMsg'), '', '');
+    } catch (e) {
+      msg($('feedRefreshMsg'), `새로고침 실패: ${esc(e.message)}`, 'bad');
+    } finally { btn.disabled = false; }
   }
 
   /** 명단(이름·이메일·전화번호·상태·면제일·카톡방 참여 여부 등)만 바뀐 동작에서 쓴다.
@@ -2061,7 +2097,7 @@
     try {
       const obj = JSON.parse(await f.text());
       await Store.importAll(obj);
-      await refresh();
+      await refresh({ fresh: true });
       msg($('dataMsg'), `복원 완료 · 참가자 ${obj.participants.length}명, 인증 ${obj.submissions.length}건`, 'ok');
     } catch (e) {
       msg($('dataMsg'), `복원 실패: ${esc(e.message)}`, 'bad');
@@ -2252,6 +2288,7 @@
     $('reminderTemplateSave').addEventListener('click', saveReminderTemplate);
     $('reminderTemplateReset').addEventListener('click', resetReminderTemplate);
 
+    $('feedRefresh').addEventListener('click', refreshFeedNow);
     $('exportJson').addEventListener('click', exportJson);
     $('exportCsvSub').addEventListener('click', exportSubmissionsCsv);
     $('exportCsvMatrix').addEventListener('click', exportMatrixCsv);
@@ -2267,7 +2304,7 @@
       if (!confirm('모든 참가자와 인증 기록을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?')) return;
       if (!confirm('정말로 전체 삭제할까요? 먼저 백업을 받아두시는 것을 권합니다.')) return;
       await Store.clearAll();
-      await refresh();
+      await refresh({ fresh: true });
       msg($('dataMsg'), '전체 데이터를 삭제했습니다.', 'warn');
     });
 
@@ -2288,7 +2325,9 @@
         }
       });
 
+      let loadedFor = ''; // 같은 로그인으로 불러온 뒤 로그인 알림이 또 와도(앱 재연결 등) 다시 읽지 않는다
       Store.onAuthStateChanged(async (user) => {
+        if (!user) loadedFor = '';
         if (user) {
           const email = user.email || '';
           const whitelist = CONFIG.adminEmails || [];
@@ -2297,6 +2336,8 @@
             $('adminDashboard').style.display = 'block';
             $('adminAuthHeader').style.display = 'flex';
             $('adminEmailLabel').textContent = `${email} (운영진)`;
+            if (loadedFor === email) return;
+            loadedFor = email;
             await refresh();
           } else {
             $('adminAuthGate').style.display = 'block';

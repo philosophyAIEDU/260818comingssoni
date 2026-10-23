@@ -102,6 +102,7 @@
   <!-- ── 일일현황 ─────────────────────── -->
   <section class="card panel" data-panel="status">
     <h2>일일현황 <span class="tag" id="sortTag">누적 미인증 많은 순</span></h2>
+    <div class="feed-asof"><span id="feedAsOf" class="muted"></span><button type="button" id="feedRefresh" class="ghost">최신으로 새로고침</button><span id="feedRefreshMsg"></span></div>
     <p class="hint">참가자 × 날짜 매트릭스입니다. 셀을 클릭하면 해당 날짜의 제출 내용 또는 면제 등록/해제를 할 수 있습니다.</p>
     <div class="scroll">
       <table class="matrix" id="matrix"></table>
@@ -643,6 +644,7 @@
 <script src="js/streaks.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/mailTemplates.js"></script>
+<script src="js/feed-client.js"></script>
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
