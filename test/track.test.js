@@ -1,4 +1,4 @@
-// track 함수: 참여자 ID가 그 시즌 명단에 있을 때만 인증 이름으로 멤버별 이용량에 더한다.
+// track 함수: Firebase 무료 요금제 한도를 아끼도록 묶음마다 쓰기 1번·읽기 0번. 이름은 보고서에서 명단으로 찾는다.
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const lib = path.join(__dirname, '../netlify/functions/_lib');
@@ -20,7 +20,6 @@ require.cache[require.resolve(path.join(lib, 'firebaseAdmin.js'))] = { exports: 
 const { handler } = require('../netlify/functions/track.js');
 (async () => {
   const season = global.CS.pickSeason(global.CS.seasonNowKST());
-  const col = season.dataPrefix ? `${season.dataPrefix}_participants` : 'participants';
   const send = (body) => handler({ httpMethod: 'POST', body: JSON.stringify(body) });
   const D = 'b'.repeat(32);
   assert.equal((await handler({ httpMethod: 'GET' })).statusCode, 405);
@@ -28,15 +27,10 @@ const { handler } = require('../netlify/functions/track.js');
   assert.equal(writes.length, 0, '이상한 묶음은 저장하지 않음');
   await send({ d: D, p: 'index', active: 40, m: { p: 'p1', s: season.id } });
   assert.equal(writes.length, 1); assert.equal(writes[0].name, 'analyticsDaily'); assert.deepEqual(writes[0].opts, { merge: true });
-  const key = `${season.id}_p1`;
-  assert.equal(writes[0].data.members[key].name, '김현우', '명단의 인증 이름');
-  assert.deepEqual(reads, [`${col}/p1`]);
-  await send({ d: D, p: 'content', active: 20, m: { p: 'p1', s: season.id } });
-  assert.equal(reads.length, 1, '확인한 이름은 잠시 기억');
-  await send({ d: D, p: 'index', active: 10, m: { p: 'ghost', s: season.id } });
-  assert.equal(writes[2].data.members, undefined, '명단에 없는 ID는 이름 없이');
-  assert.deepEqual(writes[2].data.activeSec, { inc: 10 });
+  assert.deepEqual(writes[0].data.members[`${season.id}_p1`], { season: season.id, pid: 'p1', active: { inc: 40 }, play: { inc: 0 }, read: { inc: 0 } });
+  assert.deepEqual(reads, [], '받을 때는 명단을 읽지 않음(읽기 0번)');
   await send({ d: D, p: 'index', active: 10, m: { p: 'p1', s: 'nope' } });
-  assert.equal(writes[3].data.members, undefined, '없는 시즌');
-  console.log('track: 명단에 있는 참여자만 인증 이름으로 연결·이름 확인 캐시·없는 ID/시즌은 이름 없이 통과');
+  assert.equal(writes[1].data.members, undefined, '없는 시즌은 멤버로 더하지 않음');
+  assert.deepEqual(writes[1].data.activeSec, { inc: 10 });
+  console.log('track: 묶음당 쓰기 1번·읽기 0번·참여자 ID와 시즌만 저장(이름은 보고서에서)·없는 시즌은 버림 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

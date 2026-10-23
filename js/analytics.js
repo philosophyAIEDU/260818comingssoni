@@ -1,5 +1,5 @@
 /* 이용 통계 — 화면을 실제로 보고 있는 시간, 영상이 재생된 시간, 칼럼을 읽은 시간을 모아
- * 45초마다 서버(/.netlify/functions/track)에 보낸다. 운영진 화면 [이용 통계]에서만 본다.
+ * 5분마다, 그리고 화면을 떠날 때 서버(/.netlify/functions/track)에 보낸다. 운영진 화면 [이용 통계]에서만 본다.
  *
  * - 기기마다 무작위 ID 하나(이 브라우저에 저장)로 방문 기기 수를 센다.
  * - 이 기기에서 인증한(또는 댓글을 남긴) 멤버를 기억해 참여자 ID·시즌을 함께 보낸다 → 서버가 명단에서 확인해
@@ -14,7 +14,8 @@
   const DEVICE_KEY = 'personalmakers.analytics.device';
   const VISIT_KEY = 'personalmakers.analytics.lastSeen';
   const MEMBER_KEY = 'personalmakers.analytics.member';
-  const IDLE_MS = 60 * 1000, VISIT_GAP_MS = 30 * 60 * 1000, FLUSH_MS = 45 * 1000;
+  // 5분마다 모아 보낸다(Firebase 무료 요금제의 하루 쓰기 한도 2만 건을 아끼려고). 화면을 떠날 때는 그때까지를 바로 보낸다.
+  const IDLE_MS = 60 * 1000, VISIT_GAP_MS = 30 * 60 * 1000, FLUSH_MS = 5 * 60 * 1000;
   const page = (document.currentScript && document.currentScript.dataset.page) || 'index';
   const noop = { videoOpen() {}, videoClose() {}, videoPlaying() {}, columnOpen() {}, columnClose() {}, columnDepth() {}, setMember() {} };
   if (!window.fetch || /[?&]notrack\b/.test(location.search)) { window.PMTrack = noop; return; }
