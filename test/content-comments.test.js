@@ -2,19 +2,20 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
+const reads = { docs: 0 };
 function fakeDb() {
   const data = {}; let n = 0;
   const coll = (name) => (data[name] = data[name] || new Map());
   const snapOf = (id, v) => ({ id, exists: v !== undefined, data: () => (v === undefined ? undefined : JSON.parse(JSON.stringify(v))) });
   const query = (name, filters) => ({
     where: (f, op, v) => query(name, filters.concat([[f, v]])),
-    get: async () => ({ docs: [...coll(name)].filter(([, d]) => filters.every(([f, v]) => d[f] === v)).map(([id, d]) => snapOf(id, d)) })
+    get: async () => { const docs = [...coll(name)].filter(([, d]) => filters.every(([f, v]) => d[f] === v)); reads.docs += docs.length; return { docs: docs.map(([id, d]) => snapOf(id, d)) }; }
   });
   return {
     data, coll,
     collection: (name) => Object.assign(query(name, []), {
       add: async (doc) => { const id = 'c' + (++n); coll(name).set(id, doc); return { id }; },
-      doc: (id) => ({ get: async () => snapOf(id, coll(name).get(id)), delete: async () => { coll(name).delete(id); } })
+      doc: (id) => ({ get: async () => { reads.docs++; return snapOf(id, coll(name).get(id)); }, set: async (v) => { coll(name).set(id, v); }, delete: async () => { coll(name).delete(id); } })
     })
   };
 }
@@ -95,5 +96,21 @@ const { handler } = require('../netlify/functions/content-comments.js');
   assert.equal((await call('GET', { query: { column: '/p/50/', video: VIDEO } })).status, 400, '둘 다 주면 거절');
   assert.equal((await call('POST', { body: { columnId: 'https://evil.example/p/1', nickname: '최서연', text: '외부 주소' } })).status, 400);
   console.log('칼럼 댓글(글 경로별·영상과 분리·주소 검사) 통과');
+
+  // 읽기 줄이기: 목록은 30초 들고 있고(여러 명이 열어도 1번), 쓰면 바로 갱신되며, 도배 확인은 작은 문서 1건만 읽는다
+  participants.set('p7', { nickname: '읽기시험', status: 'active' });
+  await call('GET', { query: { video: 'AAAAAAAAAAA' } });
+  reads.docs = 0;
+  for (let i = 0; i < 50; i++) await call('GET', { query: { video: 'AAAAAAAAAAA' } });
+  assert.equal(reads.docs, 0, '같은 글 목록을 50번 열어도 읽기 0건(30초 보관)');
+  r = await call('POST', { body: { videoId: 'AAAAAAAAAAA', nickname: '읽기시험', text: '첫 댓글입니다' } });
+  assert.equal(r.status, 201);
+  assert.deepEqual((await call('GET', { query: { video: 'AAAAAAAAAAA' } })).body.comments.map((c) => c.text), ['첫 댓글입니다'], '쓰면 바로 목록에 보인다');
+  for (let k = 0; k < 40; k++) db.coll('contentComments').set('old' + k, { videoId: 'BBBBBBBBBBB', participantId: 'p7', nickname: '읽기시험', text: '예전 댓글 ' + k, createdAt: '2020-01-01T00:00:00.000Z', tokenHash: 'x' });
+  reads.docs = 0;
+  r = await call('POST', { body: { videoId: 'CCCCCCCCCCC', nickname: '읽기시험', text: '연달아' } });
+  assert.equal(r.status, 429, '15초 안 연속 작성은 막힌다(작은 문서 하나로 확인)');
+  assert(reads.docs <= 4, '댓글이 40개 쌓여 있어도 도배 확인은 소량만 읽는다: ' + reads.docs);
+  console.log('댓글 읽기 줄이기: 목록 30초 보관·쓰면 즉시 갱신·도배 확인은 작은 문서 1건 통과');
   console.log('영상 댓글: 멤버 이름 확인(아웃·동명이인·비멤버 거절)·글 정리·길이·연속 작성 제한·본인/운영진 삭제 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

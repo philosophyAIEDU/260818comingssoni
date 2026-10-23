@@ -5,19 +5,21 @@ function makeStore() {
   const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
   const snap = (id, v) => ({ id, exists: v !== undefined, data: () => clone(v) });
   const nextId = (() => { let n = 0; return () => 'auto' + (++n); })();
-  const matches = (d, w) => w.every(({ field, op, value }) => (op === '==' ? d[field] === value : op === '>=' ? d[field] >= value : op === '<=' ? d[field] <= value : false));
+  // field가 '__id__'이면 문서 ID로 비교(FieldPath.documentId 대역)
+  const matches = (d, w, id) => w.every(({ field, op, value }) => { const v = field === '__id__' ? id : d[field]; return op === '==' ? v === value : op === '>=' ? v >= value : op === '<=' ? v <= value : false; });
 
   /** Admin SDK 모양(서버 함수용) */
   function admin(stats) {
     const query = (name, w) => ({
       where: (field, op, value) => query(name, w.concat([{ field, op, value }])),
-      get: async () => { const docs = [...col(name)].filter(([, d]) => matches(d, w)); stats.reads += docs.length; return { docs: docs.map(([id, d]) => snap(id, d)) }; }
+      get: async () => { const docs = [...col(name)].filter(([id, d]) => matches(d, w, id)); stats.reads += docs.length; return { docs: docs.map(([id, d]) => snap(id, d)) }; }
     });
     const apply = (name, id, v, o) => { stats.writes++; col(name).set(id, o && o.merge ? Object.assign({}, col(name).get(id), v) : clone(v)); };
     return {
       collection: (name) => Object.assign(query(name, []), {
-        doc: (id) => ({ _n: name, _id: id, get: async () => { stats.reads++; return snap(id, col(name).get(id)); }, set: async (v, o) => apply(name, id, v, o) })
+        doc: (id) => ({ _n: name, _id: id, get: async () => { stats.reads++; return snap(id, col(name).get(id)); }, set: async (v, o) => apply(name, id, v, o), update: async (v) => apply(name, id, v, { merge: true }) })
       }),
+      getAll: async (...refs) => refs.map((r) => { stats.reads++; return snap(r._id, col(r._n).get(r._id)); }),
       runTransaction: async (fn) => fn({
         get: async (ref) => { stats.reads++; return snap(ref._id, col(ref._n).get(ref._id)); },
         set: (ref, v, o) => apply(ref._n, ref._id, v, o)

@@ -30,9 +30,9 @@ function sample(days) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul', viewport: { width: 1280, height: 900 } });
   await ctx.route('**/js/config.js', async (r) => { const res = await r.fetch(); r.fulfill({ response: res, body: (await res.text()).replace(/backend: '[^']+'/, "backend: 'local'"), headers: { ...res.headers(), 'content-type': 'application/javascript' } }); });
-  const asked = []; let mode = 'data';
+  const asked = [], freshAsked = []; let mode = 'data';
   await ctx.route((u) => u.pathname === '/.netlify/functions/analytics-report', (r) => {
-    const d = +new URL(r.request().url()).searchParams.get('days'); asked.push(d);
+    const q = new URL(r.request().url()).searchParams; const d = +q.get('days'); asked.push(d); freshAsked.push(q.get('fresh') === '1');
     if (mode === 'error') return r.fulfill({ status: 401, json: { error: '로그인 정보가 없습니다. 운영진 화면에서 다시 로그인해 주세요.' } });
     return r.fulfill({ json: mode === 'empty' ? buildReport({}, dateRange(d)) : sample(d) });
   });
@@ -101,6 +101,17 @@ function sample(days) {
   await page.waitForFunction(() => document.querySelectorAll('#usageDaily .usage-hit').length === 30);
   assert.deepEqual(asked, [14, 30]); assert.equal(await page.locator('[data-days="30"]').getAttribute('aria-pressed'), 'true');
   assert.match(await page.locator('.usage-hero-label').textContent(), /최근 30일/);
+  // 본 기간으로 돌아가면 5분 기억해 둔 걸 쓴다(서버를 다시 부르지 않음). [새로고침]만 fresh=1로 오늘·어제를 새로 읽고, 30초에 한 번만
+  await page.locator('[data-days="14"]').click();
+  await page.waitForFunction(() => document.querySelectorAll('#usageDaily .usage-hit').length === 14);
+  assert.deepEqual(asked, [14, 30], '14일로 돌아와도 다시 부르지 않음');
+  await page.locator('#usageRefresh').click();
+  await page.waitForFunction(() => /\d+:\d+ 기준/.test(document.querySelector('#usageUpdated').textContent));
+  await page.waitForFunction(() => true);
+  assert.deepEqual(asked, [14, 30, 14]); assert.deepEqual(freshAsked, [false, false, true], '새로고침만 fresh=1');
+  await page.locator('#usageRefresh').click();
+  await page.waitForFunction(() => /다시 눌러 주세요/.test(document.querySelector('#usageMsg').textContent));
+  assert.deepEqual(asked, [14, 30, 14], '30초 안에 또 눌러도 부르지 않음');
   // 좁은 화면·다크 모드
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '가로 넘침 없음');
@@ -113,7 +124,7 @@ function sample(days) {
   // 빈 기간·오류
   mode = 'empty'; await page.locator('[data-days="7"]').click(); await page.waitForSelector('.usage-empty');
   assert.equal(await page.locator('#usageDaily').count(), 0);
-  mode = 'error'; await page.locator('#usageRefresh').click(); await page.waitForFunction(() => /로그인/.test(document.querySelector('#usageMsg').textContent));
+  mode = 'error'; await page.evaluate(() => { document.querySelector('[data-days="90"]').click(); }); await page.waitForFunction(() => /로그인/.test(document.querySelector('#usageMsg').textContent));
   assert.equal(await page.locator('.usage-tile').count(), 6, '오류여도 앞의 그림은 남김');
   // 로그아웃하면(대시보드가 닫히면) 보던 통계를 지운다
   await page.evaluate(() => { document.getElementById('adminDashboard').style.display = 'none'; });

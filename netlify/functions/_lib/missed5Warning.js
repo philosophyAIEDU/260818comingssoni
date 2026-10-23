@@ -13,6 +13,7 @@ const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
 const { sendSms } = require('./solapi');
 const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+const { readSeasonSubmissions } = require('./feedSnapshot');
 
 /* 활성 시즌의 컬렉션만 읽고 쓴다 — 앱 화면(js/store-firebase.js)과 같은 이름 규칙이다. */
 const col = (name) => getDb().collection(collectionName(name));
@@ -23,9 +24,18 @@ async function fetchParticipants() {
   return snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
 }
 
+/** 인증글 전체 대신 날짜별 스냅샷으로 읽는다(Firebase 무료 읽기 한도 절약). 오늘·어제만 새로 읽어 방금 끝난 날까지 정확하다.
+ *  스냅샷을 못 읽으면 예전처럼 전부 읽는다. */
 async function fetchSubmissions() {
-  const snap = await col('submissions').get();
-  return snap.docs.map((d) => d.data());
+  try {
+    const season = global.CS.SEASONS.find((x) => x.id === CONFIG.seasonId);
+    const today = U.today();
+    return await readSeasonSubmissions(getDb(), season, CONFIG, U, { freshDates: [today, U.addDays(today, -1)] });
+  } catch (err) {
+    console.warn('[missed5-warning] 스냅샷으로 못 읽어 전부 읽습니다:', err.message);
+    const snap = await col('submissions').get();
+    return snap.docs.map((d) => d.data());
+  }
 }
 
 async function fetchNotifyEmails() {

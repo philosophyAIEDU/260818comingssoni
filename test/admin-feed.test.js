@@ -87,6 +87,21 @@ for (let i = 0; i < 40; i++) addSub(i, today);
   await page.waitForFunction(() => /다시 눌러 주세요/.test(document.querySelector('#feedRefreshMsg').textContent));
   assert.equal(server.reads, serverAfter, '연타해도 읽기는 늘지 않는다');
 
+  // 2-2) 명단을 고쳐도 명단 전체를 다시 읽지 않는다(기억해 둔 명단을 바로 맞춘다). 이 화면이 직접 읽은 수가 아래에 보인다
+  await page.locator('[data-tab="roster"]').click();
+  const rosterReadsBefore = client.log.filter((l) => /getDocs participants/.test(l)).length;
+  const readsBeforeEdit = client.reads;
+  const kakao = page.locator('[data-editkakao]').first();
+  await kakao.selectOption('O');
+  await page.waitForFunction(() => /카톡방 참여 여부를 수정했습니다/.test(document.querySelector('#rosterMsg').textContent));
+  await page.waitForTimeout(300);
+  assert.equal(client.log.filter((l) => /getDocs participants/.test(l)).length, rosterReadsBefore, '고친 뒤 명단 전체를 다시 읽지 않는다');
+  assert(client.reads - readsBeforeEdit <= 2, '명단 한 건을 고치는 데 든 읽기: ' + (client.reads - readsBeforeEdit) + ' ' + client.log.slice(-6).join(' | '));
+  assert.equal(await page.locator('[data-editkakao]').first().inputValue(), 'O', '고친 값이 화면에 반영');
+  assert.match(await page.locator('#readMeter').textContent(), /직접 읽은 Firestore 문서 [\d,]+건/);
+  const shown = +(await page.locator('#readMeter').textContent()).match(/문서 ([\d,]+)건/)[1].replace(/,/g, '');
+  assert(shown >= N && shown <= client.reads, '표시기 숫자는 이 화면이 읽은 양: ' + shown + ' / ' + client.reads);
+
   // 3) 운영진이 인증 기록을 지우면 그 날짜 스냅샷이 오래된 것으로 표시된다(멤버 화면이 곧 새로 받음)
   const del = page.locator('[data-tab="entries"]');
   await del.click();

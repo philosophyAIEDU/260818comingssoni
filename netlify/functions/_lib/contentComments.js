@@ -14,6 +14,7 @@
 const crypto = require('crypto');
 
 const COLLECTION = 'contentComments';
+const RATE_COLLECTION = 'commentRate';
 const MAX_TEXT = 500;
 const MAX_LIST = 200;
 const MIN_INTERVAL_MS = 15 * 1000;
@@ -45,13 +46,22 @@ function publicComment(id, d) {
   return { id, nickname: d.nickname, text: d.text, book: d.book || '', createdAt: d.createdAt };
 }
 
-async function listComments(db, query) {
+/* 댓글 목록은 열 때마다 그 글의 댓글 전부를 읽으면 읽기가 크게 늘어서(Firebase 무료 한도), 서버 인스턴스에 30초 들고 있는다.
+ * 새 댓글을 쓰거나 지우면 그 글의 목록은 바로 비운다(같은 인스턴스 안에서는 즉시, 다른 인스턴스는 최대 30초 뒤). */
+const LIST_TTL_MS = 30 * 1000;
+const listCache = new Map(); // `${field}:${value}` → { at, comments }
+const listKey = (t) => `${t.field}:${t.value}`;
+
+async function listComments(db, query, now = Date.now()) {
   const target = targetOf(query || {});
   if (!target) return { error: [400, '콘텐츠 정보가 올바르지 않습니다.'] };
+  const hit = listCache.get(listKey(target));
+  if (hit && now - hit.at < LIST_TTL_MS) return { comments: hit.comments };
   const snap = await db.collection(COLLECTION).where(target.field, '==', target.value).get();
   const comments = snap.docs.map((d) => publicComment(d.id, d.data()))
     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
     .slice(-MAX_LIST);
+  listCache.set(listKey(target), { at: now, comments });
   return { comments };
 }
 
@@ -79,10 +89,13 @@ async function addComment(db, payload, seasons, now = new Date()) {
   if (!found) return { error: [403, `'${nickname}' 이름이 이번 독서 멤버십 명단에 없어요. 인증할 때 쓰는 이름 그대로 적어 주세요.`] };
   if (found.ambiguous) return { error: [409, '같은 이름이 둘 이상이에요. 인증 화면의 이름(꼬리표 포함) 그대로 적어 주세요.'] };
 
-  const mine = await db.collection(COLLECTION).where('participantId', '==', found.participant.id).get();
-  const times = mine.docs.map((d) => Date.parse(d.data().createdAt)).filter((t) => !isNaN(t));
+  // 도배 제한: 이 사람이 최근 24시간에 남긴 시각만 작은 문서 하나(commentRate/{참여자})에 모아 둔다 —
+  // 댓글이 쌓여도 읽기는 늘 1건(예전엔 그 사람의 댓글을 전부 읽었다).
+  const rateRef = db.collection(RATE_COLLECTION).doc(`${found.season.id}_${found.participant.id}`);
+  const rateSnap = await rateRef.get();
+  const times = ((rateSnap.exists && rateSnap.data().times) || []).map((t) => Date.parse(t)).filter((t) => !isNaN(t) && now - t < 24 * 3600e3);
   if (times.some((t) => now - t < MIN_INTERVAL_MS)) return { error: [429, '조금 전에 댓글을 남기셨어요. 잠시 뒤에 다시 남겨 주세요.'] };
-  if (times.filter((t) => now - t < 24 * 3600e3).length >= DAILY_LIMIT) return { error: [429, '오늘은 댓글을 충분히 남기셨어요. 내일 또 나눠 주세요.'] };
+  if (times.length >= DAILY_LIMIT) return { error: [429, '오늘은 댓글을 충분히 남기셨어요. 내일 또 나눠 주세요.'] };
 
   const token = crypto.randomBytes(18).toString('base64url');
   const doc = {
@@ -96,6 +109,8 @@ async function addComment(db, payload, seasons, now = new Date()) {
     tokenHash: sha256(token)
   };
   const ref = await db.collection(COLLECTION).add(doc);
+  await rateRef.set({ times: [...times.map((t) => new Date(t).toISOString()), doc.createdAt].slice(-DAILY_LIMIT) });
+  listCache.delete(listKey(target));
   // member: 쓴 사람 기기가 이용 통계를 이 멤버로 잇는 데 쓴다(본인에게만 돌려준다)
   return { comment: publicComment(ref.id, doc), token, member: { p: found.participant.id, s: found.season.id } };
 }
@@ -108,7 +123,8 @@ async function removeComment(db, id, token, isAdmin) {
   if (!snap.exists) return { ok: true };
   if (!isAdmin && (!token || sha256(token) !== snap.data().tokenHash)) return { error: [403, '이 기기에서 쓴 댓글만 지울 수 있어요.'] };
   await ref.delete();
+  for (const field of ['videoId', 'columnId']) if (snap.data()[field]) listCache.delete(`${field}:${snap.data()[field]}`);
   return { ok: true };
 }
 
-module.exports = { COLLECTION, MAX_TEXT, cleanText, listComments, addComment, removeComment, findMember };
+module.exports = { COLLECTION, RATE_COLLECTION, MAX_TEXT, cleanText, listComments, addComment, removeComment, findMember };

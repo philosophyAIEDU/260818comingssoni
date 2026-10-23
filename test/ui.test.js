@@ -722,7 +722,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   //    이후의 refreshNotify() 호출이 아예 실행되지 않아 알림 메일 목록이 통째로 사라졌던 회귀 버그) ──
   const errsBeforeNoticeFail = errs.length;
   await page.evaluate(() => {
-    CS.Store.listNotices = () => Promise.reject(new Error('테스트: 공지문 컬렉션 접근 실패 시뮬레이션'));
+    window.__noticeReads = 0;
+    CS.Store.listNotices = () => { window.__noticeReads++; return Promise.reject(new Error('테스트: 공지문 컬렉션 접근 실패 시뮬레이션')); };
   });
   await page.click('button[data-tab="roster"]');
   await page.waitForTimeout(200);
@@ -735,7 +736,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   await page.waitForTimeout(200);
   t('공지문 로딩이 실패해도 알림 메일 목록은 그대로 보임',
     /1명/.test(await page.textContent('#notifyCount')) && (await page.textContent('#notifyTable')).includes('홍길동'));
-  t('공지문 로딩 실패 안내 메시지 표시', /공지문을 불러오지 못했습니다/.test(await page.textContent('#noticeMsg')));
+  // 공지문·알림 메일 목록은 화면을 열 때 한 번만 읽는다 — 명단을 고친 뒤에는 다시 읽지 않는다(Firebase 무료 읽기 한도 절약)
+  t('명단을 고쳐도 공지문 목록을 다시 읽지 않음', (await page.evaluate(() => window.__noticeReads)) === 0);
   // 방금 콘솔에 찍힌 console.error는 이 테스트가 의도적으로 유발한 것이라 전체 "JS 오류" 집계에서 제외한다.
   errs.length = errsBeforeNoticeFail;
 
