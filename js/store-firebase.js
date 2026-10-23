@@ -88,7 +88,37 @@ CS.FirebaseStore = (function () {
   const withId = (snap) => Object.assign({ id: snap.id }, snap.data());
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  /* 멤버 화면(CS.FEED_API)은 명단·그날 글 목록을 서버 스냅샷으로 받는다(js/feed-client.js) — Firestore 읽기를 아끼려는 것.
+   * 못 받으면 아래처럼 예전 방식(Firestore에서 직접)으로 읽는다. */
+  const viaApi = () => !!(CS.FeedClient && CS.FeedClient.enabled());
+
+  /** 운영진이 명단·글을 고친 뒤: 서버 스냅샷을 오래된 것으로 표시해 멤버 화면이 곧바로 새 내용을 받게 한다(실패해도 무시). */
+  async function invalidateFeed(opts) {
+    try {
+      const token = await getIdToken();
+      if (!token || typeof fetch !== 'function') return;
+      await fetch('/.netlify/functions/feed-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(Object.assign({ season: CS.CONFIG.seasonId }, opts))
+      });
+    } catch (e) { /* 멤버 화면은 곧 스냅샷이 오래되어 알아서 새로 받는다 */ }
+  }
+
+  // 여러 건을 연달아 고쳐도(일괄 등록 등) 알림은 한 번만 보낸다
+  let pendingInv = null, invTimer = null;
+  function scheduleInvalidate(opts) {
+    pendingInv = pendingInv || { roster: false, dates: new Set() };
+    if (opts.roster) pendingInv.roster = true;
+    (opts.dates || []).forEach((d) => { if (d) pendingInv.dates.add(d); });
+    clearTimeout(invTimer);
+    invTimer = setTimeout(() => { const o = pendingInv; pendingInv = null; invalidateFeed({ roster: o.roster, dates: [...o.dates] }); }, 800);
+  }
+
   async function listParticipants() {
+    if (viaApi()) {
+      try { return await CS.FeedClient.roster(); } catch (e) { console.warn('[feed] 명단 스냅샷을 못 받아 직접 읽습니다:', e.message); }
+    }
     await init();
     const snap = await fs.getDocs(col('participants'));
     return snap.docs.map(withId)
@@ -121,6 +151,7 @@ CS.FirebaseStore = (function () {
       createdAt: CS.U.nowStamp()
     }, patch || {});
     const ref = await fs.addDoc(col('participants'), body);
+    scheduleInvalidate({ roster: true });
     return Object.assign({ id: ref.id }, body);
   }
 
@@ -148,11 +179,13 @@ CS.FirebaseStore = (function () {
       body.email = email;
     }
     await fs.updateDoc(docRef('participants', id), body);
+    scheduleInvalidate({ roster: true });
 
     if (body.nickname) {
       const subs = await fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', id)));
       await Promise.all(subs.docs.map((d) =>
         fs.updateDoc(docRef('submissions', d.id), { nickname: body.nickname })));
+      scheduleInvalidate({ dates: subs.docs.map((d) => d.data().date) });
     }
     const snap = await fs.getDoc(docRef('participants', id));
     return withId(snap);
@@ -163,9 +196,16 @@ CS.FirebaseStore = (function () {
     const subs = await fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', id)));
     await Promise.all(subs.docs.map((d) => fs.deleteDoc(docRef('submissions', d.id))));
     await fs.deleteDoc(docRef('participants', id));
+    scheduleInvalidate({ roster: true, dates: subs.docs.map((d) => d.data().date) });
   }
 
   async function listSubmissions(filter) {
+    if (viaApi()) {
+      try {
+        const rows = await CS.FeedClient.submissions(filter);
+        if (rows) return rows;
+      } catch (e) { console.warn('[feed] 글 목록 스냅샷을 못 받아 직접 읽습니다:', e.message); }
+    }
     await init();
     const f = filter || {};
     const clauses = [];
@@ -191,7 +231,9 @@ CS.FirebaseStore = (function () {
     if (found) {
       const body = Object.assign({}, data, { updatedAt: now });
       await fs.updateDoc(docRef('submissions', found.id), body);
-      return Object.assign({}, found, body);
+      const updated = Object.assign({}, found, body);
+      if (viaApi()) CS.FeedClient.remember(updated);
+      return updated;
     }
     const body = Object.assign({
       upvotes: 0,
@@ -200,12 +242,16 @@ CS.FirebaseStore = (function () {
       updatedAt: now
     }, data);
     const ref = await fs.addDoc(col('submissions'), body);
-    return Object.assign({ id: ref.id }, body);
+    const created = Object.assign({ id: ref.id }, body);
+    if (viaApi()) CS.FeedClient.remember(created); // 서버 목록이 따라오기 전에도 내 화면엔 바로 보이게
+    return created;
   }
 
   async function removeSubmission(id) {
     await init();
+    const old = await fs.getDoc(docRef('submissions', id)); // 어느 날짜 목록을 새로 받게 할지 알려고(운영진 화면이라 1건)
     await fs.deleteDoc(docRef('submissions', id));
+    if (old.exists()) scheduleInvalidate({ dates: [old.data().date] });
   }
 
   async function upvoteSubmission(id, clientId) {
@@ -223,10 +269,12 @@ CS.FirebaseStore = (function () {
       upvotes: fs.increment(1),
       upvotedBy: fs.arrayUnion(clientId)
     });
-    return Object.assign({ id }, data, {
+    const voted = Object.assign({ id }, data, {
       upvotes: (data.upvotes || 0) + 1,
       upvotedBy: upvotedBy.concat(clientId)
     });
+    if (viaApi()) CS.FeedClient.remember(voted);
+    return voted;
   }
 
   /** 남의 글을 [텍스트 복사]한 참여자를 그 글에 남긴다(이번 주 메신저 집계용).
@@ -251,10 +299,12 @@ CS.FirebaseStore = (function () {
       upvotes: fs.increment(-1),
       upvotedBy: fs.arrayRemove(clientId)
     });
-    return Object.assign({ id }, data, {
+    const unvoted = Object.assign({ id }, data, {
       upvotes: Math.max(0, (data.upvotes || 0) - 1),
       upvotedBy: upvotedBy.filter((c) => c !== clientId)
     });
+    if (viaApi()) CS.FeedClient.remember(unvoted);
+    return unvoted;
   }
 
   /* ── 인증 알림 메일 수신자 목록 ───────── */
@@ -373,6 +423,7 @@ CS.FirebaseStore = (function () {
       await fs.setDoc(docRef('submissions', id), body);
     }
     if (obj.meta) await setMeta(obj.meta);
+    scheduleInvalidate({ roster: true, dates: obj.submissions.map((x) => x.date) });
   }
 
   async function clearAll() {
@@ -380,6 +431,7 @@ CS.FirebaseStore = (function () {
     for (const name of ['participants', 'submissions']) {
       const snap = await fs.getDocs(col(name));
       await Promise.all(snap.docs.map((d) => fs.deleteDoc(docRef(name, d.id))));
+      scheduleInvalidate(name === 'participants' ? { roster: true } : { dates: snap.docs.map((d) => d.data().date) });
     }
   }
 

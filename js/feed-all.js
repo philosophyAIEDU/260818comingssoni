@@ -1,5 +1,6 @@
 /* 인증 피드 전체 보기 (feed-all.html 전용) — 지금까지 제출된 모든 인증글을 날짜별로 묶어 보여준다.
  * index.html의 "전체 보기" 링크가 새 창으로 이 페이지를 연다. */
+CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으로 받는다(js/feed-client.js)
 (function () {
   const { U, Store } = CS;
   const $ = (id) => document.getElementById(id);
