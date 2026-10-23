@@ -856,7 +856,8 @@
         saveSubsCache();
         btn.dataset.busy = '1';
         (wasVoted ? Store.unvoteSubmission(id, clientId) : Store.upvoteSubmission(id, clientId))
-          .then(() => scheduleFameRefresh())
+          // 명예의 전당은 그 날짜(기본 어제) 글을 다시 읽어야 해서, 그날 글에 누른 때만 다시 센다(하루 읽기 한도 절약)
+          .then(() => { if (!sub || sub.date === fameDate) scheduleFameRefresh(); })
           .catch((err) => { apply(wasVoted, before); saveSubsCache(); alert(err.message); })
           .finally(() => { delete btn.dataset.busy; });
       });
@@ -1725,15 +1726,29 @@
         await paintOverall();
       } finally { btn.disabled = false; }
     });
+    /* 자동 새로 읽기 — Firebase 무료(Spark) 요금제의 하루 읽기 한도(5만 건) 안에 머물도록 아껴 읽는다.
+     * 한 번 읽을 때마다 그날 글 전부(저녁엔 백수십 건)를 다시 읽으므로, 예전처럼 2분마다·탭을 오갈 때마다 읽으면
+     * 몇십 명이 화면을 켜 두기만 해도 한도를 넘었다. 그래서
+     * - 3분마다, 그리고 화면으로 돌아왔을 때 읽되 90초 안에 다시 읽지는 않는다
+     * - 5분 넘게 손대지 않은(켜 두기만 한) 화면은 읽지 않는다
+     * - 명예의 전당(어제 글)은 10분에 한 번만 다시 센다 */
+    let lastPollAt = Date.now(), lastFameAt = Date.now(), lastInputAt = Date.now();
+    ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((t) => addEventListener(t, () => { lastInputAt = Date.now(); }, { capture: true, passive: true }));
     const pollFeed = () => {
       if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastInputAt > 5 * 60 * 1000 || now - lastPollAt < 90 * 1000) return;
+      lastPollAt = now;
       // 피드는 '오늘'을 보고 있을 때만, 명예의 전당(전일 기준)은 어느 날짜를 보고 있든 갱신한다
       // — 지난 날짜 피드에서 추천을 누르면 전일 순위가 바뀔 수 있기 때문이다.
       if (!feedDate || feedDate === U.today()) refreshSocialFeed().catch(console.error);
-      calculateRanksAndFame().catch(console.error);
+      if (now - lastFameAt > 10 * 60 * 1000) { lastFameAt = now; calculateRanksAndFame().catch(console.error); }
     };
-    setInterval(pollFeed, 120000);
-    document.addEventListener('visibilitychange', pollFeed);
+    setInterval(pollFeed, 180000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') lastInputAt = Date.now(); // 돌아온 것 자체가 손길이다
+      pollFeed();
+    });
 
     // 피드(전체 날짜·글 천여 건)·명예의 전당·진행현황은 손을 바로 쓸 수 있게 한 다음에 그린다.
     // (예전엔 이걸 다 그린 뒤에야 이름 고르기·검색 같은 손길에 반응해서, 느린 폰·카톡 브라우저에서

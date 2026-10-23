@@ -1,15 +1,16 @@
 /* 이용 통계 — 사이트에 머문 시간, 영상 시청 시간, 뉴스레터 읽은 시간을 하루 단위로 모은다.
  *
  * 기기마다 무작위 ID를 만들고(브라우저 저장), 서버는 그 해시 앞부분으로 "오늘 다녀간 기기 수"를 센다.
- * 그 기기에서 인증(또는 댓글)한 멤버를 알면 브라우저가 참여자 ID와 시즌을 함께 보내고, 서버가 그 시즌 명단에서
- * 실제로 있는 사람인지 확인한 뒤 인증 이름으로 멤버별 이용량(members.{시즌_참여자ID})에 더한다.
+ * 그 기기에서 인증(또는 댓글)한 멤버를 알면 브라우저가 참여자 ID와 시즌을 함께 보내고, 서버는 그 ID로
+ * 멤버별 이용량(members.{시즌_참여자ID})에 시간만 더한다. 받을 때는 명단을 읽지 않는다(하루 읽기 한도를 아끼려고).
+ * 이름은 운영진이 보고서를 열 때 명단에서 찾아 붙이고, 명단에 없는 ID는 보고서에서 뺀다.
  * 이메일·전화번호는 남기지 않는다. 보고서는 운영진만 본다.
  *
  * 저장: analyticsDaily/{YYYY-MM-DD(KST)}
  *   visits, activeSec, pages.{index|content|feed}, hours.{0..23}, devices.{해시}: 그 기기의 그날 이용 초,
  *   video.{openSec, playSec, opens}, column.{readSec, opens, completes},
  *   items.{v_영상ID | c_칼럼}: { title, kind, open, play, read, n, done }
- *   members.{시즌_참여자ID}: { name, season, active, play, read } — 멤버별로는 시간 합계만 둔다
+ *   members.{시즌_참여자ID}: { season, pid, active, play, read } — 멤버별로는 시간 합계만 둔다
  *     (언제 들어왔는지·몇 번 왔는지·무엇을 봤는지 같은 개인 행동 기록은 남기지 않는다)
  * 브라우저가 30~60초마다 그동안 쌓인 양을 보내고(track 함수), 서버는 숫자를 더하기만 한다.
  * 보고서(analytics-report 함수)는 운영진 로그인으로만 읽는다. */
@@ -60,8 +61,9 @@ function sanitizeBeacon(body) {
 }
 
 /** 묶음 하나를 그날 문서에 더할 값으로 바꾼다. inc: FieldValue.increment
- *  member: 서버가 명단에서 확인한 { pid, season, name } — 없으면 익명으로만 더한다. */
-function toUpdate(b, inc, now = new Date(), member = null) {
+ *  seasons: 알려진 시즌 ID 목록 — 그 밖의 시즌을 단 멤버 정보는 버린다. */
+function toUpdate(b, inc, now = new Date(), seasons = null) {
+  const member = b.member && (!seasons || seasons.includes(b.member.season)) ? b.member : null;
   const { date, hour } = kstParts(now);
   const sum = (kind, field) => b.items.filter((i) => i.kind === kind).reduce((n, i) => n + (i[field] || 0), 0);
   const data = {
@@ -76,7 +78,7 @@ function toUpdate(b, inc, now = new Date(), member = null) {
     items: {}
   };
   if (member) {
-    data.members = { [memberKey(member)]: { name: String(member.name).slice(0, 40), season: member.season,
+    data.members = { [memberKey(member)]: { season: member.season, pid: member.pid,
       active: inc(b.active), play: inc(sum('video', 'play')), read: inc(sum('column', 'read')) } };
   }
   for (const i of b.items) {
@@ -103,8 +105,18 @@ function dateRange(days, now = new Date()) {
   return Array.from({ length: days }, (_, i) => new Date(end.getTime() - (days - 1 - i) * 864e5).toISOString().slice(0, 10));
 }
 
-/** 그날 문서들 → 화면에 그릴 보고서. docs: { 'YYYY-MM-DD': data } / comments: [{ createdAt }] */
-function buildReport(docs, dates, comments = []) {
+/** 보고서에 붙일 이름을 찾아야 할 멤버 목록 [{ key, season, pid }] */
+function memberRefs(docs) {
+  const refs = new Map();
+  for (const d of Object.values(docs)) for (const [key, v] of Object.entries((d && d.members) || {})) {
+    if (v && v.season && v.pid && !refs.has(key)) refs.set(key, { key, season: String(v.season), pid: String(v.pid) });
+  }
+  return [...refs.values()];
+}
+
+/** 그날 문서들 → 화면에 그릴 보고서. docs: { 'YYYY-MM-DD': data } / comments: [{ createdAt }]
+ *  names: { 멤버키: 인증 이름 } — 명단에서 찾은 이름. 여기 없는 멤버(명단에 없는 ID)는 멤버 목록에서 뺀다. */
+function buildReport(docs, dates, comments = [], names = {}) {
   const n = (v) => (Number.isFinite(+v) ? +v : 0);
   const hours = Array(24).fill(0);
   const pages = Object.fromEntries(PAGES.map((p) => [p, 0]));
@@ -136,8 +148,10 @@ function buildReport(docs, dates, comments = []) {
     for (const [key, v] of Object.entries(d.members || {})) {
       if (!v || typeof v !== 'object') continue;
       // 멤버별로는 기간 합계만 돌려준다(날짜별 기록은 넘기지 않는다)
+      const name = names[key] || v.name; // 예전 형식(이름을 함께 저장)도 읽는다
+      if (!name) continue;
       const cur = members.get(key) || { key, name: '', season: '', activeSec: 0, videoPlaySec: 0, columnReadSec: 0 };
-      if (v.name) cur.name = String(v.name);
+      cur.name = String(name);
       if (v.season) cur.season = String(v.season);
       cur.activeSec += n(v.active); cur.videoPlaySec += n(v.play); cur.columnReadSec += n(v.read);
       members.set(key, cur);
@@ -184,4 +198,4 @@ function buildReport(docs, dates, comments = []) {
   return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, members: memberList, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
 }
 
-module.exports = { PAGES, kstParts, itemKey, memberKey, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };
+module.exports = { PAGES, kstParts, itemKey, memberKey, memberRefs, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };
