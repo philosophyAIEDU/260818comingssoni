@@ -118,7 +118,7 @@ assert.deepEqual(body.columns, [
   { id: '/p/50/', title: '가장 새 글입니다', url: 'https://personalmakers.stibee.com/p/50/', date: '2026-10-19' },
   { id: '/p/49/', title: '지난주 글입니다', url: 'https://personalmakers.stibee.com/p/49/', date: '2026-10-12' },
   { id: '/p/42/', title: '독서와 실행', url: 'https://personalmakers.stibee.com/p/42/', date: '2026-10-05' }]);
-assert.match(response.headers.get('Cache-Control'), /s-maxage=3600/);
+assert.match(response.headers.get('Cache-Control'), /s-maxage=600\b/);
 // 목록 API가 알려 준 공유 메일로 본문을 읽는다(글 페이지는 열지 않아도 된다)
 requested.length = 0;
 response = await handler(new Request('https://example.test/?post=' + encodeURIComponent('https://personalmakers.stibee.com/p/50/')));

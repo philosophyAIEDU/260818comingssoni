@@ -306,7 +306,7 @@ async function curatedVideos() {
 let indexCache = null;
 export function resetCaches() { indexCache = null; } // 테스트용 // { at, promise } — 목록과 본문 요청이 같은 목록 API 응답을 잠시 같이 쓴다
 function newsletterIndex() {
-  if (indexCache && Date.now() - indexCache.at < 10 * 60e3) return indexCache.promise;
+  if (indexCache && Date.now() - indexCache.at < 5 * 60e3) return indexCache.promise;
   const promise = get(`${PAGE_API}/contents`, 'application/json').then((r) => r.json()).then((data) => {
     const posts = parseContents(data);
     if (!posts.length) { console.warn('[content-library] Contents API format not recognized', JSON.stringify(describe(data)).slice(0, 1500)); indexCache = null; }
@@ -335,7 +335,9 @@ async function newsletterPosts() {
     .map(({ p }) => ({ id: p.id, title: p.title, url: p.url, date: p.date })).slice(0, 20);
 }
 
-const CACHE_OK = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
+// 새 칼럼·영상이 올라오면 10분 안에 앱에 보이게 — 브라우저는 매번 확인하고, 중간 서버(CDN)는 10분만 들고 있는다.
+// (예전엔 1시간 + 하루까지 묵은 목록을 내줄 수 있어 새 뉴스레터가 늦게 보였다)
+const CACHE_OK = 'public, max-age=0, s-maxage=600, stale-while-revalidate=600';
 const CACHE_SHORT = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
 
 export default async function handler(req) {
