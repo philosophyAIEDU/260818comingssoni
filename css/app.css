@@ -407,10 +407,10 @@ body.app {
   .app .intro-body > h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 2px 0 4px; }
   .app .intro-body > .tagline { font-size: 15px; font-weight: 400; color: var(--text); margin: 0 0 2px; }
   .app .intro-body > .author { font-size: 14px; color: var(--text-faint); }
-  .app .intro-body > .meta, .app .intro-body > .fineprint, .app .intro-body > .desc { grid-column: 1 / -1; }
+  .app .intro-body > .meta, .app .intro-body > .fineprint, .app .intro-body > .desc, .app .intro-body > .intro-more { grid-column: 1 / -1; }
   .app .intro-body > .meta { margin-top: 14px; font-size: 15px; color: var(--text); }
   .app .intro-body > .meta + .meta { margin-top: 0; }
-  .app .intro-body > .desc { margin-top: 6px; font-size: 15px; color: var(--text); }
+  .app .intro-body > .desc, .app .intro-more .desc { margin-top: 6px; font-size: 15px; color: var(--text); }
 }
 
 /* ── [내 현황] 성취감: 완주율 링 · 인증 수 · 연속 · 다음 목표 · 인증 카드 (js/progress-card.js) ──
@@ -565,3 +565,25 @@ body.app {
 .invite-latest-text strong { font-size: 14px; line-height: 1.4; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: keep-all; }
 
 .content-after-certify { display: block; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 13px; text-decoration: none; }
+
+/* 책 소개 접기 — "책 소개 보기 ▾" 한 줄. 펼치면 소개 문단 */
+.app .intro-more { margin-top: 0; }
+.app .intro-body > .fineprint:has(+ .intro-more) { margin-bottom: 4px; }
+.app .intro-more > summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--brand-ink); padding: 4px 0;
+}
+.app .intro-more > summary::-webkit-details-marker { display: none; }
+.app .intro-more > summary::after {
+  content: ''; width: 7px; height: 7px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+  transform: rotate(45deg) translateY(-2px); transition: transform .15s;
+}
+.app .intro-more[open] > summary::after { transform: rotate(-135deg) translate(-2px, 0); }
+.app .intro-more[open] > summary { margin-bottom: 2px; }
+
+/* 책 소개 카드 — 기간·독서모임: 이름(굵게) 한 줄 + 내용 한 줄 */
+.app .intro-body .meta .meta-row { display: block; }
+.app .intro-body .meta .meta-row + .meta-row { margin-top: 10px; }
+.app .intro-body .meta .meta-row > strong { display: block; font-weight: 700; color: var(--brand-ink); }
+.app .intro-body .meta .meta-row > span { display: block; }
+.app .intro-body .meta .nowrap { white-space: nowrap; }

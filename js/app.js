@@ -43,6 +43,12 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
       note: `누적 미인증 ${CONFIG.riskThreshold}회 이상 · ${CONFIG.kickoutThreshold}회부터 킥아웃 대상` }
     : { label: '누적 누락 인원', note: '누적 미인증이 1회 이상인 참여자' };
 
+  /** '매주 화요일 22:00 - 22:30 (10/27 · 11/3 · …)' → 시간은 '~'로, 괄호 속 날짜 묶음은 한 줄에서 끊기지 않게 */
+  function liveLine(label) {
+    const m = String(label || '').replace(' - ', ' ~ ').match(/^(.*?)\s*(\([^)]*\))\s*$/);
+    return m ? `${esc(m[1])} <span class="nowrap">${esc(m[2])}</span>` : esc(String(label || '').replace(' - ', ' ~ '));
+  }
+
   /* 책 소개 카드 — 시즌 설정(js/config.js)에서 통째로 채운다.
    * 책이 바뀔 때 HTML을 고치는 대신 설정만 갈아 끼우면 되도록 했다. */
   function paintIntro() {
@@ -57,13 +63,16 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
     }
     $('introByline').textContent = b.byline;
 
-    const weeks = Math.round(U.challengeDates().length / 7);
+    // 기간·독서모임 — 이름 한 줄, 내용 한 줄씩
+    const month = Number(CONFIG.startDate.slice(5, 7));
     $('introMeta').innerHTML =
-      `📅 <strong>${esc(CONFIG.periodLabel)}</strong> ${esc(U.longLabel(CONFIG.startDate))} ~ `
-      + `${esc(U.longLabel(CONFIG.endDate))}, ${weeks}주간<br>`
-      + `📢 <strong>독서모임</strong> ${esc(CONFIG.live.label)}`;
+      `<span class="meta-row"><strong>${month}월 ${esc(CONFIG.periodLabel)}</strong>`
+      + `<span>${esc(U.longLabel(CONFIG.startDate))} ~ ${esc(U.longLabel(CONFIG.endDate))}</span></span>`
+      + `<span class="meta-row"><strong>독서모임</strong><span>${liveLine(CONFIG.live.label)}</span></span>`;
     $('introFineprint').textContent = CONFIG.live.note;
     // 설정의 \n은 넓은 화면에서만 줄바꿈(한 줄씩 블록) — 휴대폰에서는 띄어쓰기로 이어진다
+    // 넓은 화면은 처음부터 펼쳐 두고, 휴대폰은 접어 둔다(첫 화면에 추천 콘텐츠가 보이게)
+    if (window.matchMedia && window.matchMedia('(min-width: 900px)').matches) $('introMore').open = true;
     $('introDesc').innerHTML = String(b.desc || '').split('\n')
       .map((line) => `<span class="desc-line">${esc(line)}</span>`).join(' ');
 
