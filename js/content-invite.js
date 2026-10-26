@@ -24,7 +24,7 @@
     a.append(text);
     return a;
   }
-  fetch('/.netlify/functions/content-library', { signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined })
+  fetch('/.netlify/functions/content-library', { cache: 'no-cache', signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined })
     .then((r) => (r.ok ? r.json() : Promise.reject(Error('unavailable'))))
     .then((data) => {
       const rows = [];

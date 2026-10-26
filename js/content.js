@@ -380,7 +380,7 @@
   async function load() {
     loading = true; render();
     try {
-      const response = await fetch(LIBRARY, { signal: AbortSignal.timeout(12000) });
+      const response = await fetch(LIBRARY, { cache: 'no-cache', signal: AbortSignal.timeout(12000) }); // 새 글이 바로 보이게 매번 확인
       if (!response.ok) throw Error('Content unavailable');
       const data = await response.json();
       const feed = (data.videos || []).filter(v => v && /^[\w-]{11}$/.test(v.id) && typeof v.title === 'string');
