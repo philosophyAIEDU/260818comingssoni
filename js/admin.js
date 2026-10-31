@@ -252,7 +252,7 @@ CS.FEED_API = 'submissions';
       <dl>
         <dt>인상 깊은 내용</dt><dd class="quote">“${esc(sub.sentence)}”</dd>
         <dt>느낀 점</dt><dd>${esc(sub.reflection)}</dd>
-        <dt>제출 시각</dt><dd>${esc(U.stampLabel(sub.updatedAt || sub.createdAt))}${late ? ' — 마감 이후 (지각)' : ''}</dd>
+        <dt>제출 시각</dt><dd>${esc(submitStamp(sub))}${late ? ' — 마감 이후 (지각)' : ''}</dd>
       </dl>` : '<p class="muted">제출된 인증이 없습니다.</p>';
 
     box.innerHTML = `<div class="entry">
@@ -940,6 +940,13 @@ CS.FEED_API = 'submissions';
   }
 
   /* ── 제출 기록 ───────────────────────── */
+  /** "처음 제출 시각 · 고친 시각" — 다른 날 고쳐 쓴 글(예: 전날 글을 다음 날 덮어씀)을 운영진이 바로 알아보게 */
+  function submitStamp(s) {
+    const first = s.createdAt || s.updatedAt;
+    const edited = s.updatedAt && s.createdAt && Date.parse(s.updatedAt) - Date.parse(s.createdAt) > 60 * 1000;
+    return `${U.stampLabel(first)} 제출` + (edited ? ` · ${U.stampLabel(s.updatedAt)} 수정` : '');
+  }
+
   function paintParticipantFilter() {
     const sel = $('fParticipant');
     const keep = sel.value;
@@ -971,7 +978,7 @@ CS.FEED_API = 'submissions';
       <div class="entry">
         <h4>${esc(s.nickname)} <span class="tag">${esc(U.shortLabel(s.date))}</span>
           ${U.isLate(s.date, s.createdAt) ? '<span class="tag bad">지각</span>' : ''}
-          <span class="muted">${esc(U.stampLabel(s.updatedAt || s.createdAt))} 제출</span>
+          <span class="muted">${esc(submitStamp(s))}</span>
           <button type="button" class="small danger" data-delentry="${esc(s.id)}" style="margin-left:auto">삭제</button></h4>
         <dl>
           <dt>인상 깊은 내용</dt><dd class="quote">“${esc(s.sentence)}”</dd>
