@@ -231,7 +231,7 @@ CS.FirebaseStore = (function () {
     if (viaApi()) {
       try {
         const rows = await CS.FeedClient.submissions(filter);
-        if (rows) return rows;
+        if (rows) return (filter && filter.participantId) ? await withFreshRecent(rows, filter.participantId) : rows;
       } catch (e) { console.warn('[feed] 글 목록 스냅샷을 못 받아 직접 읽습니다:', e.message); }
     }
     await init();
@@ -245,6 +245,20 @@ CS.FirebaseStore = (function () {
     return snap.docs.map(withId).sort((a, b) => (a.date === b.date
       ? String(a.createdAt).localeCompare(String(b.createdAt))
       : a.date.localeCompare(b.date)));
+  }
+
+  /** "내 기록"은 오늘·어제 것만 Firestore에서 바로 확인해 덧씌운다(읽기 2건).
+   *  서버 목록(스냅샷)은 최대 10분 늦을 수 있어서, 휴대폰으로 낸 글이 컴퓨터의 내 현황에서 "미인증"으로 보이는 일이 없게 한다.
+   *  확인한 내 글은 이 기기의 피드에도 바로 보이도록 기억해 둔다(FeedClient.remember). */
+  async function withFreshRecent(rows, participantId) {
+    await init();
+    const today = CS.U.today(), yesterday = CS.U.addDays(today, -1);
+    const fresh = await Promise.all([today, yesterday].map((d) =>
+      fs.getDocs(fs.query(col('submissions'), fs.where('participantId', '==', participantId), fs.where('date', '==', d)))));
+    const recent = fresh.flatMap((snap) => snap.docs.map(withId));
+    recent.forEach((r) => CS.FeedClient.remember(r));
+    return rows.filter((r) => r.date !== today && r.date !== yesterday).concat(recent)
+      .sort((a, b) => (a.date === b.date ? String(a.createdAt).localeCompare(String(b.createdAt)) : a.date.localeCompare(b.date)));
   }
 
   async function getSubmission(participantId, date) {

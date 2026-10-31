@@ -123,6 +123,22 @@ addSubs(today, 60); addSubs(shift(-1), 40); addSubs(shift(-2), 50); addSubs(shif
   await page.waitForFunction(() => document.querySelector('#socialFeedList').textContent.includes('고친 문장입니다'), null, { timeout: 15000 });
   assert(!(await page.locator('#socialFeedList').textContent()).includes('서버 스냅샷 전에도'), '옛 내용은 덮어써짐');
 
+  // 3-2) 휴대폰(위 기기)에서 인증한 직후 다른 기기(컴퓨터)를 열어도: 서버 목록은 아직 옛것이지만
+  //      내 현황은 오늘·어제를 Firestore에서 바로 확인해 "인증"으로 보이고, 피드에도 내 글이 보인다
+  {
+    const other = await openMember('다른 기기');
+    await other.page.goto(BASE + '/index.html');
+    await other.page.waitForFunction(() => document.querySelectorAll('#participant option').length >= 101);
+    const before2 = browser.reads;
+    await other.page.selectOption('#participant', { label: '멤버099' });
+    // (멤버099는 앞선 기록이 없어 집계가 멈춘 상태라, 숫자 대신 "내 기록" 목록에 오늘 글이 보이는지로 본다)
+    await other.page.waitForFunction(() => !document.querySelector('#myCard').hidden && document.querySelector('#myEntries').textContent.includes('고친 문장입니다'), null, { timeout: 15000 });
+    assert(browser.reads - before2 <= 5, '다른 기기에서 내 현황 확인에 든 직접 읽기: ' + (browser.reads - before2));
+    await searchFeed(other.page, '멤버099');
+    await other.page.waitForFunction(() => document.querySelector('#socialFeedList').textContent.includes('고친 문장입니다'), null, { timeout: 15000 });
+    await other.ctx.close();
+  }
+
   // 4) 추천: 누르면 바로 반영되고, 새로고침해도 내가 누른 상태가 유지된다(스냅샷이 옛것이어도)
   await searchFeed(page, '멤버007');
   const btn = page.locator('#socialFeedList .upvote-btn:not(.self)').first();
