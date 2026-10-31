@@ -129,6 +129,38 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
 
   function tickCountdown() {
     $('countdown').textContent = U.hhmmss(U.secondsToMidnight());
+    if (U.today() !== shownToday) onDayChange().catch(console.error);
+  }
+
+  /* ── 자정이 지나면(앱을 켜 둔 채, 특히 홈 화면 앱을 닫지 않고 다음 날 다시 연 경우) ──
+   * 예전엔 인증 날짜 칸이 앱을 연 날에 멈춰 있어서, 다음 날 인증하면 전날 글을 덮어쓰고 그날은 미인증이 됐다.
+   * 이제 날짜가 바뀌면 날짜 칸·오늘 범위·피드를 오늘 기준으로 다시 맞춘다. 단, 자정 직전부터 쓰던 글이 있으면
+   * 그 글의 날짜는 그대로 두고(그날 글이었으니) "마감이 지났다"는 안내만 띄운다. */
+  let shownToday = U.today();
+  let loadedForm = { sentence: '', reflection: '' }; // 지금 날짜 칸으로 불러온 내용 — 이것과 다르면 쓰는 중으로 본다
+  const formDirty = () => $('sentence').value !== loadedForm.sentence || $('reflection').value !== loadedForm.reflection;
+  async function onDayChange() {
+    const prev = shownToday;
+    shownToday = U.today();
+    const sel = $('certifyDate');
+    const wasPrev = sel.value === prev;
+    const dirty = formDirty();
+    populateCertifyDateOptions(participants.find((x) => x.id === currentPid) || null);
+    if (wasPrev && !dirty) {
+      sel.value = shownToday;
+      paintCertifyDatePicker();
+      if (currentPid) await loadEntryForm(currentPid, shownToday);
+    } else if (wasPrev && dirty) {
+      msg($('formMsg'), `자정이 지나 날짜가 바뀌었어요. 지금 쓰는 글은 <strong>${U.shortLabel(prev)}</strong> 인증으로 저장됩니다. ` +
+        '오늘 인증이라면 위 날짜를 오늘로 바꿔 주세요.', 'warn');
+    }
+    paintCertifyDateWarn(sel.value);
+    paintHeader(); paintPhase();
+    rangeDayIdx = null; renderTodayRange();
+    if (!feedDate || feedDate === prev) feedDate = '';
+    refreshSocialFeed().catch(console.error);
+    calculateRanksAndFame().catch(console.error);
+    if (currentPid) paintMine(currentPid).catch(console.error);
   }
 
   /* ── 배너: "오늘의 범위" — 오늘 회차뿐 아니라 ◀▶로 다른 날짜의 범위도 넘겨볼 수 있다 ── */
@@ -519,6 +551,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
   /* ── 선택된 참여자·날짜의 제출분 불러오기 + 현황 ─ */
   async function loadEntryForm(pid, date) {
     const existing = await Store.getSubmission(pid, date);
+    // (아래에서 칸을 채운 뒤 loadedForm에 기억한다 — 자정 넘김 때 "쓰는 중"인지 가리는 기준)
 
     if (existing) {
       $('sentence').value = existing.sentence || '';
@@ -536,6 +569,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
       if (canSubmitToday()) $('submitBtn').textContent = '인증하기';
       msg($('formMsg'), '');
     }
+    loadedForm = { sentence: $('sentence').value, reflection: $('reflection').value };
     autoGrow($('sentence'));
     autoGrow($('reflection'));
     paintCertifyDateWarn(date);
@@ -1553,6 +1587,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
     try {
       const saved = await Store.saveSubmission(payload);
       clearDraft(pid, date);
+      loadedForm = { sentence: $('sentence').value, reflection: $('reflection').value }; // 저장한 내용 = 불러온 내용
       if (window.PMTrack) window.PMTrack.setMember(pid, CONFIG.seasonId); // 이용 통계를 이 멤버 이름으로(운영진만 봄)
       const late = U.isLate(date, saved.createdAt);
       msg($('formMsg'),
