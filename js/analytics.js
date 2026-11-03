@@ -8,6 +8,9 @@
  * - "보고 있는 시간": 창이 보이고, 최근 1분 안에 누르거나·스크롤하거나·타이핑했거나, 영상이 재생 중인 동안.
  * - 칼럼은 읽기 창이 열려 있는 동안의 "보고 있는 시간", 끝까지(90%) 내려 읽었는지.
  * - 영상은 창이 열려 있던 시간과 실제 재생 시간(유튜브 플레이어가 알려 주는 재생 상태)을 따로 센다.
+ * - 인증글: 피드의 글(article.feed-item[data-author])이 화면에 절반 넘게 3초 이상 보이면 "읽음" 1회(같은 화면에선 글마다 한 번),
+ *   보고 있는 시간은 화면에 보이는 글들에 나눠 더한다. 글쓴이(시즌·참여자 ID)별로만 보내고, 내 글은 빼고 센다.
+ *   누가 읽었는지는 보내지 않는다 — 운영진은 "누구 글이 많이 읽혔나"만 본다.
  * 사용: <script src="js/analytics.js" data-page="index|content|feed">. content.js가 PMTrack.videoOpen·columnOpen 등을 부른다. */
 (() => {
   const ENDPOINT = '/.netlify/functions/track';
@@ -51,6 +54,44 @@
   let pending = { active: 0, items: {} };
   let lastInput = Date.now(), lastTick = Date.now();
   let video = null;   // { key, playing }
+  /* ── 인증글 읽기 ── */
+  const POST_SEEN_SEC = 3;
+  const postsInView = new Set();          // 지금 화면에 충분히 보이는 글
+  const postDwell = new WeakMap();        // 글 → 이번에 보이는 동안 쌓인 초
+  const postCounted = new Set();          // 이 화면에서 이미 "읽음"으로 센 글 ID
+  const isMine = (el) => member && el.dataset.author === member.p && el.dataset.season === member.s;
+  const postKey = (el) => (/^[\w-]{1,10}$/.test(el.dataset.season || '') && /^[\w-]{1,40}$/.test(el.dataset.author || '') ? `p:${el.dataset.season}:${el.dataset.author}` : null);
+  const io = window.IntersectionObserver ? new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      // 긴 글은 절반이 한 화면에 안 들어갈 수 있어서, 화면의 40% 이상을 차지해도 보이는 것으로 친다
+      const enough = e.isIntersecting && (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= innerHeight * 0.4);
+      if (enough) postsInView.add(e.target); else { postsInView.delete(e.target); postDwell.delete(e.target); }
+    }
+  }, { threshold: [0, 0.25, 0.5, 0.75, 1] }) : null;
+  const watched = new WeakSet();
+  function watchPosts(root) {
+    if (!io || !root.querySelectorAll) return;
+    const found = root.matches && root.matches('article.feed-item[data-author]') ? [root] : root.querySelectorAll('article.feed-item[data-author]');
+    for (const el of found) if (!watched.has(el)) { watched.add(el); io.observe(el); }
+  }
+  if (io) {
+    const start = () => { watchPosts(document.body); new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach(watchPosts); }).observe(document.body, { childList: true, subtree: true }); };
+    if (document.body) start(); else addEventListener('DOMContentLoaded', start);
+  }
+  function tickPosts(sec) {
+    const shown = [...postsInView].filter((el) => el.isConnected && !isMine(el) && postKey(el));
+    for (const el of postsInView) if (!el.isConnected) postsInView.delete(el);
+    if (!shown.length) return;
+    const share = sec / shown.length; // 한 화면에 글이 여럿이면 보고 있는 시간을 나눈다
+    for (const el of shown) {
+      const it = item(postKey(el));
+      add(it, 'read', share);
+      const dwell = (postDwell.get(el) || 0) + sec;
+      postDwell.set(el, dwell);
+      const id = el.dataset.post || el;
+      if (dwell >= POST_SEEN_SEC && !postCounted.has(id)) { postCounted.add(id); add(it, 'n', 1); }
+    }
+  }
   let column = null;  // { key, done }
   const item = (key, title) => {
     const it = pending.items[key] || (pending.items[key] = {});
@@ -75,6 +116,7 @@
       store.set(VISIT_KEY, String(now));
       if (column) add(item(column.key), 'read', sec);
       if (video) add(item(video.key), 'open', sec);
+      if (!video && !column) tickPosts(sec); // 영상·칼럼 창이 위에 떠 있으면 피드는 읽는 중이 아니다
     }
     if (playing) add(item(video.key), 'play', sec);
   }

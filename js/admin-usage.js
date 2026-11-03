@@ -221,6 +221,9 @@
     // 0) 멤버별 이용 시간
     nodes.push(memberSection(r));
 
+    // 0-1) 많이 읽힌 인증글(글쓴이별)
+    nodes.push(authorSection(r));
+
     // 1) 날짜별 이용 시간 — 영상 시청 / 뉴스레터 읽기 / 그 밖의 이용(인증·피드 등)
     const series = [
       { name: '영상 시청', color: color(1), values: r.days.map((d) => minutes(d.videoPlaySec)) },
@@ -360,6 +363,32 @@
     paint();
     fig.f.append(tableView(['멤버', '총 이용', '영상 시청', '뉴스레터 읽기', '그 밖의 이용'],
       members.map((m) => { const [v, c, o] = parts(m); return [m.name, fmtDur(m.activeSec), fmtDur(v), fmtDur(c), fmtDur(o)]; })));
+    return fig.f;
+  }
+
+  /* ── 많이 읽힌 인증글: 글쓴이별로 피드에서 읽힌 횟수(본인 제외). 누가 읽었는지는 모으지 않는다 ── */
+  let authorAll = false;
+  function authorSection(r) {
+    const list = r.topAuthors || [];
+    const t = r.totals;
+    const fig = figure('많이 읽힌 인증글', `글쓴이별 · 멤버들이 피드에서 글을 3초 넘게 읽은 횟수(본인 글 제외) · 이 기간 ${fmtNum(t.postReads || 0)}회 · ${fmtDur(t.postReadSec || 0)}`);
+    fig.f.id = 'usageAuthors';
+    if (!list.length) {
+      fig.plot.append(el('p', 'usage-empty', '아직 읽힌 인증글 기록이 없습니다. 멤버들이 인증 피드를 읽으면 쌓이기 시작해요.'));
+      return fig.f;
+    }
+    const host = el('div');
+    const more = el('button', 'member-more'); more.type = 'button';
+    const paint = () => {
+      const rows = (authorAll ? list : list.slice(0, 10)).map((a, i) => ({ name: `${i + 1}. ${a.name}`, value: a.reads, sub: `읽은 시간 ${fmtDur(a.readSec)}` }));
+      host.replaceChildren(barList(rows, { format: (v) => `${fmtNum(v)}회` }));
+      more.hidden = authorAll || list.length <= 10;
+      more.textContent = `${list.length - 10}명 더 보기`;
+    };
+    more.addEventListener('click', () => { authorAll = true; paint(); });
+    paint();
+    fig.plot.append(host, more);
+    fig.f.append(tableView(['순위', '글쓴이', '읽힌 횟수', '읽은 시간'], list.map((a, i) => [`${i + 1}`, a.name, `${a.reads}회`, fmtDur(a.readSec)])));
     return fig.f;
   }
 

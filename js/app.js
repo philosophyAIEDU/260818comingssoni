@@ -916,7 +916,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
       ? 'disabled title="지난 시즌 기록이라 추천할 수 없습니다"'
       : (own ? 'disabled title="본인 글은 추천할 수 없습니다"' : '');
     // 스레드처럼 한 글이 폭을 통째로 쓴다 — 이름 줄 / 본문 / 맨 아래 버튼 한 줄 (js/post.js)
-    return `<article class="feed-item post${isWinner ? ' win' : ''}">
+    return `<article class="feed-item post${isWinner ? ' win' : ''}" data-post="${esc(s.id)}" data-author="${esc(s.participantId)}" data-season="${esc(CS.CONFIG.seasonId)}">
       <div class="post-head">
         ${CS.Post.avatar(s.nickname)}
         <div class="feed-top">
