@@ -37,7 +37,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
     const hasUpvoted = (s.upvotedBy || []).includes(clientId);
     const btnClass = ['upvote-btn', hasUpvoted ? 'voted' : ''].filter(Boolean).join(' ');
     // index.html의 인증 피드와 같은 구조(js/post.js) — 이름 줄 / 본문 / 맨 아래 버튼 한 줄
-    return `<article class="feed-item post">
+    return `<article class="feed-item post" data-post="${esc(s.id)}" data-author="${esc(s.participantId)}" data-season="${esc(CS.CONFIG.seasonId)}">
       <div class="post-head">
         ${CS.Post.avatar(s.nickname)}
         <div class="feed-top">

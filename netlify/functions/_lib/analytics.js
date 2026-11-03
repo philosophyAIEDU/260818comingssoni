@@ -12,6 +12,8 @@
  *   items.{v_영상ID | c_칼럼}: { title, kind, open, play, read, n, done }
  *   members.{시즌_참여자ID}: { season, pid, active, play, read } — 멤버별로는 시간 합계만 둔다
  *     (언제 들어왔는지·몇 번 왔는지·무엇을 봤는지 같은 개인 행동 기록은 남기지 않는다)
+ *   authors.{시즌_참여자ID}: { season, pid, n, read } — 그 멤버의 인증글이 피드에서 읽힌 횟수·시간(모두 합친 값).
+ *     누가 누구 글을 읽었는지는 남기지 않는다(읽은 사람과 잇지 않는다). 본인 글을 본 건 브라우저가 빼고 보낸다.
  * 브라우저가 30~60초마다 그동안 쌓인 양을 보내고(track 함수), 서버는 숫자를 더하기만 한다.
  * 보고서(analytics-report 함수)는 운영진 로그인으로만 읽는다. */
 const crypto = require('crypto');
@@ -19,6 +21,7 @@ const crypto = require('crypto');
 const PAGES = ['index', 'content', 'feed'];
 const MAX_FLUSH_SEC = 900; // 한 번에 보낼 수 있는 최대 초(보내기가 몇 번 실패해 쌓인 경우까지)
 const MAX_ITEMS = 20;
+const MAX_AUTHORS = 80; // 5분 동안 피드를 훑으면 글쓴이가 수십 명 — 영상·칼럼과 따로 센다
 
 const clampSec = (n) => (Number.isFinite(+n) ? Math.max(0, Math.min(MAX_FLUSH_SEC, Math.round(+n))) : 0);
 const clampCount = (n) => (Number.isFinite(+n) ? Math.max(0, Math.min(20, Math.round(+n))) : 0);
@@ -40,13 +43,26 @@ function itemKey(raw) {
   return null;
 }
 
+/** 인증글 글쓴이: p:시즌:참여자ID */
+function authorKey(raw) {
+  const m = String(raw || '').match(/^p:([\w-]{1,10}):([\w-]{1,40})$/);
+  return m ? { season: m[1], pid: m[2] } : null;
+}
+
 /** 브라우저가 보낸 묶음을 검사해 쓸 수 있는 값만 남긴다. 이상하면 null. */
 function sanitizeBeacon(body) {
   if (!body || typeof body !== 'object') return null;
   if (!/^[a-f0-9]{16,64}$/.test(String(body.d || ''))) return null;
   if (!PAGES.includes(body.p)) return null;
-  const items = [];
-  for (const [raw, v] of Object.entries(body.items && typeof body.items === 'object' ? body.items : {}).slice(0, MAX_ITEMS)) {
+  const items = [], authors = [];
+  const entries = Object.entries(body.items && typeof body.items === 'object' ? body.items : {});
+  for (const [raw, v] of entries.filter(([raw]) => String(raw).startsWith('p:')).slice(0, MAX_AUTHORS)) {
+    const a = authorKey(raw);
+    if (!a || !v || typeof v !== 'object') continue;
+    const it = Object.assign(a, { n: clampCount(v.n), read: clampSec(v.read) });
+    if (it.n || it.read) authors.push(it);
+  }
+  for (const [raw, v] of entries.filter(([raw]) => !String(raw).startsWith('p:')).slice(0, MAX_ITEMS)) {
     const k = itemKey(raw);
     if (!k || !v || typeof v !== 'object') continue;
     const it = { key: k.key, kind: k.kind, title: cleanTitle(v.t), n: clampCount(v.n) };
@@ -56,8 +72,8 @@ function sanitizeBeacon(body) {
   }
   const m = body.m && typeof body.m === 'object' && /^[\w-]{1,40}$/.test(String(body.m.p || '')) && /^[\w-]{1,10}$/.test(String(body.m.s || ''))
     ? { pid: String(body.m.p), season: String(body.m.s) } : null;
-  const out = { device: crypto.createHash('sha256').update(body.d).digest('hex').slice(0, 16), page: body.p, visit: body.visit ? 1 : 0, active: clampSec(body.active), items, member: m };
-  return out.visit || out.active || items.length ? out : null;
+  const out = { device: crypto.createHash('sha256').update(body.d).digest('hex').slice(0, 16), page: body.p, visit: body.visit ? 1 : 0, active: clampSec(body.active), items, authors, member: m };
+  return out.visit || out.active || items.length || authors.length ? out : null;
 }
 
 /** 묶음 하나를 그날 문서에 더할 값으로 바꾼다. inc: FieldValue.increment
@@ -80,6 +96,11 @@ function toUpdate(b, inc, now = new Date(), seasons = null) {
   if (member) {
     data.members = { [memberKey(member)]: { season: member.season, pid: member.pid,
       active: inc(b.active), play: inc(sum('video', 'play')), read: inc(sum('column', 'read')) } };
+  }
+  const authors = (b.authors || []).filter((a) => !seasons || seasons.includes(a.season));
+  if (authors.length) {
+    data.authors = {};
+    for (const a of authors) data.authors[memberKey(a)] = { season: a.season, pid: a.pid, n: inc(a.n), read: inc(a.read) };
   }
   for (const i of b.items) {
     data.items[i.key] = Object.assign({ kind: i.kind, n: inc(i.n) }, i.title ? { title: i.title } : {},
@@ -108,7 +129,7 @@ function dateRange(days, now = new Date()) {
 /** 보고서에 붙일 이름을 찾아야 할 멤버 목록 [{ key, season, pid }] */
 function memberRefs(docs) {
   const refs = new Map();
-  for (const d of Object.values(docs)) for (const [key, v] of Object.entries((d && d.members) || {})) {
+  for (const d of Object.values(docs)) for (const [key, v] of Object.entries(Object.assign({}, d && d.members, d && d.authors))) {
     if (v && v.season && v.pid && !refs.has(key)) refs.set(key, { key, season: String(v.season), pid: String(v.pid) });
   }
   return [...refs.values()];
@@ -124,6 +145,7 @@ function buildReport(docs, dates, comments = [], names = {}) {
   const dist = DIST_BUCKETS.map((b) => ({ label: b.label, count: 0 }));
   const items = new Map();
   const members = new Map();
+  const authors = new Map();
   const commentsByDay = {};
   for (const c of comments) {
     const d = kstParts(new Date(c.createdAt)).date;
@@ -155,6 +177,12 @@ function buildReport(docs, dates, comments = [], names = {}) {
       if (v.season) cur.season = String(v.season);
       cur.activeSec += n(v.active); cur.videoPlaySec += n(v.play); cur.columnReadSec += n(v.read);
       members.set(key, cur);
+    }
+    for (const [key, v] of Object.entries(d.authors || {})) {
+      if (!v || typeof v !== 'object' || !names[key]) continue; // 명단에 없는 ID는 뺀다
+      const cur = authors.get(key) || { key, name: names[key], season: String(v.season || ''), reads: 0, readSec: 0 };
+      cur.reads += n(v.n); cur.readSec += n(v.read);
+      authors.set(key, cur);
     }
     const video = d.video || {}, column = d.column || {};
     return {
@@ -195,7 +223,11 @@ function buildReport(docs, dates, comments = [], names = {}) {
   const top = (kind, field) => [...items.values()].filter((i) => i.kind === kind)
     .map((i) => Object.assign(i, { sec: kind === 'video' ? i.playSec : i.readSec }))
     .sort((a, b) => b[field] - a[field] || b.opens - a.opens).slice(0, 10);
-  return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, members: memberList, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
+  const authorList = [...authors.values()].filter((a) => a.reads > 0 || a.readSec > 0)
+    .sort((a, b) => b.reads - a.reads || b.readSec - a.readSec || a.name.localeCompare(b.name, 'ko'));
+  totals.postReads = authorList.reduce((s, a) => s + a.reads, 0);
+  totals.postReadSec = authorList.reduce((s, a) => s + a.readSec, 0);
+  return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, members: memberList, topAuthors: authorList, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
 }
 
-module.exports = { PAGES, kstParts, itemKey, memberKey, memberRefs, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };
+module.exports = { PAGES, kstParts, itemKey, authorKey, memberKey, memberRefs, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };

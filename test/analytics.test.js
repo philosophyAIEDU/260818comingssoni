@@ -64,4 +64,27 @@ assert.deepEqual(mr.members, [
   { key: 's3_a', name: '김현우', season: 's3', activeSec: 1000, videoPlaySec: 400, columnReadSec: 260 },
   { key: 's3_b', name: '박지민', season: 's3', activeSec: 100, videoPlaySec: 0, columnReadSec: 0 }], '기간 합계만(날짜별·방문 기록 없음), 명단에 없는 ID는 뺌');
 assert.equal(mr.totals.members, 2); assert.equal(mr.totals.memberSec, 1100);
+// 인증글 읽기: 글쓴이(시즌·참여자 ID)별 읽힌 횟수·시간만. 읽은 사람과 잇지 않는다.
+const items = { 'p:s2:alice': { n: 2, read: 40 }, 'p:s2:bob': { n: 99, read: 5 }, 'p:../x:y': { n: 1 }, 'p:s2:zero': { n: 0, read: 0 }, 'v:xmd2_HKMgCU': { n: 1, play: 3 } };
+for (let k = 0; k < 120; k++) items[`p:s2:m${k}`] = { n: 1, read: 3 };
+const bp = sanitizeBeacon({ d: DEV, p: 'feed', active: 60, items, m: { p: 'reader', s: 's2' } });
+assert(bp.authors.length <= 80 && bp.authors.length > 70, '글쓴이는 한 번에 80명까지');
+assert.deepEqual(bp.authors.slice(0, 2), [{ season: 's2', pid: 'alice', n: 2, read: 40 }, { season: 's2', pid: 'bob', n: 20, read: 5 }], '횟수 상한·이상한 키 버림');
+assert.deepEqual(bp.items.map((i) => i.key), ['v_xmd2_HKMgCU'], '영상·칼럼과 따로 센다');
+const up = toUpdate(bp, inc, new Date(), ['s2']).data;
+assert.deepEqual(up.authors.s2_alice, { season: 's2', pid: 'alice', n: inc(2), read: inc(40) });
+assert(!JSON.stringify(up.authors).includes('reader'), '읽은 사람은 글쓴이 기록에 남기지 않는다');
+assert.equal(toUpdate(bp, inc, new Date(), ['s1']).data.authors, undefined, '모르는 시즌 글쓴이는 버림');
+assert(sanitizeBeacon({ d: DEV, p: 'feed', items: { 'p:s2:alice': { n: 1, read: 3 } } }), '글 읽기만 있어도 보낸다');
+const adocs = {
+  '2026-10-21': { authors: { s2_alice: { season: 's2', pid: 'alice', n: 3, read: 50 }, s2_bob: { season: 's2', pid: 'bob', n: 5, read: 20 }, s2_ghost: { season: 's2', pid: 'ghost', n: 9 } } },
+  '2026-10-22': { authors: { s2_alice: { season: 's2', pid: 'alice', n: 4, read: 30 } }, members: { s2_carol: { season: 's2', pid: 'carol', active: 10 } } }
+};
+assert.deepEqual(memberRefs(adocs).map((m) => m.key).sort(), ['s2_alice', 's2_bob', 's2_carol', 's2_ghost'], '글쓴이 이름도 명단에서 찾는다');
+const ar = buildReport(adocs, ['2026-10-21', '2026-10-22'], [], { s2_alice: '이혜림', s2_bob: '김현우', s2_carol: '박지민' });
+assert.deepEqual(ar.topAuthors, [
+  { key: 's2_alice', name: '이혜림', season: 's2', reads: 7, readSec: 80 },
+  { key: 's2_bob', name: '김현우', season: 's2', reads: 5, readSec: 20 }], '읽힌 횟수 순, 명단에 없는 ID는 뺌');
+assert.equal(ar.totals.postReads, 12); assert.equal(ar.totals.postReadSec, 100);
+console.log('인증글 읽기: 글쓴이별 횟수·시간만(읽은 사람과 잇지 않음)·상한·이상한 키/모르는 시즌 버림·많이 읽힌 순 통과');
 console.log('이용 통계: 묶음 검사(익명·상한·허용 화면)·KST 날짜/시각·하루 문서 증가값·기간 보고서 집계 통과');
