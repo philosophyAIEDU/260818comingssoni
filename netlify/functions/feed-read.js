@@ -3,12 +3,13 @@
  *
  *   GET  ?kind=roster&season=s3                 → { at, rows: [명단(멤버 앱에 필요한 필드만)] }
  *   GET  ?kind=day&season=s3&date=2026-10-23    → { at, rows: [그날 인증글] }
+ *   GET  ?kind=popular&season=s3                → { at, posts: { 글ID: 읽힌 횟수 }, authors: { 참여자ID: 읽은 초 } } (최근 7일, "많이 읽은 순")
  *   POST { season, roster?: true, dates?: [..] } → 운영진 로그인 토큰이 있을 때만: 그 스냅샷을 오래된 것으로 표시
  *
  * 응답은 CDN·브라우저가 잠깐 들고 있어도 되게 Cache-Control을 붙인다(오늘 글은 짧게, 지난 글은 길게). */
 const { getDb } = require('./_lib/firebaseAdmin');
 const { requireAdmin, json } = require('./_lib/adminAuth');
-const { getRoster, getDay, invalidate } = require('./_lib/feedSnapshot');
+const { getRoster, getDay, getPopular, invalidate } = require('./_lib/feedSnapshot');
 const { U } = require('./_lib/appLogic');
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,7 +58,11 @@ exports.handler = async (event) => {
       const r = await getDay(db, season, q.date, today, U.addDays);
       return send(200, { at: r.at, rows: r.rows }, cacheFor('day', q.date, today));
     }
-    return send(400, { error: 'kind는 roster 또는 day입니다.' });
+    if (q.kind === 'popular') {
+      const r = await getPopular(db, season, U.today(), U.addDays);
+      return send(200, { at: r.at, posts: r.rows.posts || {}, authors: r.rows.authors || {} }, 'public, max-age=120, s-maxage=300, stale-while-revalidate=600');
+    }
+    return send(400, { error: 'kind는 roster·day·popular 중 하나입니다.' });
   } catch (err) {
     console.error('[feed-read]', err);
     return send(/RESOURCE_EXHAUSTED|Quota exceeded/i.test(String(err && err.message)) ? 503 : 500, { error: '목록을 불러오지 못했습니다.' });

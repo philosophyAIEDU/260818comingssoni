@@ -428,11 +428,15 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
   // ── 인증 피드: 추천순 / 최신순 정렬 + 1등 배너 제거 ──
   t('중복이던 "👑 1등" 배너 제거됨', (await page.locator('#todayWinnerBadge').count()) === 0);
-  t('피드 정렬 기본값은 추천 많은순',
-    (await page.locator('#feedSortSelect').inputValue()) === 'likes',
+  t('피드 정렬 기본값은 많이 읽은 순',
+    (await page.locator('#feedSortSelect').inputValue()) === 'views',
     await page.locator('#feedSortSelect').inputValue());
   const feedOrder = () => page.locator('#socialFeedList .feed-nick').allTextContents();
   // 이 시점에 커밍쏜만 👍 1표(밤톨 0표), 작성 순서는 커밍쏜 → 밤톨
+  t('많이 읽은 순: 읽은 기록이 없으면 추천순과 같음(커밍쏜이 맨 위)',
+    (await feedOrder())[0].includes('커밍쏜'), await feedOrder());
+  await page.selectOption('#feedSortSelect', 'likes');
+  await page.waitForTimeout(300);
   t('추천순: 표를 받은 커밍쏜이 맨 위',
     (await feedOrder())[0].includes('커밍쏜'), await feedOrder());
   await page.selectOption('#feedSortSelect', 'recent');
