@@ -9,8 +9,9 @@
  * - 칼럼은 읽기 창이 열려 있는 동안의 "보고 있는 시간", 끝까지(90%) 내려 읽었는지.
  * - 영상은 창이 열려 있던 시간과 실제 재생 시간(유튜브 플레이어가 알려 주는 재생 상태)을 따로 센다.
  * - 인증글: 피드의 글(article.feed-item[data-author])이 화면에 절반 넘게 3초 이상 보이면 "읽음" 1회(같은 화면에선 글마다 한 번),
- *   보고 있는 시간은 화면에 보이는 글들에 나눠 더한다. 글쓴이(시즌·참여자 ID)별로만 보내고, 내 글은 빼고 센다.
- *   누가 읽었는지는 보내지 않는다 — 운영진은 "누구 글이 많이 읽혔나"만 본다.
+ *   보고 있는 시간은 화면에 보이는 글들에 나눠 더한다. 글(시즌·글쓴이 ID·글 ID)마다 보내고, 내 글은 빼고 센다.
+ *   같은 기기에서 같은 글은 하루 한 번만 "읽음"(= 대략 그 글을 읽은 사람 수). 누가 읽었는지는 서버에 남지 않는다 —
+ *   운영진은 "누구 글이 많이 읽혔나"를, 멤버 피드는 "많이 읽은 순"을 본다.
  * 사용: <script src="js/analytics.js" data-page="index|content|feed">. content.js가 PMTrack.videoOpen·columnOpen 등을 부른다. */
 (() => {
   const ENDPOINT = '/.netlify/functions/track';
@@ -58,9 +59,18 @@
   const POST_SEEN_SEC = 3;
   const postsInView = new Set();          // 지금 화면에 충분히 보이는 글
   const postDwell = new WeakMap();        // 글 → 이번에 보이는 동안 쌓인 초
-  const postCounted = new Set();          // 이 화면에서 이미 "읽음"으로 센 글 ID
+  // 이 기기가 오늘 이미 "읽음"으로 센 글 ID(하루 지나면 비운다)
+  const SEEN_KEY = 'personalmakers.analytics.postsSeen';
+  const kstDate = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  let seen = { date: '', ids: [] };
+  try { seen = JSON.parse(store.get(SEEN_KEY) || 'null') || seen; } catch { /* 처음 */ }
+  const postCounted = {
+    has(id) { if (seen.date !== kstDate()) seen = { date: kstDate(), ids: [] }; return seen.ids.includes(id); },
+    add(id) { this.has(id); seen.ids = seen.ids.concat(id).slice(-500); store.set(SEEN_KEY, JSON.stringify(seen)); }
+  };
   const isMine = (el) => member && el.dataset.author === member.p && el.dataset.season === member.s;
-  const postKey = (el) => (/^[\w-]{1,10}$/.test(el.dataset.season || '') && /^[\w-]{1,40}$/.test(el.dataset.author || '') ? `p:${el.dataset.season}:${el.dataset.author}` : null);
+  const ok = (v, n) => new RegExp(`^[\\w-]{1,${n}}$`).test(v || '');
+  const postKey = (el) => (ok(el.dataset.season, 10) && ok(el.dataset.author, 40) && ok(el.dataset.post, 40) ? `p:${el.dataset.season}:${el.dataset.author}:${el.dataset.post}` : null);
   const io = window.IntersectionObserver ? new IntersectionObserver((entries) => {
     for (const e of entries) {
       // 긴 글은 절반이 한 화면에 안 들어갈 수 있어서, 화면의 40% 이상을 차지해도 보이는 것으로 친다
@@ -88,7 +98,7 @@
       add(it, 'read', share);
       const dwell = (postDwell.get(el) || 0) + sec;
       postDwell.set(el, dwell);
-      const id = el.dataset.post || el;
+      const id = el.dataset.post;
       if (dwell >= POST_SEEN_SEC && !postCounted.has(id)) { postCounted.add(id); add(it, 'n', 1); }
     }
   }

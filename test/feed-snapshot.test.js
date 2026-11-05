@@ -18,6 +18,7 @@ const db = {
     where: (f, op, v) => ({ get: async () => { const docs = [...col(name)].filter(([, d]) => d[f] === v); stats.reads += docs.length; return { docs: docs.map(([id, d]) => dsnap(id, d)) }; } }),
     get: async () => { const docs = [...col(name)]; stats.reads += docs.length; return { docs: docs.map(([id, d]) => dsnap(id, d)) }; }
   }),
+  getAll: async (...refs) => Promise.all(refs.map((r) => r.get())),
   runTransaction: async (fn) => fn({ get: async (ref) => { stats.reads++; return dsnap(ref._id, col(ref._n).get(ref._id)); }, set: (ref, v, o) => { stats.writes++; col(ref._n).set(ref._id, o && o.merge ? Object.assign({}, col(ref._n).get(ref._id), v) : v); } })
 };
 let admin = true;
@@ -126,9 +127,24 @@ const today = U.today(), yesterday = U.addDays(today, -1), old = U.addDays(today
   assert.deepEqual(parse(r), { invalidated: 2 }, '범위 밖 날짜는 무시');
   assert.equal(parse(await get({ kind: 'roster', season: season.id })).rows.length, 151, '명단 변경이 바로 보임');
 
+  // 많이 읽은 순: 최근 7일 이용 기록에서 이 시즌 글별 읽힌 횟수·글쓴이별 읽은 시간. 7건 읽고 10분 동안은 다시 안 읽는다
+  col('analyticsDaily').set(today, { devices: { d1: 9 }, posts: { [`${season.id}_s1`]: { n: 3, read: 40 }, [`${season.id}_s2`]: { n: 1 }, sX_s1: { n: 50 } },
+    authors: { [`${season.id}_p1`]: { season: season.id, pid: 'p1', n: 3, read: 40 }, sX_p1: { season: 'sX', pid: 'p1', read: 999 } } });
+  col('analyticsDaily').set(yesterday, { posts: { [`${season.id}_s1`]: { n: 2 } }, authors: { [`${season.id}_p2`]: { season: season.id, pid: 'p2', n: 1, read: 300 } } });
+  stats.reads = 0; snap._memory.clear();
+  r = await get({ kind: 'popular', season: season.id });
+  assert.deepEqual(parse(r).posts, { s1: 5, s2: 1 }, '글별 읽힌 횟수(다른 시즌 제외)');
+  assert.deepEqual(parse(r).authors, { p1: 40, p2: 300 }, '글쓴이별 읽은 시간');
+  assert(!/devices|d1/.test(r.body), '기기·읽은 사람 정보는 내려가지 않음');
+  assert.match(r.headers['Cache-Control'], /s-maxage=300/);
+  const popReads = stats.reads;
+  assert(popReads <= 10, '날짜 문서 7건 + 스냅샷 ' + popReads);
+  for (let i = 0; i < 100; i++) { if (i % 10 === 0) snap._memory.clear(); await get({ kind: 'popular', season: season.id }); }
+  assert(stats.reads - popReads <= 10, '10분 안에는 요약 스냅샷만 읽음 ' + (stats.reads - popReads));
+
   // 너무 큰 스냅샷은 저장하지 않고 그대로 준다(서버 메모리 45초만)
   stats.reads = 0; snap._memory.clear();
   const big = await snap.readThrough(db, 'big', 1000, async () => Array.from({ length: 4000 }, (_, i) => ({ id: i, t: require('crypto').randomBytes(300).toString('hex') })), now);
   assert.equal(big.rows.length, 4000); assert.equal(col('feedSnapshots').get('big').z, undefined, '너무 커서 저장하지 않음');
-  console.log('읽기 줄이기: 명단 개인정보 제외·목록은 한 번만 읽고 300번 요청해도 읽기 0건·TTL(명단 30분/오늘 10분/어제 45분/2~6일 전 12시간/그 이전 3일)·리스·읽기 실패 시 직전 스냅샷·범위 밖 날짜 무시·운영진 갱신·큰 스냅샷 통과');
+  console.log('읽기 줄이기: 명단 개인정보 제외·목록은 한 번만 읽고 300번 요청해도 읽기 0건·TTL(명단 30분/오늘 10분/어제 45분/2~6일 전 12시간/그 이전 3일)·리스·읽기 실패 시 직전 스냅샷·범위 밖 날짜 무시·운영진 갱신·많이 읽은 순 요약(7일·10분 공유)·큰 스냅샷 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

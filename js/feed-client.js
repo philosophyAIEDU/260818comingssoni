@@ -119,8 +119,27 @@ CS.FeedClient = (function () {
       : a.date.localeCompare(b.date)));
   }
 
+  /** "많이 읽은 순"용 요약 { posts: { 글ID: 읽힌 횟수 }, authors: { 참여자ID: 읽은 초 } } — 서버가 10분마다 만들고,
+   *  여기서도 5분 기억한다(피드를 다시 그릴 때마다 부르지 않게). 못 받으면 빈 요약(→ 추천순으로 정렬된다). */
+  const POP_MS = 5 * 60 * 1000;
+  let pop = null;
+  async function popular() {
+    if (pop && pop.season === seasonId() && Date.now() - pop.loaded < POP_MS) return pop.data;
+    try {
+      const res = await fetch(`${ENDPOINT}?${new URLSearchParams({ kind: 'popular', season: seasonId() })}`);
+      if (!res.ok) throw new Error(`feed-read ${res.status}`);
+      const body = await res.json();
+      const data = { posts: (body && body.posts) || {}, authors: (body && body.authors) || {} };
+      pop = { season: seasonId(), loaded: Date.now(), data };
+      return data;
+    } catch (e) {
+      pop = { season: seasonId(), loaded: Date.now() - POP_MS + 60 * 1000, data: (pop && pop.data) || { posts: {}, authors: {} } }; // 실패하면 1분 뒤 다시
+      return pop.data;
+    }
+  }
+
   /** 오늘 목록 스냅샷을 만든 시각(ms). 아직 못 받았으면 0 */
   const todayAt = () => snapshotAt[CS.U.today()] || 0;
 
-  return { enabled, rosterEnabled, todayAt, roster, submissions, remember, overlay, datesFor, _loadRecent: loadRecent };
+  return { enabled, rosterEnabled, todayAt, popular, roster, submissions, remember, overlay, datesFor, _loadRecent: loadRecent };
 })();

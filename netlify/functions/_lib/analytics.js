@@ -14,6 +14,7 @@
  *     (언제 들어왔는지·몇 번 왔는지·무엇을 봤는지 같은 개인 행동 기록은 남기지 않는다)
  *   authors.{시즌_참여자ID}: { season, pid, n, read } — 그 멤버의 인증글이 피드에서 읽힌 횟수·시간(모두 합친 값).
  *     누가 누구 글을 읽었는지는 남기지 않는다(읽은 사람과 잇지 않는다). 본인 글을 본 건 브라우저가 빼고 보낸다.
+ *   posts.{시즌_글ID}: { n, read } — 글마다 읽힌 횟수(기기마다 하루 한 번)·시간. 멤버 피드의 "많이 읽은 순"에 쓴다.
  * 브라우저가 30~60초마다 그동안 쌓인 양을 보내고(track 함수), 서버는 숫자를 더하기만 한다.
  * 보고서(analytics-report 함수)는 운영진 로그인으로만 읽는다. */
 const crypto = require('crypto');
@@ -43,10 +44,10 @@ function itemKey(raw) {
   return null;
 }
 
-/** 인증글 글쓴이: p:시즌:참여자ID */
+/** 인증글: p:시즌:글쓴이ID[:글ID] */
 function authorKey(raw) {
-  const m = String(raw || '').match(/^p:([\w-]{1,10}):([\w-]{1,40})$/);
-  return m ? { season: m[1], pid: m[2] } : null;
+  const m = String(raw || '').match(/^p:([\w-]{1,10}):([\w-]{1,40})(?::([\w-]{1,40}))?$/);
+  return m ? Object.assign({ season: m[1], pid: m[2] }, m[3] ? { post: m[3] } : {}) : null;
 }
 
 /** 브라우저가 보낸 묶음을 검사해 쓸 수 있는 값만 남긴다. 이상하면 null. */
@@ -100,7 +101,14 @@ function toUpdate(b, inc, now = new Date(), seasons = null) {
   const authors = (b.authors || []).filter((a) => !seasons || seasons.includes(a.season));
   if (authors.length) {
     data.authors = {};
-    for (const a of authors) data.authors[memberKey(a)] = { season: a.season, pid: a.pid, n: inc(a.n), read: inc(a.read) };
+    // 한 묶음에 같은 글쓴이의 글이 여럿이면 먼저 합친다(같은 필드에 increment를 두 번 쓰면 뒤의 것만 남는다)
+    const byAuthor = new Map();
+    for (const a of authors) {
+      const k = memberKey(a), cur = byAuthor.get(k) || { season: a.season, pid: a.pid, n: 0, read: 0 };
+      cur.n += a.n; cur.read += a.read; byAuthor.set(k, cur);
+      if (a.post) (data.posts = data.posts || {})[postKey(a)] = { n: inc(a.n), read: inc(a.read) };
+    }
+    for (const [k, a] of byAuthor) data.authors[k] = { season: a.season, pid: a.pid, n: inc(a.n), read: inc(a.read) };
   }
   for (const i of b.items) {
     data.items[i.key] = Object.assign({ kind: i.kind, n: inc(i.n) }, i.title ? { title: i.title } : {},
@@ -110,6 +118,23 @@ function toUpdate(b, inc, now = new Date(), seasons = null) {
 }
 
 const memberKey = (m) => `${m.season}_${m.pid}`.replace(/[^\w-]/g, '_');
+const postKey = (a) => `${a.season}_${a.post}`.replace(/[^\w-]/g, '_');
+
+/** 멤버 피드 "많이 읽은 순"에 쓸 요약 — 최근 날짜 문서들에서 그 시즌 것만.
+ *  posts: { 글ID: 읽힌 횟수 }, authors: { 참여자ID: 읽은 시간(초) }. 누가 읽었는지는 들어 있지 않다. */
+function popularity(docs, seasonId) {
+  const posts = {}, authors = {};
+  const pre = `${seasonId}_`;
+  for (const d of Object.values(docs || {})) {
+    for (const [k, v] of Object.entries((d && d.posts) || {})) {
+      if (k.startsWith(pre) && v && +v.n > 0) posts[k.slice(pre.length)] = (posts[k.slice(pre.length)] || 0) + +v.n;
+    }
+    for (const v of Object.values((d && d.authors) || {})) {
+      if (v && v.season === seasonId && v.pid && +v.read > 0) authors[v.pid] = (authors[v.pid] || 0) + Math.round(+v.read);
+    }
+  }
+  return { posts, authors };
+}
 
 const DIST_BUCKETS = [
   { label: '1분 미만', max: 60 },
@@ -230,4 +255,4 @@ function buildReport(docs, dates, comments = [], names = {}) {
   return { from: dates[0], to: dates[dates.length - 1], days, hours, pages, distribution: dist, totals, members: memberList, topAuthors: authorList, topVideos: top('video', 'sec'), topColumns: top('column', 'sec') };
 }
 
-module.exports = { PAGES, kstParts, itemKey, authorKey, memberKey, memberRefs, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };
+module.exports = { PAGES, kstParts, itemKey, authorKey, popularity, memberKey, memberRefs, sanitizeBeacon, toUpdate, dateRange, buildReport, DIST_BUCKETS };

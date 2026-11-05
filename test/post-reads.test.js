@@ -1,5 +1,5 @@
 // 인증글 읽기 기록: 피드에서 글이 3초 넘게 보이면 글쓴이별로 "읽음"을 센다(본인 글 제외, 같은 글은 한 번).
-// 보내는 묶음에는 글쓴이(시즌·참여자 ID)와 횟수·시간만 담긴다.
+// 보내는 묶음에는 글(시즌·글쓴이 ID·글 ID)과 횟수·시간만 담긴다. 같은 기기에서 같은 글은 하루 한 번.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const BASE = process.env.BASE || 'http://127.0.0.1:8765';
@@ -39,7 +39,8 @@ const START = '2026-10-26', END = '2026-11-22';
   await page.waitForSelector('article.feed-item[data-author]');
   assert.equal(await page.locator('article.feed-item[data-author="p1"]').first().getAttribute('data-season'), 's1');
 
-  const sums = () => { const out = {}; for (const b of beacons) for (const [k, v] of Object.entries(b.items || {})) if (k.startsWith('p:')) { out[k] = out[k] || { n: 0, read: 0 }; out[k].n += v.n || 0; out[k].read += v.read || 0; } return out; };
+  // 글쓴이별로 모아 본다(키: p:시즌:글쓴이:글ID → p:시즌:글쓴이)
+  const sums = () => { const out = {}; for (const b of beacons) for (const [key, v] of Object.entries(b.items || {})) if (key.startsWith('p:')) { assert.match(key, /^p:s1:p\d:s\dp\d$/); const k = key.split(':').slice(0, 3).join(':'); out[k] = out[k] || { n: 0, read: 0 }; out[k].n += v.n || 0; out[k].read += v.read || 0; } return out; };
   const flush = async () => { await page.evaluate(() => PMTrack._flush(false)); await page.waitForTimeout(50); };
 
   // 피드 맨 위가 거의 안 보이는 처음 화면에선 아무 글도 세지 않는다
@@ -66,10 +67,20 @@ const START = '2026-10-26', END = '2026-11-22';
   assert(total > firstReads && total <= 6, `내려가며 새 글을 셈(이혜림·김현우 글은 6개) ${JSON.stringify(s)}`);
   assert(s['p:s1:p1'].n >= 1 && s['p:s1:p2'].n >= 1 && !s['p:s1:p3']);
   assert(Object.values(s).every((v) => v.read > 0), '읽은 시간도 함께');
-  // 보내는 묶음에 글 내용·글 ID·이름은 없다
+  // 보내는 묶음에 글 내용·이름은 없다
   const text = JSON.stringify(beacons);
-  assert(!/이혜림|김현우|문장|s0p1/.test(text), '글쓴이 ID·횟수·시간만 보낸다');
+  assert(!/이혜림|김현우|문장|느낀/.test(text), '글 ID·글쓴이 ID·횟수·시간만 보낸다');
+  // 같은 날 다시 열어도 이미 읽은 글은 다시 세지 않는다(기기마다 하루 한 번 = 대략 읽은 사람 수)
+  await page.reload();
+  await page.waitForSelector('article.feed-item[data-author]');
+  await page.evaluate(() => document.querySelector('article.feed-item').scrollIntoView({ block: 'start' }));
+  await page.clock.runFor(6000); await flush();
+  assert.equal(Object.values(sums()).reduce((a, v) => a + v.n, 0), total, '같은 날 다시 봐도 그대로');
+  // 다음 날이면 다시 센다
+  await page.clock.fastForward(24 * 3600e3); await page.mouse.wheel(0, 10); await page.mouse.wheel(0, -10);
+  await page.clock.runFor(6000); await flush();
+  assert(Object.values(sums()).reduce((a, v) => a + v.n, 0) > total, '다음 날엔 다시 셈');
   assert.deepEqual(errors, []);
-  console.log('인증글 읽기 기록: 3초 넘게 보인 글만·같은 글은 한 번·내 글 제외·내려가며 새 글·시간 함께·이름/내용은 보내지 않음 통과');
+  console.log('인증글 읽기 기록: 3초 넘게 보인 글만·같은 글은 기기마다 하루 한 번·내 글 제외·내려가며 새 글·시간 함께·이름/내용은 보내지 않음 통과');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

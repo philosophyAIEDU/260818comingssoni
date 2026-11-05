@@ -12,7 +12,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
   let participants = [];
   let feedDate = '';     // 피드에서 볼 날짜. 빈 값이면 전체 날짜(지금까지 올라온 모든 글, 최신 날짜부터)
   let feedVisibleCount = FEED_PAGE_SIZE;
-  let feedSort = 'likes'; // 'likes' 추천 많은순(기본) | 'recent' 최신순
+  let feedSort = 'views'; // 'views' 많이 읽은 순(기본) | 'likes' 추천 많은순 | 'recent' 최신순
   let feedSearch = '';    // 피드에서 찾을 이름(초성도 됨). 빈 값이면 전체.
   let currentPid = '';
 
@@ -940,19 +940,35 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
     </article>`;
   }
 
+  /* 많이 읽은 순(기본): 멤버들이 피드에서 3초 넘게 읽은 횟수(기기마다 하루 한 번, 본인 제외)가 많은 글이 위로.
+   * 그날 글이 아직 별로 안 읽혔으면(아침 등 — 그날 글 전체가 읽힌 횟수 VIEWS_WARM 미만) 최근 7일 동안
+   * 멤버들이 오래 머물러 읽은 사람의 글을 먼저 보여 준다. 기록이 없으면 추천순과 같다. 요약은 서버가 10분마다 만든다. */
+  const VIEWS_WARM = 10;
+  let popular = { posts: {}, authors: {} };
+  async function loadPopular() {
+    if (feedSort !== 'views' || CONFIG.backend === 'local' || !CS.FeedClient || !CS.FeedClient.popular) return; // 로컬 저장 모드엔 서버가 없다
+    popular = await CS.FeedClient.popular();
+  }
   function sortFeedDay(list) {
-    // 정렬: 추천 많은순(기본) | 최신순. 동점·동시각이면 먼저 올린 사람이 위로.
+    // 동점·동시각이면 먼저 올린 사람이 위로
     if (feedSort === 'recent') {
       return list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     }
-    return list.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) ||
-      String(a.createdAt).localeCompare(String(b.createdAt)));
+    const byLikes = (a, b) => (b.upvotes || 0) - (a.upvotes || 0) || String(a.createdAt).localeCompare(String(b.createdAt));
+    if (feedSort === 'views') {
+      const views = (x) => popular.posts[x.id] || 0, stay = (x) => popular.authors[x.participantId] || 0;
+      const warm = list.reduce((n, x) => n + views(x), 0) >= VIEWS_WARM;
+      return list.sort((a, b) => (warm
+        ? views(b) - views(a) || stay(b) - stay(a)
+        : stay(b) - stay(a) || views(b) - views(a)) || byLikes(a, b));
+    }
+    return list.sort(byLikes);
   }
 
   let feedById = new Map(); // 지금 피드에 그린 글 — 엄지척을 누르면 이 객체(캐시와 같은 것)를 바로 고친다
   async function refreshSocialFeed() {
     const date = feedDate;
-    const subs = await feedSubs(date);
+    const [subs] = await Promise.all([feedSubs(date), loadPopular()]);
     feedById = new Map(subs.map((x) => [x.id, x]));
     const today = U.today();
     paintFeedDateSelect();

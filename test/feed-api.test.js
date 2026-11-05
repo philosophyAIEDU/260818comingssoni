@@ -29,7 +29,10 @@ const N = 100;
 for (let i = 0; i < N; i++) store.col('participants').set('p' + i, { nickname: `멤버${String(i).padStart(3, '0')}`, status: 'active', joinDate: START, outDate: null, exemptDates: [], email: `m${i}@x.com`, phone: '010-1111-' + i, note: '운영 메모', createdAt: '2026-01-01T00:00:00' });
 let sid = 0;
 const addSubs = (date, count) => { for (let i = 0; i < count; i++) store.col('submissions').set('seed' + (sid++), { participantId: 'p' + i, nickname: `멤버${String(i).padStart(3, '0')}`, date, sentence: `${date} 문장 ${i}`, reflection: '느낀 점 '.repeat(20), upvotes: 0, upvotedBy: [], createdAt: `${date}T0${i % 9}:00:00`, updatedAt: `${date}T0${i % 9}:00:00` }); };
-addSubs(today, 60); addSubs(shift(-1), 40); addSubs(shift(-2), 50); addSubs(shift(-3), 50); addSubs(shift(-4), 50);
+addSubs(today, 60); addSubs(shift(-1), 40);
+// 이용 기록(많이 읽은 순): 오늘 글 중 seed30(멤버030)이 8회·seed31(멤버031)이 4회 읽힘 / 글쓴이 중 멤버035·멤버020이 최근 오래 읽힘
+store.col('analyticsDaily').set(today, { posts: { s1_seed30: { n: 8, read: 90 }, s1_seed31: { n: 4, read: 30 } },
+  authors: { s1_p35: { season: 's1', pid: 'p35', n: 5, read: 900 }, s1_p20: { season: 's1', pid: 'p20', n: 2, read: 300 } } }); addSubs(shift(-2), 50); addSubs(shift(-3), 50); addSubs(shift(-4), 50);
 
 (async () => {
   const chromeArgs = {};
@@ -165,6 +168,22 @@ addSubs(today, 60); addSubs(shift(-1), 40); addSubs(shift(-2), 50); addSubs(shif
   assert(await page.locator('#participant option', { hasText: '새멤버' }).count() === 1);
   await ctx.close();
 
+  // 5-2) 피드 기본 정렬은 "많이 읽은 순": 오늘처럼 읽힌 기록이 넉넉하면 많이 읽힌 글이 위로,
+  //      아직 거의 안 읽힌 날(어제 목록 — 읽힌 기록 0)은 최근 오래 읽힌 사람의 글이 위로
+  ({ ctx, page } = await openMember('많이 읽은 순'));
+  await page.goto(BASE + '/index.html');
+  await page.waitForFunction(() => document.querySelectorAll('#socialFeedList .feed-item').length > 0);
+  assert.equal(await page.locator('#feedSortSelect').inputValue(), 'views');
+  const nicks = () => page.locator('#socialFeedList .feed-nick').allTextContents();
+  await page.waitForFunction(() => /멤버030/.test(document.querySelector('#socialFeedList .feed-nick').textContent));
+  assert.deepEqual((await nicks()).slice(0, 2).map((n) => n.replace(/[^\w가-힣]/g, '')), ['멤버030', '멤버031'], '오늘: 많이 읽힌 글 순');
+  await page.selectOption('#feedDateSelect', shift(-1));
+  await page.waitForFunction(() => /멤버035/.test(document.querySelector('#socialFeedList .feed-nick').textContent));
+  assert.deepEqual((await nicks()).slice(0, 2).map((n) => n.replace(/[^\w가-힣]/g, '')), ['멤버035', '멤버020'], '거의 안 읽힌 날: 오래 읽힌 사람 순');
+  await page.selectOption('#feedSortSelect', 'recent');
+  await page.waitForFunction(() => !/멤버035/.test(document.querySelector('#socialFeedList .feed-nick').textContent));
+  await ctx.close();
+
   // 6) 서버 목록을 못 받으면(함수 장애) 예전처럼 Firestore에서 직접 읽어 앱은 그대로 동작한다
   const ctx2 = await browserApp.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
   await ctx2.exposeFunction('__fsOp', store.clientOp(browser));
@@ -179,6 +198,6 @@ addSubs(today, 60); addSubs(shift(-1), 40); addSubs(shift(-2), 50); addSubs(shif
   await ctx2.close();
 
   assert.deepEqual(errors.filter((e) => !/feed-read|500/.test(e)), []);
-  console.log(`읽기 줄이기 통합: 기기가 처음 열 때 Firestore 직접 읽기 ${firstOpenBrowserReads}건·서버 목록 읽기 ${firstServerReads}건(한 번만)·20대 더 열어도 서버 +${extraServer}건·기기당 직접 읽기 ${Math.round(extraBrowser / 20)}건·인증 저장 1번 쓰기·내 글/수정/추천이 스냅샷보다 먼저 화면에 반영·운영진 갱신 요청·함수 장애 시 직접 읽기로 동작 통과`);
+  console.log(`읽기 줄이기 통합: 기기가 처음 열 때 Firestore 직접 읽기 ${firstOpenBrowserReads}건·서버 목록 읽기 ${firstServerReads}건(한 번만)·20대 더 열어도 서버 +${extraServer}건·기기당 직접 읽기 ${Math.round(extraBrowser / 20)}건·인증 저장 1번 쓰기·내 글/수정/추천이 스냅샷보다 먼저 화면에 반영·운영진 갱신 요청·많이 읽은 순(많이 읽힌 글/아침엔 오래 읽힌 사람)·함수 장애 시 직접 읽기로 동작 통과`);
   await browserApp.close();
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -1,6 +1,6 @@
 // 이용 통계: 받은 묶음 검사·하루 문서에 더할 값·보고서 집계를 검증한다.
 const assert = require('node:assert/strict');
-const { sanitizeBeacon, toUpdate, buildReport, dateRange, itemKey, kstParts, memberRefs } = require('../netlify/functions/_lib/analytics');
+const { sanitizeBeacon, toUpdate, buildReport, dateRange, itemKey, kstParts, memberRefs, popularity } = require('../netlify/functions/_lib/analytics');
 const DEV = 'a'.repeat(32);
 
 assert.equal(sanitizeBeacon(null), null);
@@ -86,5 +86,16 @@ assert.deepEqual(ar.topAuthors, [
   { key: 's2_alice', name: '이혜림', season: 's2', reads: 7, readSec: 80 },
   { key: 's2_bob', name: '김현우', season: 's2', reads: 5, readSec: 20 }], '읽힌 횟수 순, 명단에 없는 ID는 뺌');
 assert.equal(ar.totals.postReads, 12); assert.equal(ar.totals.postReadSec, 100);
+// 글마다(p:시즌:글쓴이:글ID): 글쓴이 합계와 글별 횟수를 함께. 같은 글쓴이 글 여럿은 먼저 합친다
+const bq = sanitizeBeacon({ d: DEV, p: 'index', items: { 'p:s2:alice:postA': { n: 1, read: 10 }, 'p:s2:alice:postB': { n: 1, read: 5 }, 'p:s2:bob:postC': { n: 1, read: 4 }, 'p:s2:bob:bad id': { n: 1 } } });
+const uq = toUpdate(bq, inc, new Date(), ['s2']).data;
+assert.deepEqual(uq.authors, { s2_alice: { season: 's2', pid: 'alice', n: inc(2), read: inc(15) }, s2_bob: { season: 's2', pid: 'bob', n: inc(1), read: inc(4) } });
+assert.deepEqual(uq.posts, { s2_postA: { n: inc(1), read: inc(10) }, s2_postB: { n: inc(1), read: inc(5) }, s2_postC: { n: inc(1), read: inc(4) } });
+// 멤버 피드 "많이 읽은 순" 요약: 그 시즌 글별 횟수·글쓴이별 시간만(기기·멤버 정보 없음)
+const pop = popularity({
+  d1: { devices: { x: 1 }, members: { s2_r: { season: 's2', pid: 'r', active: 5 } }, posts: { s2_postA: { n: 3 }, s1_postA: { n: 9 }, s2_postZ: { n: 0 } }, authors: { s2_alice: { season: 's2', pid: 'alice', read: 30.4 }, s1_bob: { season: 's1', pid: 'bob', read: 99 } } },
+  d2: { posts: { s2_postA: { n: 2 }, s2_postC: { n: 1 } }, authors: { s2_alice: { season: 's2', pid: 'alice', read: 10 } } }
+}, 's2');
+assert.deepEqual(pop, { posts: { postA: 5, postC: 1 }, authors: { alice: 40 } });
 console.log('인증글 읽기: 글쓴이별 횟수·시간만(읽은 사람과 잇지 않음)·상한·이상한 키/모르는 시즌 버림·많이 읽힌 순 통과');
 console.log('이용 통계: 묶음 검사(익명·상한·허용 화면)·KST 날짜/시각·하루 문서 증가값·기간 보고서 집계 통과');

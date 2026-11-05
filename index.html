@@ -215,7 +215,7 @@
 
     <!-- 인증 피드 -->
     <section class="card feed-card">
-      <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 새로고침 · 날짜(기본 전체 날짜) · 정렬(추천순/최신순) -->
+      <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 새로고침 · 날짜(기본 전체 날짜) · 정렬(많이 읽은 순(기본)/추천순/최신순) -->
       <div class="feed-head">
         <h2>인증 피드 <span class="tag" id="feedCount" hidden>0명</span></h2>
         <div class="feed-head-actions">
@@ -225,6 +225,7 @@
             <option value="">전체 날짜</option>
           </select>
           <select id="feedSortSelect" class="sort-mini" aria-label="정렬 기준">
+            <option value="views">많이 읽은 순</option>
             <option value="likes">추천순</option>
             <option value="recent">최신순</option>
           </select>

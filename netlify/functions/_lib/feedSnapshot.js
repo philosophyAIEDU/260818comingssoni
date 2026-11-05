@@ -17,7 +17,7 @@ const zlib = require('zlib');
 const COLLECTION = 'feedSnapshots';
 const MIN = 60 * 1000;
 // 명단은 운영진이 고칠 때마다 invalidate로 바로 갱신되므로 길게 둔다. 지난 글도 거의 안 바뀐다.
-const TTL = { roster: 30 * MIN, today: 10 * MIN, yesterday: 45 * MIN, week: 12 * 60 * MIN, older: 72 * 60 * MIN };
+const TTL = { popular: 10 * MIN, roster: 30 * MIN, today: 10 * MIN, yesterday: 45 * MIN, week: 12 * 60 * MIN, older: 72 * 60 * MIN };
 const LEASE_MS = 25 * 1000;
 const MEMORY_MS = 45 * 1000;
 const MAX_STORED_CHARS = 900 * 1000;
@@ -109,6 +109,20 @@ function getDay(db, season, date, today, addDays, now, force) {
   }, now, force);
 }
 
+/** 멤버 피드 "많이 읽은 순"용 요약: 최근 7일 이용 기록(analyticsDaily)에서 글별 읽힌 횟수·글쓴이별 읽은 시간.
+ *  다시 만들 때 날짜 문서 7건을 읽고, 10분 동안은 모두 같은 요약을 나눠 쓴다. */
+const POPULAR_DAYS = 7;
+function getPopular(db, season, today, addDays, now) {
+  return readThrough(db, `${season.id}__popular`, TTL.popular, async () => {
+    const { popularity } = require('./analytics');
+    const dates = Array.from({ length: POPULAR_DAYS }, (_, i) => addDays(today, -i));
+    const snaps = await db.getAll(...dates.map((d) => db.collection('analyticsDaily').doc(d)));
+    const docs = {};
+    snaps.forEach((snap, i) => { if (snap.exists) docs[dates[i]] = snap.data(); });
+    return popularity(docs, season.id);
+  }, now);
+}
+
 /** 시즌의 인증글 전체를 날짜별 스냅샷으로 모은다 — 예약 메일(리마인드·경고)이 누락 횟수를 셀 때 쓴다.
  *  글 하나하나를 읽는 대신 지난 날은 스냅샷 문서 1건씩만 읽고, freshDates(오늘·어제)만 새로 읽는다.
  *  (지난 날의 늦은 제출은 어차피 미인증(X)이라 스냅샷이 하루 묵어도 누락 횟수는 같다.)
@@ -140,4 +154,4 @@ async function invalidate(db, season, { roster, dates }) {
   return keys.length;
 }
 
-module.exports = { readSeasonSubmissions, COLLECTION, TTL, ROSTER_FIELDS, publicParticipant, ttlFor, readThrough, getRoster, getDay, invalidate, encode, decode, dayKey, rosterKey, _memory: memory };
+module.exports = { getPopular, readSeasonSubmissions, COLLECTION, TTL, ROSTER_FIELDS, publicParticipant, ttlFor, readThrough, getRoster, getDay, invalidate, encode, decode, dayKey, rosterKey, _memory: memory };
