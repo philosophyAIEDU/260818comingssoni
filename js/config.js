@@ -378,6 +378,9 @@ CS.SEASONS = [{
   riskThreshold: Infinity,
   autoWarnThreshold: Infinity,
   // 🎁 정리본 선물 기준 — 누락이 이 횟수 미만이면 대상. 운영진 [알림 메일 › 선물 대상자]가 쓴다.
+  // 🔕 누락·미인증 알림 메일(21시 리마인드·누락 5회 안내)을 받지 않는 참여자 id — 본인이 요청한 경우.
+  // 운영진 화면 [명단 관리]의 "알림" 체크를 끄는 것과 같다(그쪽은 명단에 noReminder로 저장). 정리본 메일은 그대로 간다.
+  reminderOptOut: ['DcBj4jh0hNvHycBFgGp1'], // 2026-11-06 본인 요청
   giftMissLimit: 6,
   // 🎁 정리본 메일 자동 발송 — link를 채워 배포하면 sendAt(KST)에 이 시즌 대상자(+운영진이 추가한 사람) 전원에게 한 번 보낸다.
   // 다음 시즌이 켜진 뒤여도 이 시즌 명단으로 계산한다. link가 비어 있으면 아무것도 안 보낸다.

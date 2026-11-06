@@ -97,6 +97,7 @@ async function runDailyReminder() {
   const candidates = stats.filter((s) => {
     const p = s.participant;
     if (p.status === 'out') return false;
+    if (p.noReminder === true || (CONFIG.reminderOptOut || []).includes(p.id)) return false; // 본인 요청으로 알림 끔
     if (s.submittedToday) return false;
     if ((p.exemptDates || []).includes(todayISO)) return false;
     return p.remindedAt !== todayISO;
