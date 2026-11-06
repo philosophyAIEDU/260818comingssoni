@@ -99,6 +99,7 @@ async function runMissed5Warning() {
   const candidates = stats.filter((s) =>
     s.missed === wm.threshold
     && s.participant.status !== 'out'
+    && s.participant.noReminder !== true && !(CONFIG.reminderOptOut || []).includes(s.participant.id) // 본인 요청으로 알림 끔
     && !s.participant.warned5At);
 
   let sentEmail = 0;

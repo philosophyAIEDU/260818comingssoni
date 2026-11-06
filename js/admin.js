@@ -362,6 +362,9 @@ CS.FEED_API = 'submissions';
           ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
         </select></td>
         <td><input type="number" min="1" max="99" value="${p.seasonStreak || ((CS.STREAKS || {})[CONFIG.seasonId] || {})[p.id] || 1}" data-editstreak="${p.id}" title="이번 시즌 포함 연속 참여 시즌 수 (2부터 앱에 배지)" style="width:58px"></td>
+        <td>${(CONFIG.reminderOptOut || []).includes(p.id)
+          ? '<span class="muted" title="js/config.js reminderOptOut에서 꺼 둠">🔕 끔</span>'
+          : `<label style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" data-editremind="${p.id}"${p.noReminder ? '' : ' checked'}>${p.noReminder ? '🔕 끔' : '받음'}</label>`}</td>
         <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
         <td class="num">${st.missed}</td>
@@ -387,7 +390,7 @@ CS.FEED_API = 'submissions';
     }).join('');
 
     t.innerHTML = `<thead><tr>
-      <th>이름</th><th>이메일</th><th>전화번호</th><th>카톡방</th><th title="연속 참여 시즌 수">연속</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
+      <th>이름</th><th>이메일</th><th>전화번호</th><th>카톡방</th><th title="연속 참여 시즌 수">연속</th><th title="누락·미인증 알림 메일(21시 리마인드·누락 5회 안내)을 받는지 — 정리본 메일과는 상관없음">알림</th><th>상태</th><th class="num">인증</th><th class="num">미인증</th>
       <th class="num">인증률</th><th>면제일</th><th></th>
     </tr></thead><tbody>${rows}</tbody>`;
 
@@ -427,6 +430,18 @@ CS.FEED_API = 'submissions';
         try {
           await Store.updateParticipant(el.dataset.editstreak, { seasonStreak: n });
           msg($('rosterMsg'), n >= 2 ? `연속 ${n}시즌으로 표시합니다 — 앱 이름 옆에 배지가 붙습니다.` : '연속 표시를 없앴습니다.', 'ok');
+        } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
+        await refreshLite();
+      });
+    });
+    t.querySelectorAll('[data-editremind]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        const p = participants.find((x) => x.id === el.dataset.editremind);
+        try {
+          await Store.updateParticipant(el.dataset.editremind, { noReminder: !el.checked });
+          msg($('rosterMsg'), el.checked
+            ? `${esc(p ? p.nickname : '')} 님에게 다시 누락·미인증 알림 메일을 보냅니다.`
+            : `${esc(p ? p.nickname : '')} 님에게는 누락·미인증 알림 메일을 보내지 않습니다(정리본 메일은 그대로).`, 'ok');
         } catch (e) { msg($('rosterMsg'), esc(e.message), 'bad'); }
         await refreshLite();
       });
