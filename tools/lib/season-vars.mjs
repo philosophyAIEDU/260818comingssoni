@@ -135,7 +135,11 @@ export function seasonVars(spec) {
   const endDate = spec.endDate || addDays(startDate, DAYS - 1);
   const days = Math.round((D(endDate) - D(startDate)) / 86400000) + 1;
   const switchAt = spec.switchAt || `${startDate}T01:00`;
-  const lockPrevAt = `${startDate}T02:00`;
+  // 앞 시즌은 이 시즌이 켜지고 한 시간 뒤에 잠근다(전환 시각을 바꿔도 잠금이 먼저 오지 않게)
+  const lockPrevAt = (() => {
+    const [d, t] = switchAt.split('T'); const h = +t.slice(0, 2) + 1;
+    return h < 24 ? `${d}T${String(h).padStart(2, '0')}${t.slice(2)}` : `${addDays(d, 1)}T${String(h - 24).padStart(2, '0')}${t.slice(2)}`;
+  })();
   const retroFrom = addDays(endDate, 1);
   // 자산화 기간은 다음 달 20일까지 — 다음 시즌이 21일에 시작하니까
   const nextStart = (() => { const d = D(startDate); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(21); return iso(d); })();
@@ -195,6 +199,14 @@ export function seasonVars(spec) {
     '상세_책준비': pages.detailBookPrep,
     '설명서_책준비': pages.guideBookPrep,
     '4주차방법': pages.guideWeek4,
+    // 이 시즌에만 있는 설명서 섹션(예: 혁명의 팡파르 4주차 30일 챌린지) — 선물 안내 바로 위. 없으면 빈 값
+    '설명서_추가': pages.guideExtra || '',
+    // 설명서 일정 표 칸 안의 '* ' 주석 — 2026-11부터 노션 API가 칸 안 '* '를 '  • '로 바꿔 넣는다(11월 설명서에서 확인)
+    '표_주석': pages.guideTableNote || '* ',
+    // 설명서 「준비물」 이미지 — 노션에 직접 올린 사진이면 사본에 '(노션 첨부 이미지)'로 남는다. 표지 주소로 넣었으면 그 주소
+    '설명서_표지': pages.guideCoverImage || '(노션 첨부 이미지)',
+    // 이 시즌에만 있는 설명서 하위 페이지 줄(사본 대조용) — 없으면 빈 값
+    '설명서_추가하위': pages.guideExtraChild ? `\n📄 하위 페이지: ${pages.guideExtraChild}` : '',
     '기준도서': pages.baseBook,
     // 노션 표 한 칸 안에서 줄을 바꾼다. 장 표기(ch)가 있으면 첫 줄 앞에 "ch — "
     '일정표': plan.map((day, i) => {
