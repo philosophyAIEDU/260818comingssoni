@@ -172,7 +172,8 @@ export function seasonVars(spec) {
     '은는': josaEunNeun(book.name || ''),
     '책소개': book.desc,
     '저자표기': book.byline,
-    '책표지URL': book.coverUrl,
+    // 상세페이지 표지 — 노션에 직접 올린 이미지면 pages.detailCoverImage에 '(노션 첨부 이미지)'
+    '책표지URL': pages.detailCoverImage || book.coverUrl,
     '일수': String(days),
     '기간표기': `${shortD(startDate)} ~ ${shortD(endDate)}`,
     '시작일표기': shortD(startDate),
