@@ -182,6 +182,15 @@ export function seasonVars(spec) {
     '라이브요일': liveWd,
     '라이브시작': liveStart,
     '라이브끝': liveEnd,
+    // 라이브 길이 — liveStart~liveEnd로 계산 ("30분" / "1시간" / "1시간 30분")
+    '라이브길이': (() => {
+      const m = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+      const d = m(liveEnd) - m(liveStart); const h = Math.floor(d / 60), r = d % 60;
+      return [h ? `${h}시간` : '', r ? `${r}분` : ''].filter(Boolean).join(' ');
+    })(),
+    // 문장용: "30분간" / "1시간 동안" · "30분 시간을" / "1시간을" (지난 시즌 문구 그대로 유지)
+    '라이브길이_진행': '',
+    '라이브길이_비워': '',
     '라이브시각': hourLabel(liveStart),
     '라이브날짜': liveDates.map(md).join(' · '),
     '라이브횟수': String(liveDates.length),
@@ -219,6 +228,15 @@ export function seasonVars(spec) {
       return `| ${i + 1}일차 | ${shortD(addDays(startDate, i))} | ${lines.join('\n')} |`;
     }).join('\n')
   };
+
+  // 상세 「3가지」 제목 꼬리표 — 시즌 JSON pages.detailBenefitTags: true면 " 60분" · " (28일)"을 붙인다 (11월부터)
+  { const on = (spec.pages || {}).detailBenefitTags;
+    const mins = (() => { const m = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5); return m(liveEnd) - m(liveStart); })();
+    vars['상세_라이브길이표기'] = on ? ` ${mins}분` : '';
+    vars['상세_인증일수표기'] = on ? ` (${days}일)` : ''; }
+  { const L = vars['라이브길이'];
+    vars['라이브길이_진행'] = L.endsWith('분') ? `${L}간` : `${L} 동안`;
+    vars['라이브길이_비워'] = L === '30분' ? '30분 시간을' : `${L}을`; }
 
   return {
     startDate, endDate, days, switchAt, lockPrevAt, retroFrom, retroUntil, nextStart,
