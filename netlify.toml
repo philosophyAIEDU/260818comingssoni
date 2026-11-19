@@ -34,9 +34,9 @@
 
 # 독서 멤버십 상세페이지 바로가기 — SNS·vo.la 짧은 링크는 이 주소로 건다.
 # (vo.la 무료 회원은 notion.site 주소를 막고, notion.so 주소는 노션 앱 화면·상위 페이지 경로가 보인다)
-# 매달 새 상세페이지가 나오면 to 만 새 공개 주소로 바꾼다. ?utm_… 쿼리는 그대로 따라간다.
+# 매달 새 상세페이지가 나오면 to 만 새 공개 주소로 바꾼다. 상세페이지는 상위 경로가 안 보이도록 「퍼메스 독서챌린지」 바로 아래에 두고 단독으로 웹 게시한다. ?utm_… 쿼리는 그대로 따라간다.
 [[redirects]]
   from = "/membership"
-  to = "https://capable-hook-3dd.notion.site/41bf15a6c51c81648f74e40ae699a214"
+  to = "https://capable-hook-3dd.notion.site/41df15a6c51c81159d56c05ef08fdc68"
   status = 302
   force = true
