@@ -19,7 +19,7 @@
   "appUrl": "https://personalmakersbook.netlify.app/",
   "applyUrl": "https://vo.la/J5kGHL",
   "liveStart": "22:00",
-  "liveEnd": "22:30",
+  "liveEnd": "23:00",
   "giftMissLimit": 6,
   "bookEditionRule": "",
   "pages": {
@@ -30,7 +30,8 @@
     "guideCoverImage": "https://image.aladin.co.kr/product/6932/90/cover500/8937432234_1.jpg",
     "guideTableNote": "  • ",
     "baseBook": "『지적자본론』 (마스다 무네아키 지음 · 이정환 옮김 · 민음사). 원판(2015)·특별판(2021) 모두 같은 번역입니다. 판에 따라 쪽수가 다를 수 있어 목차 기준으로 안내합니다.",
-    "detailCoverImage": "(노션 첨부 이미지)"
+    "detailCoverImage": "(노션 첨부 이미지)",
+    "detailBenefitTags": true
   },
   "weeklyPrompts": [
     {
