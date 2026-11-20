@@ -87,5 +87,13 @@ const handler = require('../netlify/functions/roster-import.js').handler;
   await importRoster(db, CS, cfg, [{ name: '늦은분', email: 'late@x.com', phone: '01077778888' }]);
   const inv3 = await runSeasonInvite({ db, CS, sendSms, nowKST: `${start}T11:00` });
   assert.equal(inv3.sent, 1); assert.equal(smsSent[0].to, '01077778888');
+  // 강퇴 대상 확인용 목록: 앞 시즌(s3)에 있었는데 이번(s4)에 없는 사람
+  store.col('s3_participants').set('x2', { nickname: '떠난분', email: 'gone@x.com', status: 'active' });
+  store.col('s3_participants').set('x3', { nickname: '박 기존', email: '', phone: '010-9999-8888', status: 'active' });
+  const { rosterLists } = require(path.join(lib, 'rosterImport.js'));
+  const cur = [...store.col(P).values()];
+  const L = await rosterLists(db, CS, cfg, cur);
+  assert.equal(L.previousSeason.id, 's3');
+  assert.deepEqual(L.dropped.map((x) => x.name), ['떠난분'], '이메일·전화·이름 중 하나라도 맞으면 남은 사람');
   console.log('✓ roster-import · season-invite 통과');
 })().catch((e) => { console.error(e); process.exit(1); });

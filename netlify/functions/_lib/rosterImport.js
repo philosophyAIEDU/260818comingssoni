@@ -140,4 +140,26 @@ function tokenOk(event, hashes) {
   return !!token && (hashes || []).includes(sha(token));
 }
 
-module.exports = { importRoster, cleanRows, pickTargetSeason, tokenOk, sha };
+/** 강퇴 대상 확인용: 이번 시즌 명단, 바로 앞 시즌 명단, 앞 시즌엔 있었는데 이번에 없는 사람.
+ *  같은 사람인지는 이메일 → 전화번호 → 이름(공백·괄호 무시) 순으로 본다. */
+async function rosterLists(db, CS, cfg, current) {
+  const row = (p) => ({ name: p.nickname, email: p.email || '', phone: digits(p.phone), payment: p.payment || '', kakaoJoined: p.kakaoJoined || '' });
+  const at = CS.SEASONS.findIndex((s) => s.id === cfg.seasonId);
+  const prevSeason = at > 0 ? CS.configFor(CS.SEASONS[at - 1].id) : null;
+  let previous = [];
+  if (prevSeason) {
+    previous = (await db.collection(colFor(prevSeason, 'participants')).get()).docs.map((d) => d.data()).filter((p) => p.status !== 'out');
+  }
+  const em = new Set(); const ph = new Set(); const nm = new Set();
+  current.forEach((p) => { if (p.email) em.add(emailKey(p.email)); if (digits(p.phone)) ph.add(digits(p.phone)); if (p.nickname) nm.add(nameKey(p.nickname)); });
+  const stays = (p) => (p.email && em.has(emailKey(p.email))) || (digits(p.phone) && ph.has(digits(p.phone))) || nm.has(nameKey(p.nickname));
+  return {
+    season: cfg.seasonId, book: cfg.book && cfg.book.name,
+    current: current.map(row),
+    previousSeason: prevSeason ? { id: prevSeason.seasonId, book: prevSeason.book && prevSeason.book.name } : null,
+    previous: previous.map(row),
+    dropped: previous.filter((p) => !stays(p)).map(row)
+  };
+}
+
+module.exports = { importRoster, rosterLists, cleanRows, pickTargetSeason, tokenOk, sha };

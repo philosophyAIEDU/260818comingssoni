@@ -4,10 +4,11 @@
  *     Authorization: Bearer <ROSTER_IMPORT_TOKEN>   (래피드 서버 Vercel 환경 변수. 앱에는 SHA-256만 — CS.COMMON.rosterImportSha256)
  *     { "season": "s4"(생략 가능), "rows": [{ "name", "email", "phone", "status": "paid"|"due" }], "dryRun": false }
  *   GET  (같은 인증) → 지금 시즌 명단 인원·초대 문자 현황
+ *   GET ?list=1 → 이번 시즌 명단 + 앞 시즌 명단 + 앞 시즌엔 있었는데 이번에 없는 사람(dropped) — 강퇴 대상 확인용
  */
 const { getDb } = require('./_lib/firebaseAdmin');
 require('./_lib/appLogic'); // global.CS 준비
-const { importRoster, pickTargetSeason, tokenOk } = require('./_lib/rosterImport');
+const { importRoster, pickTargetSeason, tokenOk, rosterLists } = require('./_lib/rosterImport');
 
 const json = (statusCode, body) => ({ statusCode, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) });
 
@@ -26,6 +27,7 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'GET') {
       const snap = await db.collection(cfg.dataPrefix ? `${cfg.dataPrefix}_participants` : 'participants').get();
       const ps = snap.docs.map((d) => d.data()).filter((p) => p.status !== 'out');
+      if ((event.queryStringParameters || {}).list) return json(200, await rosterLists(db, CS, cfg, ps));
       return json(200, {
         season: cfg.seasonId, book: cfg.book && cfg.book.name, startDate: cfg.startDate,
         participants: ps.length, withPhone: ps.filter((p) => p.phone).length,
