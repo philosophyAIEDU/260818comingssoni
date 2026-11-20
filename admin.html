@@ -123,6 +123,34 @@
 
   <!-- ── 명단 관리 ─────────────────────── -->
   <section class="card panel" data-panel="roster" hidden>
+    <h2>명단 자동 반영 <span class="tag">매월 21일 00:30</span></h2>
+    <p class="hint">
+      시작일 <strong>00:30</strong>에 래피드 결제 완료(18~20일)·21일 갱신 예정 멤버와 아래 예외 참여자가 이 시즌 명단에 <strong>자동으로 들어갑니다</strong>(엑셀 업로드 불필요).
+      <strong>09:00</strong>에는 새로 오신 분에게만 단톡방 초대 문자가 나가고, 커밍쏜 메일로 <strong>단톡방에서 내보낼 분(사유)</strong>이 옵니다.
+      넣기만 하고 아무도 지우지 않습니다.
+    </p>
+    <div class="actions">
+      <button id="raLoad">미리보기 불러오기</button>
+      <button class="primary" id="raRun" hidden>지금 반영</button>
+    </div>
+    <div id="raMsg"></div>
+    <div id="raOut"></div>
+    <details class="fold">
+      <summary>예외 참여자 · 결제자 이름 · 초대 문자 설정</summary>
+      <div class="field">
+        <label class="muted" for="raExtras">래피드 결제 없이 참여하는 분(쿠폰·해외 이체) — 한 줄에 한 명 「이름, 이메일, 전화번호」(이메일·번호는 없어도 됨)</label>
+        <textarea id="raExtras" rows="4" placeholder="홍길동&#10;김철수, kim@example.com, 010-1234-5678"></textarea>
+      </div>
+      <div class="field">
+        <label class="muted" for="raAliases">결제자와 참여자 이름이 다른 분(가족 대리결제) — 한 줄에 「결제자 → 참여자」(결제자는 이름 또는 전화번호)</label>
+        <textarea id="raAliases" rows="3" placeholder="김엄마 → 김딸"></textarea>
+      </div>
+      <label><input type="checkbox" id="raInvite" checked> 09:00 단톡방 초대 문자 자동 발송</label>
+      <div class="actions"><button id="raSave">설정 저장</button></div>
+    </details>
+  </section>
+
+  <section class="card panel" data-panel="roster" hidden>
     <h2>명단 등록</h2>
     <p class="hint">신청 폼으로 모은 이름을 한 줄에 하나씩 붙여넣고 등록하세요. 이미 있는 이름은 건너뜁니다.</p>
     <div id="rosterMsg"></div>
@@ -648,6 +676,7 @@
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-roster-auto.js"></script>
 <script src="js/admin-usage.js"></script>
 <!-- 명단 시트 업로드에서 엑셀(.xlsx/.xls) 파일을 직접 읽기 위한 SheetJS는 여기서 미리 불러오지 않는다.
      대부분의 방문에서는 쓰지 않는 수백 KB짜리 라이브러리라, 엑셀 업로드를 실제로 시도할 때만
