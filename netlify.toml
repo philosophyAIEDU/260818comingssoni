@@ -19,6 +19,11 @@
 [functions."send-gift-scheduled"]
   schedule = "*/10 * * * *"
 
+# 10분마다, 시즌 시작일 09:00~22:00(KST)이면 앱 명단에 새로 들어온 사람에게 단톡방 초대 문자를 한 번씩 보낸다.
+# (명단은 래피드 결제 서버가 시작일 06:00에 roster-import로 넣는다. 링크는 js/config.js 시즌의 kakaoInvite.url)
+[functions."send-season-invite"]
+  schedule = "*/10 * * * *"
+
 # 홈 화면 설치용 manifest — 기본값(octet-stream) 대신 제 형식으로 보낸다
 [[headers]]
   for = "/manifest.webmanifest"
