@@ -72,12 +72,18 @@ async function importRoster(db, CS, cfg, rowsIn, { dryRun = false, now = new Dat
     const key = r.email || r.phone;
     if (seen.has(key)) continue;
     seen.add(key);
-    const same = (r.email && byEmail.get(r.email)) || (r.phone && byPhone.get(r.phone));
+    let same = (r.email && byEmail.get(r.email)) || (r.phone && byPhone.get(r.phone));
+    // 이름만 있고 이메일·전화번호가 비어 있는 사람(운영진이 이름만 넣어 둔 경우)은 이름이 같으면 같은 사람으로 보고 채운다
+    if (!same) {
+      const byNm = byName.get(nameKey(r.name));
+      if (byNm && !byNm.email && !digits(byNm.phone)) same = byNm;
+    }
     if (same) {
       const patch = {};
       if (!same.email && r.email) patch.email = r.email;
       if (!digits(same.phone) && r.phone) patch.phone = r.phone;
       if (Object.keys(patch).length) {
+        Object.assign(same, patch); index(same);
         filled.push(same.nickname);
         writes.push(() => pCol.doc(same.id).set(patch, { merge: true }));
       } else skipped.push(same.nickname);
