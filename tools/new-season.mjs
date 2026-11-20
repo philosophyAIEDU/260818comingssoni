@@ -66,6 +66,8 @@ const seasonSrc = `, {
   // 끝난 뒤에도 참여자가 책 소개 화살표로 넘겨 볼 수 있다(읽기 전용 · 기록 내려받기 닫힘)
   browsable: true,
   startsAt: ${q(switchAt)},   // 이 시각(KST)이 지나면 저절로 이 시즌이 켜진다
+  // 💬 시작일 단톡방 초대 문자 — url을 채워 배포하면 시작일 at~22:00(KST)에 앱 명단 전원에게 한 번씩 간다. 비어 있으면 안 보낸다.
+  kakaoInvite: { url: ${q(spec.kakaoInviteUrl || '')}, code: ${q(spec.kakaoInviteCode || '')}, at: '09:00' },
   title: '퍼스널메이커스 독서 멤버십',
   subtitle: '${esc(spec.book.name)} 인증 시스템',
   periodLabel: '멤버십 기간',
