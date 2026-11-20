@@ -13,6 +13,7 @@ const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
 const { sendSms } = require('./solapi');
 const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+const { isReminderOptedOut } = require('./reminderOptOut');
 const { readSeasonSubmissions } = require('./feedSnapshot');
 
 /* 활성 시즌의 컬렉션만 읽고 쓴다 — 앱 화면(js/store-firebase.js)과 같은 이름 규칙이다. */
@@ -99,7 +100,7 @@ async function runMissed5Warning() {
   const candidates = stats.filter((s) =>
     s.missed === wm.threshold
     && s.participant.status !== 'out'
-    && s.participant.noReminder !== true && !(CONFIG.reminderOptOut || []).includes(s.participant.id) // 본인 요청으로 알림 끔
+    && !isReminderOptedOut(s.participant, CONFIG) // 본인 요청으로 알림 끔(시즌이 바뀌어도 이메일로 계속)
     && !s.participant.warned5At);
 
   let sentEmail = 0;
@@ -110,6 +111,7 @@ async function runMissed5Warning() {
   for (const s of candidates) {
     const p = s.participant;
     const email = resolveEmailFor(p, notifyEmails);
+    if (isReminderOptedOut(p, CONFIG, email)) continue; // 알림 메일 목록 주소로 찾았어도 끈 사람이면 보내지 않는다
     const phone = (p.phone || '').trim();
     if (!email && !phone) { skippedNoContact++; continue; }
 
