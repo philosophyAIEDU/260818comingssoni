@@ -12,6 +12,7 @@
 const { getDb } = require('./firebaseAdmin');
 const { sendMail, sleep } = require('./mailer');
 const { CONFIG, U, MailTemplates, collectionName } = require('./appLogic');
+const { isReminderOptedOut } = require('./reminderOptOut');
 const { readSeasonSubmissions } = require('./feedSnapshot');
 
 const col = (name) => getDb().collection(collectionName(name));
@@ -97,7 +98,7 @@ async function runDailyReminder() {
   const candidates = stats.filter((s) => {
     const p = s.participant;
     if (p.status === 'out') return false;
-    if (p.noReminder === true || (CONFIG.reminderOptOut || []).includes(p.id)) return false; // 본인 요청으로 알림 끔
+    if (isReminderOptedOut(p, CONFIG)) return false; // 본인 요청으로 알림 끔(시즌이 바뀌어도 이메일로 계속)
     if (s.submittedToday) return false;
     if ((p.exemptDates || []).includes(todayISO)) return false;
     return p.remindedAt !== todayISO;
@@ -114,6 +115,7 @@ async function runDailyReminder() {
     const p = s.participant;
     const email = resolveEmailFor(p, withEmail);
     if (!email) { skippedNoEmail++; continue; }
+    if (isReminderOptedOut(p, CONFIG, email)) continue; // 알림 메일 목록 주소로 찾았어도 끈 사람이면 보내지 않는다
 
     const vars = {
       이름: p.nickname,

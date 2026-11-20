@@ -24,7 +24,26 @@ CS.FEED_API = 'submissions';
   }
 
   /* ── 데이터 로드 ─────────────────────── */
+
+  /* 🔕 시즌이 바뀌어도 알림을 끈 사람(CONFIG.reminderOptOutEmailSha256 — 이메일 해시)을 명단에서 알아본다 */
+  let optOutIds = new Set();
+  async function markOptOut() {
+    const hashes = CONFIG.reminderOptOutEmailSha256 || [];
+    const out = new Set();
+    if (hashes.length && window.crypto && crypto.subtle) {
+      for (const p of participants) {
+        const e = String(p.email || '').trim().toLowerCase();
+        if (!e) continue;
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(e));
+        const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hashes.includes(hex)) out.add(p.id);
+      }
+    }
+    optOutIds = out;
+  }
+
   async function repaint() {
+    await markOptOut();
     stats = U.buildStats(participants, submissions)
       .sort((a, b) => (b.missed - a.missed)
         || (a.verified - b.verified)
@@ -362,8 +381,8 @@ CS.FEED_API = 'submissions';
           ${kakaoOpt('', '미정')}${kakaoOpt('O', 'O')}${kakaoOpt('X', 'X')}
         </select></td>
         <td><input type="number" min="1" max="99" value="${p.seasonStreak || ((CS.STREAKS || {})[CONFIG.seasonId] || {})[p.id] || 1}" data-editstreak="${p.id}" title="이번 시즌 포함 연속 참여 시즌 수 (2부터 앱에 배지)" style="width:58px"></td>
-        <td>${(CONFIG.reminderOptOut || []).includes(p.id)
-          ? '<span class="muted" title="js/config.js reminderOptOut에서 꺼 둠">🔕 끔</span>'
+        <td>${(CONFIG.reminderOptOut || []).includes(p.id) || optOutIds.has(p.id)
+          ? '<span class="muted" title="본인 요청 — 설정(js/config.js)에서 꺼 둠, 시즌이 바뀌어도 계속">🔕 끔</span>'
           : `<label style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" data-editremind="${p.id}"${p.noReminder ? '' : ' checked'}>${p.noReminder ? '🔕 끔' : '받음'}</label>`}</td>
         <td><span class="tag ${rt.cls}">${rt.label}</span></td>
         <td class="num">${st.verified}</td>
