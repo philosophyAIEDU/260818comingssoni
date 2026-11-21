@@ -2,13 +2,15 @@
  *
  *   POST /.netlify/functions/roster-import
  *     Authorization: Bearer <ROSTER_IMPORT_TOKEN>   (래피드 서버 Vercel 환경 변수. 앱에는 SHA-256만 — CS.COMMON.rosterImportSha256)
- *     { "season": "s4"(생략 가능), "rows": [{ "name", "email", "phone", "status": "paid"|"due" }], "dryRun": false }
+ *     { "season": "s4"(생략 가능), "rows": [{ "name", "email", "phone", "status": "paid"|"due"|"out" }], "dryRun": false, "final": false }
+ *     out = 시작 전 결제 취소·종료(래피드로 들어온 사람만 아웃). 결제자 이름·예외 참여자는 _lib/rosterAuto.js
  *   GET  (같은 인증) → 지금 시즌 명단 인원·초대 문자 현황
  *   GET ?list=1 → 이번 시즌 명단 + 앞 시즌 명단 + 앞 시즌엔 있었는데 이번에 없는 사람(dropped) — 강퇴 대상 확인용
  */
 const { getDb } = require('./_lib/firebaseAdmin');
 require('./_lib/appLogic'); // global.CS 준비
 const { importRoster, pickTargetSeason, tokenOk, rosterLists } = require('./_lib/rosterImport');
+const RA = require('./_lib/rosterAuto');
 
 const json = (statusCode, body) => ({ statusCode, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) });
 
@@ -34,8 +36,22 @@ exports.handler = async (event) => {
         invited: ps.filter((p) => p.invitedAt).length, inviteUrlSet: !!(cfg.kakaoInvite && cfg.kakaoInvite.url)
       });
     }
-    const r = await importRoster(db, CS, cfg, body.rows, { dryRun: !!body.dryRun });
-    console.log(`[roster-import] ${r.season} 받음 ${r.received} · 추가 ${r.added.length} · 보완 ${r.filled.length} · 건너뜀 ${r.skipped.length}${r.dryRun ? ' (미리보기)' : ''}`);
+    // 결제자 → 참여자 이름 · 예외 참여자 · 시작 전 환불(아웃) — _lib/rosterAuto.js
+    const now = new Date().toISOString();
+    const dryRun = !!body.dryRun;
+    const settings = await RA.loadSettings(db);
+    const all = Array.isArray(body.rows) ? body.rows : [];
+    const inRows = RA.applyAliases(all.filter((x) => x && x.status !== 'out'), settings);
+    const outRows = all.filter((x) => x && x.status === 'out');
+    const have = new Set(inRows.map((x) => String(x.name || '').replace(/\s+/g, '')));
+    const extras = settings.extras.filter((x) => !have.has(x.name.replace(/\s+/g, '')));
+    const r = await importRoster(db, CS, cfg, inRows.concat(extras.filter((x) => x.email || x.phone).map((x) => ({ ...x, status: 'paid' }))), { dryRun, now });
+    r.extrasAdded = await RA.addNameOnly(db, cfg, extras.filter((x) => !x.email && !x.phone), { dryRun, now });
+    r.outed = await RA.markOut(db, cfg, outRows, inRows, { dryRun, today, now });
+    r.renamed = inRows.filter((x) => x.payer).map((x) => ({ name: x.name, payer: x.payer }));
+    r.total += r.extrasAdded.length;
+    if (!dryRun) await RA.logRun(db, cfg, r, { final: !!body.final, now });
+    console.log(`[roster-import] ${r.season} 받음 ${r.received} · 추가 ${r.added.length + r.extrasAdded.length} · 보완 ${r.filled.length} · 아웃 ${r.outed.length} · 건너뜀 ${r.skipped.length}${dryRun ? ' (미리보기)' : ''}`);
     return json(200, r);
   } catch (err) {
     console.error('[roster-import] 실패', err);
