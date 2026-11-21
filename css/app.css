@@ -308,8 +308,10 @@ body.app {
 
   /* 책 소개는 이제 [공지·안내] 탭을 통째로 쓰니 소개글을 접지 않고 다 보여 준다 */
 
-  /* 피드는 탭 하나를 통째로 쓰니 안쪽 스크롤 없이 길게 */
-  .app .feed-scroll { max-height: none; padding-right: 0; }
+  /* 피드는 탭 하나를 통째로 쓰니 안쪽 스크롤 없이 길게.
+     스크롤 상자 성질(overflow·overscroll-behavior: contain)도 함께 끈다 — 남아 있으면 최신 크롬(안드로이드)이
+     글 위에서 시작한 스크롤을 페이지로 넘기지 않아 "페이지가 안 내려가는" 일이 생긴다. */
+  .app .feed-scroll { max-height: none; padding-right: 0; overflow: visible; overscroll-behavior: auto; touch-action: auto; }
 
   .app .card { padding: 16px; }
 
