@@ -17,7 +17,7 @@ function makeStore() {
     const apply = (name, id, v, o) => { stats.writes++; col(name).set(id, o && o.merge ? Object.assign({}, col(name).get(id), v) : clone(v)); };
     return {
       collection: (name) => Object.assign(query(name, []), {
-        doc: (id) => ({ _n: name, _id: id, get: async () => { stats.reads++; return snap(id, col(name).get(id)); }, set: async (v, o) => apply(name, id, v, o), update: async (v) => apply(name, id, v, { merge: true }) })
+        doc: (id) => ({ _n: name, _id: id, get: async () => { stats.reads++; return snap(id, col(name).get(id)); }, set: async (v, o) => apply(name, id, v, o), update: async (v) => apply(name, id, v, { merge: true }), delete: async () => { stats.writes++; col(name).delete(id); } })
       }),
       getAll: async (...refs) => refs.map((r) => { stats.reads++; return snap(r._id, col(r._n).get(r._id)); }),
       runTransaction: async (fn) => fn({

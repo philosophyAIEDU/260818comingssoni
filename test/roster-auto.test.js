@@ -89,6 +89,25 @@ const find = (n) => [...P().values()].find((x) => x.nickname === n);
   assert.deepEqual(r.body.outed, []);
   assert.equal(find('새사람').status, 'active');
 
+  // ── 결제 실패 확정(graceEnd): 시작 뒤(22일)에도, 운영진이 손으로 넣은 사람도 — 인증 기록 없으면 지움 ──
+  P().set('manual', { nickname: '실패이', email: 'fail@x.com', phone: '01077770000', status: 'active' });
+  store.col('s4_notifyEmails').set('nm', { name: '실패이', email: 'fail@x.com' });
+  P().set('withsub', { nickname: '인증함', email: 'sub@x.com', phone: '01077770001', status: 'active' });
+  store.col('s4_submissions').set('sx', { participantId: 'withsub', date: '2026-11-21' });
+  r = await post({ graceEnd: true, rows: [
+    { name: '실패이', email: 'fail@x.com', phone: '01077770000', status: 'out' },
+    { name: '인증함', email: 'sub@x.com', phone: '01077770001', status: 'out' },
+    { name: '쿠폰이', email: '', phone: '', status: 'out' }
+  ] });
+  assert.deepEqual(r.body.outed.sort(), ['실패이', '인증함'].sort(), '예외 참여자는 빼고');
+  assert(!P().get('manual'), '인증 기록 없으면 명단에서 지움');
+  assert(!store.col('s4_notifyEmails').get('nm'), '알림 메일 목록에서도');
+  assert.equal(P().get('withsub').status, 'out', '인증 기록이 있으면 아웃으로 보존');
+  assert.equal(find('쿠폰이').status, 'active');
+  today = '2026-11-25';
+  r = await post({ graceEnd: true, rows: [{ name: '새사람', email: 'new@x.com', phone: '010-2222-0001', status: 'out' }] });
+  assert.deepEqual(r.body.outed, [], '시작일+3일이 지나면 안 함');
+
   // ── 미리보기는 쓰지 않음 ──
   const before = P().size;
   r = await post({ dryRun: true, rows: [{ name: '미리', email: 'pre@x.com', phone: '010-3333-0001', status: 'paid' }] });
