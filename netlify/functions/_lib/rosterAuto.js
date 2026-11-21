@@ -69,9 +69,13 @@ async function addNameOnly(db, cfg, extras, { dryRun, now }) {
   return added;
 }
 
-/** 시작 전 환불된 분 → 아웃. 래피드로 들어온 사람만, 이번 묶음에 결제자로 다시 들어온 사람은 제외 */
-async function markOut(db, cfg, outRows, keepRows, { dryRun, today, now }) {
-  if (!outRows.length || today > cfg.startDate) return [];
+/** 시작 전 환불된 분 → 아웃. 래피드로 들어온 사람만, 이번 묶음에 결제자로 다시 들어온 사람은 제외.
+ *  graceEnd(결제 실패 유예가 끝나 확정, 시작일+3일까지): 예외 참여자만 빼고 누구든 — 인증 기록이 없으면 명단에서 지우고(알림 메일 목록도),
+ *  인증 기록이 있으면 아웃으로 둔다(기록 보존). */
+async function markOut(db, cfg, outRows, keepRows, { dryRun, today, now, graceEnd = false }) {
+  if (!outRows.length) return [];
+  const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  if (graceEnd ? today > addDays(cfg.startDate, 3) : today > cfg.startDate) return [];
   const col = db.collection(colFor(cfg, 'participants'));
   const docs = (await col.get()).docs.map((d) => Object.assign({ id: d.id }, d.data()));
   const keep = new Set(keepRows.flatMap((r) => [emailKey(r.email), digits(r.phone)]).filter(Boolean));
@@ -79,12 +83,24 @@ async function markOut(db, cfg, outRows, keepRows, { dryRun, today, now }) {
   for (const r of outRows) {
     const em = emailKey(r.email); const ph = digits(r.phone);
     if ((em && keep.has(em)) || (ph && keep.has(ph))) continue;
-    const p = docs.find((d) => d.source === 'latpeed' && d.status !== 'out'
-      && ((em && emailKey(d.email) === em) || (ph && digits(d.phone) === ph)));
+    const p = docs.find((d) => (graceEnd ? d.source !== 'extra' : d.source === 'latpeed') && d.status !== 'out'
+      && ((em && emailKey(d.email) === em) || (ph && digits(d.phone) === ph) || (graceEnd && nameKey(d.nickname) === nameKey(r.name) && !em && !ph)));
     if (!p) continue;
     out.push(p.nickname);
     p.status = 'out';
-    if (!dryRun) await col.doc(p.id).set({ status: 'out', outDate: cfg.startDate, note: `시작 전 결제 취소·종료(래피드) ${now.slice(0, 10)}` }, { merge: true });
+    if (dryRun) continue;
+    if (graceEnd) {
+      const subs = await db.collection(colFor(cfg, 'submissions')).where('participantId', '==', p.id).get();
+      if (!subs.docs.length) {
+        await col.doc(p.id).delete();
+        const mails = await db.collection(colFor(cfg, 'notifyEmails')).get();
+        for (const m of mails.docs) if (p.email && emailKey(m.data().email) === emailKey(p.email)) await db.collection(colFor(cfg, 'notifyEmails')).doc(m.id).delete();
+        continue;
+      }
+      await col.doc(p.id).set({ status: 'out', outDate: today, note: `결제 실패 확정(래피드) ${now.slice(0, 10)}` }, { merge: true });
+      continue;
+    }
+    await col.doc(p.id).set({ status: 'out', outDate: cfg.startDate, note: `시작 전 결제 취소·종료(래피드) ${now.slice(0, 10)}` }, { merge: true });
   }
   return out;
 }
