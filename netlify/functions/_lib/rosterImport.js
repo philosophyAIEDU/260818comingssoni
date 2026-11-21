@@ -80,6 +80,10 @@ async function importRoster(db, CS, cfg, rowsIn, { dryRun = false, now = new Dat
     }
     if (same) {
       const patch = {};
+      // 시작 전 결제 실패·취소로 아웃됐던 래피드 회원이 다시 결제하면 되살린다(운영진이 직접 아웃한 사람은 그대로)
+      if (same.status === 'out' && same.source === 'latpeed' && /^시작 전/.test(String(same.note || ''))) {
+        patch.status = 'active'; patch.outDate = null; patch.note = '';
+      }
       if (!same.email && r.email) patch.email = r.email;
       if (!digits(same.phone) && r.phone) patch.phone = r.phone;
       if (Object.keys(patch).length) {

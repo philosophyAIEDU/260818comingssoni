@@ -65,6 +65,16 @@ const find = (n) => [...P().values()].find((x) => x.nickname === n);
   assert.equal(find('김딸').status, 'active');
   assert.equal(P().size, n1, '아웃은 지우지 않는다');
 
+  // ── 아웃된 뒤 다시 결제하면 되살림 ──
+  r = await post({ rows: [{ name: '환불이', email: 'refund@x.com', phone: '010-1111-0004', status: 'paid' }] });
+  assert.equal(find('환불이').status, 'active', '다시 결제 → 되살림');
+  assert.equal(find('환불이').outDate, null);
+  // 운영진이 직접 아웃한 사람은 되살리지 않음
+  const manual = [...P().entries()].find(([, v]) => v.nickname === '박결제');
+  P().set(manual[0], { ...manual[1], status: 'out', note: '운영진 아웃' });
+  await post({ rows: [{ name: '박결제', email: 'pay@x.com', phone: '010-1111-0003', status: 'paid' }] });
+  assert.equal(find('박결제').status, 'out');
+
   // ── 21일 00:30 최종 · 기록 ──
   today = s4.startDate;
   r = await post({ final: true, rows: [{ name: '새사람', email: 'new@x.com', phone: '010-2222-0001', status: 'paid' }] });
