@@ -501,6 +501,14 @@ function t(name, cond, extra) {
       && r.skipped.some((x) => x.reason.includes('없는 날짜')), r.skipped);
     t('같은 날짜가 두 번이면 앞의 것을 씀', r.items[1].text.includes('오늘은 2일차'), r.items[1].text);
     t('빈 글이면 아무것도 없음', U.parseNoticeBatch('  \n ').items.length === 0 && U.parseNoticeBatch('').skipped.length === 0);
+    // 펜스와 첫 머리줄이 한 줄에 붙어 오는 경우("``` 📖 … 1일차 공지") — 머리줄을 잃지 않는다. 닫는 펜스가 없어도 된다
+    const glued = U.parseNoticeBatch('``` 📖 퍼스널메이커스 독서 멤버십 1일차 공지\n2026년 8월 24일(월)\n\n첫날\n\n'
+      + '==================================================\n\n📖 퍼스널메이커스 독서 멤버십 2일차 공지\n2026년 8월 25일(화)\n\n둘째 날');
+    t('펜스와 첫 머리줄이 한 줄이어도 머리줄을 지키고 펜스만 지움',
+      glued.items.length === 2 && glued.items[0].title === '📖 퍼스널메이커스 독서 멤버십 1일차 공지' && glued.items[0].dayNo === 1
+      && !glued.items[0].text.includes('`') && glued.items[1].text.endsWith('둘째 날'), glued.items.map((x) => x.title));
+    t('언어 이름이 붙은 펜스 줄(```text)은 통째로 지움',
+      U.parseNoticeBatch('```text\n📖 1일차 공지\n2026년 8월 24일(월)\n본문\n```').items[0].title === '📖 1일차 공지');
     t('구분선이 없으면 한 덩어리(하루치)로 읽음', U.parseNoticeBatch('📖 1일차 공지\n2026년 8월 24일(월)\n본문').items.length === 1);
   }
 

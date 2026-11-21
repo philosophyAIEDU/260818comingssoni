@@ -253,7 +253,8 @@ CS.U = (function () {
    * 실제 회차와 다르면 날짜가 잘못 적힌 것일 수 있어 mismatch로 표시해 준다. */
   function parseNoticeBatch(raw) {
     const text = String(raw || '').replace(/\r\n?/g, '\n')
-      .replace(/^\s*```[^\n]*\n/, '').replace(/\n\s*```\s*$/, '');
+      // 코드 펜스 지우기: 맨 앞 "```"(언어 이름만 붙은 줄은 통째로, "``` 📖 1일차 공지"처럼 같은 줄에 글이 이어지면 펜스만)
+      .replace(/^\s*```[\w-]*[ \t]*\n/, '').replace(/^\s*```[ \t]*/, '').replace(/\n?\s*```\s*$/, '');
     const items = [];
     const skipped = [];
     const seen = new Set();
