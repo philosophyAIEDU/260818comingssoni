@@ -23,7 +23,14 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'POST') {
     try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON 형식이 아닙니다.' }); }
   } else if (event.httpMethod !== 'GET') return json(405, { error: 'Method Not Allowed' });
-  const cfg = pickTargetSeason(CS, body.season || (event.queryStringParameters || {}).season, today);
+  // cohort(기수 시작일)를 주면 그날 시작하는 시즌에만 넣는다 — 다음 달 시즌 설정이 아직 없을 때 지난 시즌에 잘못 들어가지 않게
+  const cohort = body.cohort || (event.queryStringParameters || {}).cohort;
+  let cfg;
+  if (cohort) {
+    const s = CS.SEASONS.find((x) => x.startDate === cohort);
+    if (!s) return json(409, { error: 'no-season', message: `${cohort}에 시작하는 시즌이 앱(js/config.js)에 아직 없습니다` });
+    cfg = CS.configFor(s.id);
+  } else cfg = pickTargetSeason(CS, body.season || (event.queryStringParameters || {}).season, today);
   if (!cfg) return json(400, { error: '알 수 없는 시즌: ' + body.season });
   const db = getDb();
   try {

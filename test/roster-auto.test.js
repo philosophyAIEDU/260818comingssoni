@@ -108,6 +108,15 @@ const find = (n) => [...P().values()].find((x) => x.nickname === n);
   r = await post({ graceEnd: true, rows: [{ name: '새사람', email: 'new@x.com', phone: '010-2222-0001', status: 'out' }] });
   assert.deepEqual(r.body.outed, [], '시작일+3일이 지나면 안 함');
 
+  // ── cohort를 주면 그날 시작하는 시즌만 — 없으면 409(지난 시즌에 넣지 않음) ──
+  const before409 = P().size;
+  let rr = await handler({ httpMethod: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body: JSON.stringify({ cohort: '2099-12-21', rows: [{ name: '미래', email: 'f@x.com', phone: '01099998888', status: 'paid' }] }) });
+  assert.equal(rr.statusCode, 409);
+  assert.equal(JSON.parse(rr.body).error, 'no-season');
+  assert.equal(P().size, before409);
+  rr = await handler({ httpMethod: 'GET', headers: { authorization: `Bearer ${TOKEN}` }, queryStringParameters: { list: '1', cohort: s4.startDate } });
+  assert.equal(JSON.parse(rr.body).season, 's4');
+
   // ── 미리보기는 쓰지 않음 ──
   const before = P().size;
   r = await post({ dryRun: true, rows: [{ name: '미리', email: 'pre@x.com', phone: '010-3333-0001', status: 'paid' }] });
