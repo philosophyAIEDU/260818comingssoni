@@ -399,7 +399,6 @@ meta/app           { ... }
 | `SOLAPI_API_KEY` | [솔라피](https://solapi.com) 콘솔 → [내 정보] → API Key 관리에서 발급받은 API Key. **전화번호가 등록된 참여자가 없다면 없어도 무방**합니다(메일만 나갑니다). |
 | `SOLAPI_API_SECRET` | 같은 화면에서 함께 발급되는 API Secret. |
 | `SOLAPI_SENDER` | 문자 발신번호. 솔라피에 **사전 등록(본인 인증)** 해 둔 번호여야 실제로 발송됩니다 — 통신법상 등록 안 된 번호로는 보낼 수 없습니다. |
-| `LATPEED_NOTIFY_SECRET` | **명단 자동 반영**(매달 21일 00:30)이 문자 서버(latpeed-notify)에서 이번 기수 멤버를 읽을 때 쓰는 값 — latpeed-notify의 `CRON_SECRET`과 같은 값. 저장소에 넣지 않는다. 없으면 21일에 "멈춤" 메일이 온다. |
 
 값을 등록하고 재배포하면, `netlify.toml`의 `schedule` 설정을 Netlify가 자동으로 인식해 매일 자정 직후
 실행합니다. Netlify 대시보드의 **Functions** 탭에서 `send-missed5-warning`이 예약 함수로 등록됐는지,

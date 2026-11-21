@@ -40,8 +40,6 @@ CS.COMMON = {
   ],
   // 🚪 이번 기수 명단 자동 입력(roster-import) — 래피드 결제 서버가 시작일 06:00에 보낸다.
   // 토큰은 그 서버(Vercel 환경 변수 ROSTER_IMPORT_TOKEN)에만 있고, 여기엔 SHA-256만 둔다.
-  // 🗓 매달 21일 00:30 명단 자동 반영(roster-auto-sync)이 이번 기수 멤버를 읽어 오는 문자 서버. 비밀값은 Netlify 환경 변수 LATPEED_NOTIFY_SECRET.
-  latpeedNotifyUrl: 'https://latpeed-notify-personalmakers.vercel.app',
   rosterImportSha256: ['d23920c2bfc5964b38e326891c55570e8916f89ee80d913306f80e5efe539bff'],
   // 💬 시즌 시작일 단톡방 초대 문자(send-season-invite) 문안 — 링크는 시즌마다 kakaoInvite.url
   inviteSms: {
