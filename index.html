@@ -12,6 +12,7 @@
   <meta name="description" content="퍼스널메이커스 독서 챌린지 프로세스 이코노미 인증 시스템">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/sidenav.css">
   <link rel="icon" type="image/png" href="icons/favicon-64.png?v=blue-logo-2">
   <!-- 홈 화면에 추가했을 때 아이콘·이름(아이폰은 apple-touch-icon, 안드로이드는 manifest) -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=blue-logo-2">
@@ -57,7 +58,7 @@
     </section>
 
     <!-- 책 소개 -->
-    <section class="card intro">
+    <section class="card intro" id="bookCard">
       <!-- 내용은 js/config.js의 활성 시즌 설정에서 채운다(app.js paintIntro) -->
       <!-- 양옆 화살표 = 이전·다음 시즌 책으로 넘겨 보기(지난 시즌은 읽기 전용). 누를 때만 그 시즌을 불러온다.
            넓은 화면에서는 카드 양옆, 휴대폰에서는 표지 양옆에 걸친다. -->
@@ -214,7 +215,7 @@
     <div class="pane" data-pane="feed" id="pane-feed">
 
     <!-- 인증 피드 -->
-    <section class="card feed-card">
+    <section class="card feed-card" id="feedCard">
       <!-- 맨 위 한 줄: 제목 · 오른쪽 위에 새로고침 · 날짜(기본 전체 날짜) · 정렬(많이 읽은 순(기본)/추천순/최신순) -->
       <div class="feed-head">
         <h2>인증 피드 <span class="tag" id="feedCount" hidden>0명</span></h2>
@@ -264,7 +265,7 @@
     <div class="pane" data-pane="fame" id="pane-fame">
 
     <!-- 명예의 전당 -->
-    <section class="card fame-card">
+    <section class="card fame-card" id="fameCard">
       <h2>🏆 명예의 전당 <span class="tag warn" id="fameTag">전일 Top 5</span></h2>
       <p class="hint"><strong id="fameDateLabel">어제</strong> 올라온 인증글 중 추천을 많이 받은 분들입니다.
         이름을 클릭하면 그 사람의 인상 깊은 내용과 느낀 점을 볼 수 있습니다. 오늘 순위는 인증 피드에서 확인해주세요.</p>
@@ -437,6 +438,7 @@
   <script src="js/progress-card.js"></script>
   <script src="js/app.js"></script>
   <script src="js/tabs.js"></script>
+  <script src="js/sidenav.js"></script>
   <script src="js/install.js"></script>
   <script src="js/content-invite.js"></script>
   <script src="js/analytics.js" data-page="index"></script>

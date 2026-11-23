@@ -137,7 +137,8 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
   // ── 참가자 화면: 인증 제출 ──
   await page.goto(BASE + '/index.html');
   await page.waitForTimeout(400);
-  t('브랜드 로고 노출', await page.isVisible('.brand-logo'));
+  // 넓은 화면은 위 머리 대신 왼쪽 사이드바 머리에 로고·서비스 이름(휴대폰은 위 머리 — 아래 휴대폰 검사)
+  t('브랜드 로고 노출', await page.isVisible('.sn-brand img') && /독서/.test(await page.textContent('.sn-brand-name')));
   t('브랜드명 반영', (await page.textContent('#brandTitle')).includes('퍼스널메이커스'));
 
   // ── 배너: "오늘의 범위" 접이식 (이 컨텍스트는 오늘이 9일차) ──

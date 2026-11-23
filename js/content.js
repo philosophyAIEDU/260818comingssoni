@@ -39,6 +39,7 @@
   }
   function syncReaderSave() { if (active) { $('readerSave').textContent = saved.has(active.id) ? '✓ 보관 중' : '나중에 보기'; $('readerSave').setAttribute('aria-pressed', String(saved.has(active.id))); } }
   function render() {
+    document.dispatchEvent(new CustomEvent('cs:content-filter', { detail: { filter } }));
     const items = filter === 'saved' ? all().filter(x => saved.has(x.id)) : filter === 'videos' ? videos : columns;
     $('savedCount').textContent = String([...saved].filter(id => all().some(x => x.id === id)).length);
     $('contentCount').textContent = items.length ? `${items.length}편` : '';
@@ -350,6 +351,7 @@
   function readHash() {
     const h = decodeURIComponent(location.hash.slice(1));
     if (FILTERS.includes(h)) filter = h;
+    else if (!h) filter = 'videos'; // 뒤로 가기로 주소 없는 첫 화면에 돌아오면 기본 탭
     else if (h.startsWith('open=')) pendingOpen = h.slice(5);
   }
   function openPending() {
@@ -361,7 +363,12 @@
     filter = item.type; render(); openItem(item.id);
   }
   window.addEventListener('hashchange', () => { readHash(); render(); openPending(); });
-  document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; setHash(filter); render(); }));
+  // 탭을 누르면 주소가 쌓인다 — 뒤로 가기로 앞 탭에 돌아오고, 전체 메뉴(js/sidenav.js)도 같은 탭을 표시한다
+  document.querySelectorAll('.content-tabs [data-filter]').forEach(button => button.addEventListener('click', () => {
+    filter = button.dataset.filter;
+    if (location.hash !== '#' + filter) { try { history.pushState(null, '', '#' + filter); } catch { setHash(filter); } }
+    render();
+  }));
   $('contentStatus').addEventListener('click', e => { if (e.target.id === 'retryColumns') load(); });
   $('readerClose').addEventListener('click', () => $('contentReader').close());
   $('contentReader').addEventListener('close', () => { track().videoClose(); track().columnClose(); $('readerMedia').replaceChildren(); active = null; if (location.hash.startsWith('#open=')) setHash(filter); commentsFor = ''; document.body.classList.remove('content-reader-open'); });
