@@ -30,11 +30,49 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
 
 (async () => {
   const browser = await chromium.launch();
+  /* PC도 메뉴 하나 = 화면 하나(js/tabs.js)라, 넓은 화면 검사에서 다른 화면(피드·내 현황 등)의 요소를 다룰 때는
+   * 사람이 메뉴를 누르듯 그 화면을 먼저 연다. 휴대폰 폭 검사는 탭 동작 자체를 보니 건드리지 않는다. */
+  const openPaneOf = (pg, sel) => pg.evaluate((s) => {
+    if (innerWidth < 900 || !window.CS || !CS.Tabs) return;
+    let el = null; try { el = document.querySelector(s); } catch (e) { return; }
+    const pane = el && el.closest('.pane');
+    if (pane && !pane.classList.contains('active')) CS.Tabs.activate(pane.dataset.pane, { push: false, keepScroll: true });
+  }, sel).catch(() => {});
+  const autoPane = (pg) => {
+    for (const k of ['click', 'fill', 'selectOption', 'isVisible', 'check', 'hover', 'focus', 'type', 'press', 'dispatchEvent', 'setInputFiles']) {
+      const orig = pg[k].bind(pg);
+      pg[k] = async (sel, ...rest) => { if (typeof sel === 'string') await openPaneOf(pg, sel); return orig(sel, ...rest); };
+    }
+    // page.locator(…)로 고른 것도 그 동작 전에 화면을 연다(하위 locator·first·nth도 같은 뿌리 선택자로)
+    const ACTS = new Set(['click', 'fill', 'selectOption', 'isVisible', 'isHidden', 'isDisabled', 'isEnabled', 'check', 'hover', 'focus', 'press', 'type', 'waitFor', 'boundingBox', 'screenshot', 'scrollIntoViewIfNeeded', 'dblclick', 'tap']);
+    const wrapLoc = (loc, root) => new Proxy(loc, {
+      get(target, prop) {
+        const v = target[prop];
+        if (typeof v !== 'function') return v;
+        if (ACTS.has(prop)) return async (...a) => { await openPaneOf(pg, root); return v.apply(target, a); };
+        if (['locator', 'first', 'last', 'nth', 'filter', 'getByText', 'getByRole'].includes(prop)) return (...a) => wrapLoc(v.apply(target, a), root);
+        return v.bind(target);
+      }
+    });
+    const origLocator = pg.locator.bind(pg);
+    pg.locator = (sel, opts) => wrapLoc(origLocator(sel, opts), sel);
+    const origWait = pg.waitForSelector.bind(pg);
+    pg.waitForSelector = async (sel, opts) => {
+      const until = Date.now() + ((opts && opts.timeout) || 30000);
+      if (opts && opts.state && opts.state !== 'visible') return origWait(sel, opts);
+      for (;;) {
+        await openPaneOf(pg, sel);
+        try { return await origWait(sel, Object.assign({}, opts, { timeout: 250 })); } catch (e) { if (Date.now() > until) throw e; }
+      }
+    };
+    return pg;
+  };
+  const rawNewPage = (c) => { const np = c.newPage.bind(c); c.newPage = async () => autoPane(await np()); return c; };
   // 공지·안내의 추천 콘텐츠 카드(최신 목록)와 이용 통계 전송은 Netlify 함수를 부른다. 정적 테스트 서버엔 함수가 없으니
   // 모든 컨텍스트에서 대신 답해 둔다(각 기능은 test/content-ui·analytics 테스트가 검증).
   const rawNewContext = browser.newContext.bind(browser);
   browser.newContext = async (opts) => {
-    const c = await rawNewContext(opts);
+    const c = rawNewPage(await rawNewContext(opts));
     await c.route((u) => u.pathname === '/.netlify/functions/content-library', (r) => r.fulfill({ json: { videos: [], columns: [] } }));
     await c.route((u) => u.pathname === '/.netlify/functions/track', (r) => r.fulfill({ status: 204 })); // 이용 통계(test/content-ui·analytics가 검증)
     return c;

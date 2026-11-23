@@ -57,20 +57,19 @@
       { id: 'columns', label: '뉴스레터 칼럼', filter: 'columns' },
       { id: 'saved', label: '보관함', filter: 'saved' }
     ] },
-    { title: '멤버십 안내', items: [
-      { id: 'info', label: '이번 책·일정', route: 'info' },
-      { id: 'rules', label: '안내·규칙', route: 'rules' }
+    { title: '멤버십', items: [
+      { id: 'info', label: '멤버십 안내', route: 'info' } // 이번 책·일정 + 안내·규칙을 한 화면에(#rules 주소는 그 화면의 규칙 카드로)
     ] }
   ];
 
-  const hrefOf = (it) => (it.filter ? `content.html${q}#${it.filter}` : `index.html${q}#${it.route}`);
+  const hrefOf = (it) => (it.filter ? `content.html${q}#${it.filter}` : `index.html${q}${it.route === 'certify' ? '' : '#' + it.route}`);
 
   /** 이 메뉴가 지금 갈 수 있는 곳인지 — 인증 화면은 실제 카드 상태로, 콘텐츠 화면은 같은 규칙(시즌·감춘 카드)으로 */
   function itemAvailable(it) {
     if (it.filter) return true;
     if (page === 'index' && CS.Tabs) return CS.Tabs.available(it.route);
     if (it.route === 'overall') return false; // 참여자 화면에서는 감춘 카드(운영진 화면에서 본다)
-    if (browse && ['certify', 'me', 'rules'].includes(it.route)) return false;
+    if (browse && ['certify', 'me'].includes(it.route)) return false;
     return true;
   }
 
@@ -265,7 +264,6 @@
     desktop.addEventListener('change', () => { if (desktop.matches) closeDrawer({ noFocus: true }); });
 
     /* ── 메뉴 누르기 ── */
-    let spyPause = 0;
     links.forEach((a) => a.addEventListener('click', (e) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const route = a.dataset.snRoute; const filter = a.dataset.snFilter;
@@ -273,9 +271,8 @@
       if (page === 'index' && route && CS.Tabs) {
         e.preventDefault();
         if (wasDrawer) closeDrawer({ noFocus: true, keepScroll: false });
-        spyPause = Date.now() + 900;
         setActive(a.parentElement.dataset.item);
-        CS.Tabs.go(route, { hash: '#' + route, smooth: true, focus: !wasDrawer });
+        CS.Tabs.go(route, { hash: route === 'certify' ? '' : '#' + route, focus: !wasDrawer });
         if (wasDrawer) menuBtn.focus({ preventScroll: true });
       } else if (page === 'content' && filter) {
         e.preventDefault();
@@ -296,9 +293,9 @@
     if (page === 'index') {
       document.addEventListener('cs:tab', (e) => {
         refreshAvailability();
-        if (e.detail && e.detail.route) setActive(e.detail.route);
+        if (e.detail && e.detail.route) setActive(e.detail.route === 'rules' ? 'info' : e.detail.route);
       });
-      if (CS.Tabs) setActive(CS.Tabs.route());
+      if (CS.Tabs) setActive(CS.Tabs.route() === 'rules' ? 'info' : CS.Tabs.route());
       // 지난 시즌 둘러보기·카드 숨김이 늦게 정해져도(시즌 잠금 확인은 비동기) 메뉴가 따라간다
       new MutationObserver(refreshAvailability).observe(document.body, { attributes: true, attributeFilter: ['class'] });
       ['overallCard', 'certifyCard', 'rulesCard'].forEach((id) => {
@@ -311,27 +308,6 @@
         if (el) new MutationObserver(() => paintSeasonNav(nav)).observe(el, { attributes: true, attributeFilter: ['hidden', 'href'] });
       });
 
-      // 넓은 화면: 스크롤 위치에 따라 지금 자리 표시
-      const order = ['info', 'rules', 'certify', 'feed', 'fame', 'overall', 'me'];
-      let ticking = false;
-      function spy() {
-        ticking = false;
-        if (!desktop.matches || Date.now() < spyPause || !CS.Tabs) return;
-        const line = 96;
-        let pick = null;
-        for (const r of order) {
-          if (!CS.Tabs.available(r)) continue;
-          const el = document.getElementById(CS.Tabs.ROUTES[r].target);
-          if (!el) continue;
-          if (!pick) pick = r;
-          if (el.getBoundingClientRect().top <= line) pick = r;
-        }
-        if (pick && pick !== activeId) setActive(pick);
-      }
-      window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }, { passive: true });
-      // 처음 열 때도 지금 보이는 자리로(넓은 화면에서 주소 없이 열면 맨 위 = 이번 책·일정)
-      window.addEventListener('load', () => requestAnimationFrame(spy), { once: true });
-      desktop.addEventListener('change', () => { if (desktop.matches) requestAnimationFrame(spy); else if (CS.Tabs) setActive(CS.Tabs.route()); });
     } else {
       const fromHash = () => {
         const h = (location.hash || '').slice(1);
