@@ -48,7 +48,7 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
     await page.waitForTimeout(300);
   }
 
-  const MENU = ['오늘의 인증', '나의 현황', '인증 피드', '명예의 전당', '추천 유튜브', '뉴스레터 칼럼', '보관함', '이번 책·일정', '안내·규칙'];
+  const MENU = ['오늘의 인증', '나의 현황', '인증 피드', '명예의 전당', '추천 유튜브', '뉴스레터 칼럼', '보관함', '멤버십 안내'];
   const menuLabels = (page) => page.$$eval('#sidenav .sn-scroll li:not([hidden]) .sn-label', (els) => els.map((e) => e.childNodes[0].textContent.trim()));
   const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   const current = (page) => page.$$eval('#sidenav [aria-current="page"]', (els) => els.map((e) => e.closest('li').dataset.item));
@@ -87,32 +87,28 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
       t(`${W}: 본문이 사이드바와 겹치지 않음`, mainX >= 240, mainX);
       t(`${W}: 아이콘 + 이름이 함께`, await page.locator('#sidenav [data-item="feed"] .sn-ico').isVisible() && await page.locator('#sidenav [data-item="feed"] .sn-label').isVisible());
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/nav-${W}.png` });
-      t(`${W}: 처음 열면 보이는 자리(맨 위 = 이번 책·일정) 표시`, (await current(page)).join() === 'info', await current(page));
+      t(`${W}: 처음 열면 [오늘의 인증] 화면`, (await current(page)).join() === 'certify' && await page.isVisible('#certifyCard') && !(await page.isVisible('#bookCard')), await current(page));
 
-      // 메뉴 → 섹션 이동 + aria-current + 주소
-      const DEST = { certify: '#certifyCard', me: '#whoCard', feed: '#feedCard', fame: '#fameCard', info: '#bookCard', rules: '#rulesCard' };
-      for (const [id, sel] of Object.entries(DEST)) {
+      // 메뉴 하나 = 화면 하나 — 고른 화면만 보이고 맨 위에서 시작(위아래로 오가지 않음)
+      const PANES = ['info', 'certify', 'feed', 'fame', 'me'];
+      const DEST = { me: ['me', '#whoCard', '#me'], feed: ['feed', '#feedCard', '#feed'], fame: ['fame', '#fameCard', '#fame'], info: ['info', '#bookCard', '#info'], certify: ['certify', '#certifyCard', ''] };
+      for (const [id, [pane, sel, hash]] of Object.entries(DEST)) {
+        await page.evaluate(() => window.scrollTo(0, 300));
         await page.click(`#sidenav [data-item="${id}"] a`);
-        await page.waitForTimeout(950);
-        const ok = await inView(page, sel);
-        const cur = await current(page);
-        const hash = await page.evaluate(() => location.hash);
-        t(`${W}: [${id}] → ${sel} 보임 · 표시 · 주소 #${id}`, ok && cur.join() === id && hash === '#' + id, { ok, cur, hash });
+        await page.waitForTimeout(250);
+        const vis = await page.evaluate((ps) => ps.filter((p) => getComputedStyle(document.getElementById('pane-' + p)).display !== 'none'), PANES);
+        const st = { vis, cur: await current(page), hash: await page.evaluate(() => location.hash), y: await page.evaluate(() => window.scrollY) };
+        t(`${W}: [${id}] → ${pane} 화면만 보임 · 맨 위 · 표시 · 주소 '${hash}'`,
+          st.vis.join() === pane && await page.isVisible(sel) && st.y === 0 && st.cur.join() === id && st.hash === hash, st);
       }
-      const curStyle = await page.$eval('#sidenav [data-item="rules"] a', (a) => ({ bg: getComputedStyle(a).backgroundColor, bar: getComputedStyle(a, '::before').width }));
+      t(`${W}: [멤버십 안내] 한 화면에 이번 책·일정 + 안내·규칙`, await (async () => {
+        await page.click('#sidenav [data-item="info"] a'); await page.waitForTimeout(200);
+        return await page.isVisible('#bookCard') && await page.isVisible('#rulesCard');
+      })());
+      const curStyle = await page.$eval('#sidenav [data-item="info"] a', (a) => ({ bg: getComputedStyle(a).backgroundColor, bar: getComputedStyle(a, '::before').width }));
       t(`${W}: 지금 메뉴는 배경색 + 표시선`, curStyle.bg !== 'rgba(0, 0, 0, 0)' && curStyle.bar === '3px', curStyle);
-      // 고른 제목이 위에 가리지 않음(넓은 화면은 머리가 없어 0 위로만 안 넘으면 된다)
-      const top = await page.$eval('#rulesCard', (e) => e.getBoundingClientRect().top);
-      t(`${W}: 옮긴 제목이 가려지지 않음`, top >= 0 && top < 60, top);
-
-      // 스크롤 위치에 따라 메뉴 갱신
-      await page.evaluate(() => document.querySelector('#feedCard').scrollIntoView());
-      await page.waitForTimeout(300);
-      t(`${W}: 스크롤로 피드에 오면 [인증 피드] 표시`, (await current(page)).join() === 'feed', await current(page));
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(300);
-      t(`${W}: 맨 위로 오면 [이번 책·일정] 표시`, (await current(page)).join() === 'info', await current(page));
-
+      const top = await page.$eval('#pane-info', (e) => e.getBoundingClientRect().top);
+      t(`${W}: 화면 제목이 위에 가려지지 않음`, top >= 0 && top < 60, top);
       // 뒤로 가기
       await page.click('#sidenav [data-item="feed"] a'); await page.waitForTimeout(900);
       await page.click('#sidenav [data-item="fame"] a'); await page.waitForTimeout(900);
@@ -177,7 +173,7 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
       t(`${W}: 배경 클릭으로 닫힘`, !(await page.isVisible('#sidenav')) && await page.evaluate(() => document.activeElement.classList.contains('sn-menu-btn')));
 
       // 메뉴 선택 → 그 pane을 먼저 열고 카드로
-      const DEST = { feed: ['feed', '#feedCard'], fame: ['fame', '#fameCard'], rules: ['info', '#rulesCard'], info: ['info', '#bookCard'], me: ['me', '#whoCard'], certify: ['certify', '#certifyCard'] };
+      const DEST = { feed: ['feed', '#feedCard'], fame: ['fame', '#fameCard'], info: ['info', '#bookCard'], me: ['me', '#whoCard'], certify: ['certify', '#certifyCard'] };
       for (const [id, [pane, sel]] of Object.entries(DEST)) {
         await page.click('.sn-menu-btn'); await page.waitForTimeout(250);
         await page.click(`#sidenav [data-item="${id}"] a`); await page.waitForTimeout(400);
@@ -210,7 +206,7 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
 
     // ── 직접 접속 · 새로고침 ──
     await page.goto(BASE + '/index.html#rules'); await page.waitForTimeout(600);
-    t(`${W}: 주소 #rules로 직접 접속 → 안내·규칙 보임·표시`, await inView(page, '#rulesCard') && (await current(page)).join() === 'rules');
+    t(`${W}: 예전 주소 #rules로 직접 접속 → 멤버십 안내 화면의 규칙 카드 · 메뉴는 [멤버십 안내]`, await inView(page, '#rulesCard') && (await current(page)).join() === 'info');
     await page.goto(BASE + '/index.html#me'); await page.waitForTimeout(500);
     await page.reload(); await page.waitForTimeout(600);
     t(`${W}: 기존 #me 새로고침 → 나의 현황`, await page.isVisible('#whoCard') && (await current(page)).join() === 'me');
@@ -247,7 +243,7 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
     t(`${W}: 한 번 더 뒤로 → 칼럼 탭`, (await page.getAttribute('.content-tabs [data-filter="columns"]', 'aria-pressed')) === 'true' && (await current(page)).join() === 'columns');
     // 콘텐츠 → 오늘의 인증
     if (mobile) { await page.click('.sn-menu-btn'); await page.waitForTimeout(250); }
-    await page.click('#sidenav [data-item="certify"] a'); await page.waitForURL('**/index.html#certify'); await page.waitForTimeout(700);
+    await page.click('#sidenav [data-item="certify"] a'); await page.waitForURL((u) => u.pathname.endsWith('/index.html') && !u.hash); await page.waitForTimeout(700);
     if (mobile) t(`${W}: 콘텐츠 → [오늘의 인증] 인증 화면`, await page.evaluate(() => document.querySelector('.pane.active').dataset.pane) === 'certify');
     else t(`${W}: 콘텐츠 → [오늘의 인증] 인증 카드로`, await inView(page, '#certifyCard'));
     await page.selectOption('#participant', { label: '커밍쏜' }); await page.waitForTimeout(200);
@@ -255,6 +251,9 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
     // 기존 인증 기능 그대로
     await page.click('#submitBtn'); await page.waitForTimeout(600);
     t(`${W}: 인증 제출 동작`, /인증|완료|저장/.test(await page.textContent('#formMsg')), (await page.textContent('#formMsg')).slice(0, 40));
+    t(`${W}: 인증 직후 "다른 분들 글 보기 · 내 현황 보기" 바로가기(PC에도)`, await page.isVisible('#formMsg .quick-go'));
+    await page.click('#formMsg .quick-go [data-go="feed"]'); await page.waitForTimeout(250);
+    t(`${W}: 바로가기 → 인증 피드 화면 · 메뉴 표시`, await page.isVisible('#feedCard') && !(await page.isVisible('#certifyCard')) && (await current(page)).join() === 'feed');
     await ctx.close();
   }
 
@@ -267,7 +266,7 @@ const t = (n, c, x) => (c ? (pass++, console.log('  ok  ', n)) : (fail++, consol
     const page = await ctx.newPage();
     await page.goto(BASE + '/content.html?season=s3#videos'); await page.waitForTimeout(500);
     const labels = await menuLabels(page);
-    t('지난 시즌(콘텐츠 화면): 인증·나의 현황·규칙 메뉴 빠짐', !labels.includes('오늘의 인증') && !labels.includes('나의 현황') && !labels.includes('안내·규칙') && labels.includes('인증 피드'), labels);
+    t('지난 시즌(콘텐츠 화면): 인증·나의 현황 메뉴 빠짐', !labels.includes('오늘의 인증') && !labels.includes('나의 현황') && labels.includes('멤버십 안내') && labels.includes('인증 피드'), labels);
     t('지난 시즌: 메뉴 주소에 ?season=s3 유지', (await page.getAttribute('#sidenav [data-item="feed"] a', 'href')) === 'index.html?season=s3#feed');
     t('지난 시즌: 시즌 표시', /지난 시즌/.test(await page.textContent('#sidenav .sn-season')));
     await ctx.close();

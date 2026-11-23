@@ -1,8 +1,8 @@
 /* 화면 이동 — 휴대폰 하단 탭 · 전체 메뉴(js/sidenav.js) · 주소(#…)를 한 곳에서 맞춘다.
  *
  * 화면 내용과 동작은 전부 js/app.js가 그대로 맡고, 이 파일은 "지금 어느 자리(route)를 보여 줄지"만 정한다.
- *  - 휴대폰(900px 미만): 다섯 묶음(.pane) 중 하나만 보인다. 자리를 고르면 그 묶음을 먼저 열고 그 카드로 간다.
- *  - 넓은 화면: 묶음을 위에서 아래로 이어서 보여 주고, 자리를 고르면 그 카드로 스크롤한다.
+ *  - 휴대폰·PC 모두 다섯 묶음(.pane) 중 하나만 보인다 — 메뉴 하나가 화면 하나(위아래로 오가지 않는다).
+ *    자리를 고르면 그 묶음을 열고 맨 위에서 시작한다(#rules처럼 묶음 안 카드를 가리키면 그 카드로).
  *
  * 자리(route) → 묶음(pane) · 카드
  *   #certify(주소 없음과 같다) 오늘의 인증 · #me 나의 현황 · #feed 인증 피드 · #fame 명예의 전당
@@ -50,7 +50,7 @@
     const r = ROUTES[name];
     const el = r && $(r.target);
     if (!el) return;
-    if (isMobile() && r.top) { window.scrollTo(0, 0); return; }
+    if (r.top) { window.scrollTo(0, 0); return; }
     el.scrollIntoView({ block: 'start', behavior: smooth && !reduce.matches ? 'smooth' : 'auto' });
   }
 
@@ -130,14 +130,14 @@
     const keepLast = () => { last = location.href; };
     document.addEventListener('cs:tab', keepLast);
 
-    // 처음 열 때: 주소의 자리. 넓은 화면에서 주소 없이 열면 예전처럼 맨 위(책 소개)부터.
+    // 처음 열 때: 주소의 자리(주소가 없으면 오늘의 인증)
     const first = fromHash();
     const shown = go(first, { history: false, scroll: false });
     if (shown !== first) go(shown, { push: false, scroll: false });
     if (location.hash && ROUTES[location.hash.slice(1)]) {
       // 카드 위 글·이미지가 자리를 잡은 뒤 한 번 더 맞춘다(새로고침·직접 접속)
       requestAnimationFrame(() => scrollToTarget(currentRoute, false));
-      window.addEventListener('load', () => { if (window.scrollY < 4 || isMobile()) scrollToTarget(currentRoute, false); }, { once: true });
+      window.addEventListener('load', () => scrollToTarget(currentRoute, false), { once: true });
     }
 
     const card = $('myCard');
@@ -145,10 +145,10 @@
       new MutationObserver(syncMyEmpty).observe(card, { attributes: true, attributeFilter: ['hidden'] });
       syncMyEmpty();
     }
-    // 인증 직후 바로가기 — 휴대폰에서는 아래 카드들이 다른 탭에 있으니 길을 열어 준다
+    // 인증 직후 바로가기 — 피드·내 현황은 다른 화면에 있으니 길을 열어 준다
     document.addEventListener('cs:submitted', () => {
       const box = $('formMsg');
-      if (!box || !isMobile()) return;
+      if (!box) return;
       const old = box.querySelector('.quick-go');
       if (old) old.remove();
       const wrap = document.createElement('div');

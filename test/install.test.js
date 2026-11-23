@@ -23,7 +23,8 @@ const FAKE_PROMPT = () => {
     await ctx.route((u) => u.pathname.startsWith('/.netlify/functions/'), (r) => r.fulfill({ status: 204 }));
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(BASE + url);
+    // 설치 안내 카드는 [멤버십 안내] 화면 맨 위에 있다(메뉴 하나 = 화면 하나)
+    await page.goto(BASE + url + (url.includes('#') ? '' : '#info'));
     await page.waitForSelector('#installApp');
     return { ctx, page };
   }
