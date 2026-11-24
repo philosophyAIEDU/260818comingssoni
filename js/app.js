@@ -1044,17 +1044,41 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
   let awardShown = null;   // 지금 보여 줄 주 { from, to, announce, no, items } — 수상자가 있는 가장 최근 주
   let awardHistory = [];   // 지금까지 발표된 모든 주(수상자 없는 주 포함)
   let seasonOver = false;
+  const AWARD_OPENED_KEY = `${CONFIG.storagePrefix}.awardOpened`; // 시상 드롭다운을 펼쳐 본 마지막 발표(새 소식 N 끄기)
+  let awardPanelOpen = false; // 피드를 다시 그려도 펼친 상태 유지
+
+  /** 그 글로 바로 — 그 날짜 피드를 열고(검색은 비움) 글까지 내려가 잠깐 빛나게 한다 */
+  async function goToPost(postId, date) {
+    if (!postId) return;
+    if (CS.Tabs && CS.Tabs.route() !== 'feed') CS.Tabs.go('feed', { scroll: false });
+    feedSearch = '';
+    $('feedSearch').value = '';
+    feedDate = date || '';
+    const sel = $('feedDateSelect');
+    feedVisibleCount = 999; // 그날 글은 다 그린다(하루치라 많지 않다)
+    await refreshSocialFeed();
+    if (sel && [...sel.options].some((o) => o.value === feedDate)) sel.value = feedDate;
+    const el = $('socialFeedList').querySelector(`[data-post="${CSS.escape(postId)}"]`);
+    if (!el) return;
+    el.setAttribute('tabindex', '-1');
+    el.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el.focus({ preventScroll: true });
+    el.classList.remove('post-flash');
+    void el.offsetWidth; // 같은 글을 다시 눌러도 빛나게
+    el.classList.add('post-flash');
+    setTimeout(() => el.classList.remove('post-flash'), 2400);
+  }
 
   function awardList(awards) {
     return [
       ...awards.popular.map((w) => ({
-        kind: 'popular', title: '이번 주 인기 게시자', emoji: '🏆', nickname: w.nickname, count: w.people || w.likes,
+        kind: 'popular', title: '이번 주 인기 게시자', emoji: '🏆', nickname: w.nickname, participantId: w.participantId, count: w.people || w.likes,
         text: `이번 주의 인기 게시자로 <strong>${esc(w.nickname)}님</strong>이 선정되셨습니다. ` +
           `1주일간 ${w.people || w.likes}분에게 좋아요를 받으셨습니다. ` +
           `앞으로도 좋은 인사이트 공유해주세요. 감사합니다. ${esc(w.nickname)}님`
       })),
       ...awards.messenger.map((w) => ({
-        kind: 'messenger', title: '이번 주 메신저', emoji: '💌', nickname: w.nickname, count: w.authors,
+        kind: 'messenger', title: '이번 주 메신저', emoji: '💌', nickname: w.nickname, participantId: w.participantId, count: w.authors,
         text: `이번 주의 메신저로 <strong>${esc(w.nickname)}님</strong>이 선정되셨습니다. ` +
           `1주일간 ${w.authors}분의 글을 공유해주셨습니다. ` +
           `덕분에 좋은 글을 함께 볼 수 있었습니다. 감사합니다 ${esc(w.nickname)}님.`
@@ -1105,9 +1129,11 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
   }
 
   /** 시즌 전체 주간 수상 기록(1주차부터). 시즌이 끝난 뒤 피드와 마지막 축하 카드에 쓴다. */
-  function awardHistoryHtml() {
+  function awardHistoryHtml(inModal) {
     const who = (items, kind) => {
-      const names = items.filter((x) => x.kind === kind).map((x) => `${esc(x.nickname)}님`);
+      const names = items.filter((x) => x.kind === kind).map((x) => (x.postId && !inModal
+        ? `<button type="button" class="award-name-link" data-award-post="${esc(x.postId)}" data-award-date="${esc(x.postDate)}">${esc(x.nickname)}님</button>`
+        : `${esc(x.nickname)}님`));
       return names.length ? names.join(', ') : '<span class="muted">없음</span>';
     };
     return `<ol class="award-history">${awardHistory.map((w) => `<li>
@@ -1129,7 +1155,7 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
         <div class="award-who">${CS.Post.avatar(x.nickname)}<span>${esc(x.nickname)}님</span></div>
       </div>`).join('')}</div>
       <div class="award-msgs">${items.map((x) => `<p class="award-msg"><span class="award-msg-kind">${x.emoji} ${esc(x.title)}</span>${x.text}</p>`).join('')}</div>
-      ${seasonOver ? `<h4 class="award-history-title">『${esc(CONFIG.book.name)}』 주간 수상 기록</h4>${awardHistoryHtml()}` : ''}
+      ${seasonOver ? `<h4 class="award-history-title">『${esc(CONFIG.book.name)}』 주간 수상 기록</h4>${awardHistoryHtml(true)}` : ''}
     </section>`;
   }
 
@@ -1169,25 +1195,61 @@ CS.FEED_API = true; // 멤버 화면: 명단·글 목록은 서버 스냅샷으�
     const weeks = U.awardWeeks(today);
     const subs = weeks.length ? await loadAllSubs() : [];
     awardHistory = weeks.map((w, i) => Object.assign({}, w, { no: i + 1, items: awardList(U.weeklyAwards(subs, w, participants)) }));
+    // 수상자를 누르면 그 글로 — 인기 게시자는 그 주 가장 추천 많은 글, 메신저는 그 주 가장 최근 글
+    awardHistory.forEach((w) => w.items.forEach((x) => {
+      const mine = subs.filter((s) => s.participantId === x.participantId && s.date >= w.from && s.date <= w.to);
+      const pick = mine.sort((a, b) => (x.kind === 'popular' ? (b.upvotes || 0) - (a.upvotes || 0) : 0)
+        || String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+      if (pick) { x.postId = pick.id; x.postDate = pick.date; }
+    }));
     awardShown = awardHistory.filter((w) => w.items.length).pop() || null;
     seasonOver = today > CONFIG.endDate;
 
-    let html = '';
+    // 피드를 먼저 보도록 시상 소식은 접어 둔다. 새 소식(이 기기에서 아직 펼쳐 보지 않은 발표)이 있을 때만 주황 N.
+    let title = ''; let sub = ''; let body = ''; let mark = '';
     if (seasonOver && awardHistory.length) {
-      html = `<div class="award-range">『${esc(CONFIG.book.name)}』 주간 수상 기록</div>${awardHistoryHtml()}`;
+      title = `🏆 『${esc(CONFIG.book.name)}』 주간 수상 기록`;
+      sub = `${awardHistory.length}주`;
+      body = awardHistoryHtml();
+      mark = `end:${CONFIG.endDate}`;
     } else if (awardShown) {
       // 다음 수상자가 나올 때까지 그대로 둔다(수상자 없는 주가 끼어도 지난 수상자를 계속 보여 줌)
-      const line = (x) => x.kind === 'popular'
+      const what = (x) => x.kind === 'popular'
         ? `🏆 이번 주 인기 게시자 <strong>${esc(x.nickname)}님</strong> <span class="muted">· 1주일간 ${x.count}분에게 좋아요</span>`
         : `💌 이번 주 메신저 <strong>${esc(x.nickname)}님</strong> <span class="muted">· 1주일간 ${x.count}분의 글 공유</span>`;
-      html = `<div class="award-range">${awardShown.no}주차 · ${esc(U.shortLabel(awardShown.from))} ~ ${esc(U.shortLabel(awardShown.to))}</div>` +
-        awardShown.items.map((x) => `<div class="award-line">${line(x)}</div>`).join('');
+      title = '🏆 이번 주 시상';
+      sub = `${awardShown.no}주차 · ${esc(U.shortLabel(awardShown.from))} ~ ${esc(U.shortLabel(awardShown.to))}`;
+      body = awardShown.items.map((x) => (x.postId
+        ? `<button type="button" class="award-line award-line-link" data-award-post="${esc(x.postId)}" data-award-date="${esc(x.postDate)}">
+            <span>${what(x)}</span><span class="award-go">글 보기<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.4 10.4 8 6 12.6"/></svg></span></button>`
+        : `<div class="award-line">${what(x)}</div>`)).join('');
+      mark = `week:${awardShown.to}`;
     }
-    if (html && awardShown) html += '<div><button type="button" class="small award-open-btn" data-award-open>🎉 축하 카드 보기</button></div>';
-    box.innerHTML = html;
-    box.hidden = !html;
+    if (body && awardShown) body += '<div><button type="button" class="small award-open-btn" data-award-open>🎉 축하 카드 보기</button></div>';
+    let opened = '';
+    try { opened = localStorage.getItem(AWARD_OPENED_KEY) || ''; } catch (e) { /* 저장 불가 환경 */ }
+    const isNew = !!mark && opened !== mark;
+    box.innerHTML = body ? `<button type="button" class="award-toggle" aria-expanded="${awardPanelOpen}" aria-controls="awardPanel">
+        <span class="award-toggle-text"><span class="award-toggle-title">${title}</span><span class="award-toggle-sub">${sub}</span></span>
+        ${isNew ? '<span class="award-new" title="새 소식">N<span class="sr-only"> 새 소식</span></span>' : ''}
+        <svg class="ico award-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 6.3 8 10.1l3.8-3.8"/></svg>
+      </button>
+      <div class="award-panel" id="awardPanel"${awardPanelOpen ? '' : ' hidden'}>${body}</div>` : '';
+    box.hidden = !body;
+    const toggle = box.querySelector('.award-toggle');
+    if (toggle) toggle.addEventListener('click', () => {
+      awardPanelOpen = !awardPanelOpen;
+      toggle.setAttribute('aria-expanded', String(awardPanelOpen));
+      $('awardPanel').hidden = !awardPanelOpen;
+      if (awardPanelOpen) { // 펼쳐 봤으면 새 소식 표시를 끈다
+        try { localStorage.setItem(AWARD_OPENED_KEY, mark); } catch (e) { /* 저장 불가 환경 */ }
+        const n = toggle.querySelector('.award-new');
+        if (n) n.remove();
+      }
+    });
     const btn = box.querySelector('[data-award-open]');
     if (btn) btn.addEventListener('click', openAwardModal);
+    box.querySelectorAll('[data-award-post]').forEach((b) => b.addEventListener('click', () => goToPost(b.dataset.awardPost, b.dataset.awardDate)));
 
     // 발표 당일에만, 이 기기에서 처음 볼 때 한 번 축하 카드를 띄운다.
     const latest = awardHistory[awardHistory.length - 1];

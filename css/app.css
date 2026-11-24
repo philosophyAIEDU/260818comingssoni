@@ -520,6 +520,46 @@ body.app {
 /* 이번 주 시상 상자 — 수상자가 없을 땐 비어 있는 노란 띠가 보이던 것(display:grid가 hidden을 덮음) 막기 + 연파랑으로 */
 .weekly-awards[hidden] { display: none; }
 .app .weekly-awards { background: var(--tint); border-color: var(--tint-line); }
+/* 피드를 먼저 — 시상 소식은 한 줄 드롭다운으로 접어 두고, 누르면 펼치고 다시 누르면 닫힌다 */
+.app .weekly-awards { padding: 0; gap: 0; overflow: hidden; }
+.app .award-toggle {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%; min-height: 48px;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+}
+.app .award-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+.app .award-toggle-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.app .award-toggle-title { font-size: 14px; font-weight: 700; color: var(--brand-ink); }
+.app .award-toggle-sub { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.app .award-new {
+  flex: none; display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: #ff7a1a; color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.app .award-chev { flex: none; width: 16px; height: 16px; color: var(--text-dim); transition: transform .18s; }
+.app .award-toggle[aria-expanded="true"] .award-chev { transform: rotate(180deg); }
+.app .award-panel { display: grid; gap: 8px; padding: 0 14px 14px; border-top: 1px solid var(--tint-line); padding-top: 12px; }
+.app .award-panel[hidden] { display: none; }
+/* 수상자 줄 = 그 글로 가는 버튼 */
+.app .award-line-link {
+  all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 8px 10px; margin: 0 -10px; border-radius: 10px; font-size: 14px; line-height: 1.5; color: var(--text); word-break: keep-all;
+}
+.app .award-line-link:hover { background: var(--surface); }
+.app .award-line-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.app .award-line-link > span:first-child { flex: 1; min-width: 0; }
+.app .award-go { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; font-weight: 700; color: var(--brand-ink); white-space: nowrap; }
+.app .award-go .ico { width: 13px; height: 13px; }
+.app .award-name-link { all: unset; cursor: pointer; color: var(--brand-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; padding: 4px 0; }
+.app .award-name-link:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+/* 수상자를 눌러 도착한 글 — 잠깐 연파랑으로 빛난다 */
+.app .feed-item { scroll-margin-top: 16px; }
+@media (max-width: 899px) { .app .feed-item { scroll-margin-top: 76px; } }
+@keyframes post-flash { 0%, 60% { background-color: var(--tint); box-shadow: 0 0 0 2px var(--tint-line); } 100% { background-color: transparent; box-shadow: none; } }
+.app .feed-item.post-flash { animation: post-flash 2.4s ease-out; border-radius: 12px; }
+.app .feed-item:focus { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .app .award-chev { transition: none; }
+  .app .feed-item.post-flash { animation: none; background-color: var(--tint); }
+}
 /* 진행 링 바탕선도 연파랑 — 파란 링이 회색 위보다 또렷하게 이어져 보이게 */
 .app .ring-track { stroke: var(--tint-line); }
 

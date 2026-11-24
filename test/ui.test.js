@@ -2579,9 +2579,40 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     t('인증 피드 맨 위에 이번 주 수상자가 글로 적힘',
       box.includes('2주차') && box.includes('이번 주 인기 게시자 인기왕님') && box.includes('3분에게 좋아요')
       && box.includes('이번 주 메신저 전달왕님') && box.includes('2분의 글 공유'), box);
+    // 피드를 먼저 — 시상 소식은 한 줄 드롭다운으로 접혀 있고, 새 소식이면 주황 N
+    await w.click('#tabbar [data-go="feed"]').catch(() => {});
+    t('시상 소식은 처음엔 접혀 있음(피드가 바로 보임)', await w.isVisible('#weeklyAwards .award-toggle')
+      && !(await w.isVisible('#awardPanel')) && (await w.getAttribute('#weeklyAwards .award-toggle', 'aria-expanded')) === 'false');
+    t('새 소식이면 주황 N 표시', await w.isVisible('#weeklyAwards .award-new')
+      && (await w.$eval('#weeklyAwards .award-new', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 122, 26)');
+    t('접힌 줄에 몇 주차인지', (await w.textContent('#weeklyAwards .award-toggle')).includes('2주차'));
+    await w.click('#weeklyAwards .award-toggle');
+    t('누르면 쫙 펼쳐짐 · N 사라짐', await w.isVisible('#awardPanel') && (await w.getAttribute('#weeklyAwards .award-toggle', 'aria-expanded')) === 'true'
+      && (await w.locator('#weeklyAwards .award-new').count()) === 0);
+    await w.click('#weeklyAwards .award-toggle');
+    t('다시 누르면 닫힘', !(await w.isVisible('#awardPanel')));
+    // 수상자를 누르면 그 글로 — 인기 게시자 = 그 주 가장 추천 많은 글(a1), 메신저 = 그 주 가장 최근 글(b1)
+    await w.click('#weeklyAwards .award-toggle');
+    await w.click('#weeklyAwards .award-line-link >> nth=0');
+    await w.waitForTimeout(900);
+    const landed = await w.evaluate(() => {
+      const el = document.querySelector('#socialFeedList [data-post="a1"]');
+      const r = el && el.getBoundingClientRect();
+      return { found: !!el, top: r && Math.round(r.top), inView: !!r && r.top >= 0 && r.bottom <= innerHeight, flash: !!el && el.classList.contains('post-flash'), focus: document.activeElement === el, date: document.querySelector('#feedDateSelect').value };
+    });
+    t('인기 게시자를 누르면 그 글(그 주 가장 추천 많은 글)로 이동 · 잠깐 빛남', landed.found && landed.inView && landed.flash && landed.focus && landed.date === '2026-09-07', landed);
+    await w.click('#weeklyAwards .award-line-link >> nth=1');
+    await w.waitForTimeout(900);
+    t('메신저를 누르면 그 사람의 그 주 글로 이동', await w.evaluate(() => {
+      const el = document.querySelector('#socialFeedList [data-post="b1"]');
+      const r = el && el.getBoundingClientRect();
+      return !!el && r.top >= 0 && r.bottom <= innerHeight && document.querySelector('#feedDateSelect').value === '2026-09-10';
+    }));
     await w.reload();
     await w.waitForTimeout(600);
     t('같은 날 다시 들어와도 또 뜨지 않음', !(await w.isVisible('#awardModal')));
+    t('한 번 펼쳐 본 소식이면 N 없음 · 다시 접힌 채', (await w.locator('#weeklyAwards .award-new').count()) === 0 && !(await w.isVisible('#awardPanel')));
+    await w.click('#weeklyAwards .award-toggle');
     await w.click('#weeklyAwards [data-award-open]');
     await w.waitForTimeout(400);
     t('피드의 [축하 카드 보기]로 다시 볼 수 있음', await w.isVisible('#awardModal'));
@@ -2613,6 +2644,7 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
     // 다음 일요일: 3주차(9/14~9/19)는 엄지척·복사가 없어 수상자 없음 → 카드 없이 2주차 수상자를 계속 보여 줌
     await freshVisit('2026-09-20');
     t('수상자가 없는 주의 발표일엔 카드가 안 뜸', !(await w.isVisible('#awardModal')));
+    t('지난 소식 그대로면 N 없음', (await w.locator('#weeklyAwards .award-new').count()) === 0);
     box = await feedBox();
     t('다음 수상자가 나올 때까지 지난 수상자를 계속 적어 둠', box.includes('2주차') && box.includes('인기왕님'), box);
 
@@ -2631,6 +2663,17 @@ const t = (n, c, x) => c ? (pass++, console.log('  ok  ', n)) : (fail++, console
       && box.includes('💌 메신저 전달왕님') && box.includes('4주차') && box.includes('🏆 인기 게시자 보통님'), box);
     t('수상자가 없는 주는 "없음"으로 표시', (await w.textContent('#weeklyAwards .award-history li')).includes('없음'),
       await w.textContent('#weeklyAwards .award-history li'));
+    t('시즌 기록으로 바뀌면 새 소식 N', await w.isVisible('#weeklyAwards .award-new'));
+    await w.click('#weeklyAwards .award-toggle');
+    await w.click('#weeklyAwards .award-history .award-name-link >> text=보통님');
+    await w.waitForTimeout(900);
+    t('주간 기록의 이름을 눌러도 그 글로 이동', await w.evaluate(() => {
+      const el = document.querySelector('#socialFeedList [data-post="d1"]');
+      const r = el && el.getBoundingClientRect();
+      return !!el && r.top >= 0 && r.bottom <= innerHeight;
+    }));
+    await w.selectOption('#feedDateSelect', '');
+    await w.waitForTimeout(300);
 
     // 이름을 고른 기기에서 남의 글을 [텍스트 복사]하면 그 글에 복사한 사람이 남는다
     await w.evaluate(() => { navigator.clipboard.writeText = () => Promise.resolve(); });
