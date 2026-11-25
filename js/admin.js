@@ -1603,6 +1603,8 @@ CS.FEED_API = 'submissions';
     giftExtras = Array.isArray(meta.giftExtras) ? meta.giftExtras.filter((x) => x && x.email) : [];
     paintGiftExtras();
     paintGiftSchedule(meta);
+    giftPending = meta.giftPending || null;
+    paintGiftOpen();
     // 받은 사람 수는 명단의 발송 기록(giftSentAt)으로 센다 — 발송이 중간에 끊겨 giftLastRun이 안 남아도 맞게
     const { eligible } = giftCandidates();
     const got = eligible.filter((x) => x.stat.participant.giftSentAt).length + giftExtras.filter((x) => x.sentAt).length;
@@ -1696,17 +1698,20 @@ CS.FEED_API = 'submissions';
   }
 
   /** 서버 함수(send-gift-mail)가 대상자를 다시 계산해서 보낸다 — 여기서는 링크·문구만 넘긴다. */
-  async function sendGiftMail() {
+  async function sendGiftMail(opts) {
+    opts = opts && opts.strict ? opts : {}; // 클릭 이벤트로 불리면 기본(직접 보내기)
+    if (opts.link) $('giftLink').value = opts.link;
+    const out = opts.msgEl || $('giftSendMsg');
     const link = $('giftLink').value.trim();
-    if (!/^https?:\/\//.test(link)) { msg($('giftSendMsg'), '정리본 링크(https://…)를 먼저 넣어 주세요.', 'bad'); return; }
-    if (!Store.getIdToken) { msg($('giftSendMsg'), '이 백엔드(로컬 저장)에서는 메일을 보낼 수 없습니다. Firebase 배포본에서 눌러 주세요.', 'bad'); return; }
+    if (!/^https?:\/\//.test(link)) { msg(out, '정리본 링크(https://…)를 먼저 넣어 주세요.', 'bad'); return; }
+    if (!Store.getIdToken) { msg(out, '이 백엔드(로컬 저장)에서는 메일을 보낼 수 없습니다. Firebase 배포본에서 눌러 주세요.', 'bad'); return; }
     const { eligible } = giftCandidates();
-    const resend = $('giftResend').checked;
+    const resend = opts.strict ? false : $('giftResend').checked; // 정리본 오픈은 이미 받은 사람에게 다시 보내지 않는다
     const fresh = eligible.filter((r) => resend || !r.stat.participant.giftSentAt);
     const extra = giftExtraPending(resend);
-    if (!fresh.length && !extra.length) { msg($('giftSendMsg'), '보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).', 'warn'); return; }
-    if (!confirm(`${fresh.length + extra.length}명에게 정리본 메일을 보낼까요?${extra.length ? `\n(추가한 ${extra.length}명 포함)` : ''}\n${link}`)) return;
-    const btn = $('giftSendBtn');
+    if (!fresh.length && !extra.length) { msg(out, '보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).', 'warn'); return; }
+    if (!confirm(opts.confirmText || `${fresh.length + extra.length}명에게 정리본 메일을 보낼까요?${extra.length ? `\n(추가한 ${extra.length}명 포함)` : ''}\n${link}`)) return;
+    const btn = opts.button || $('giftSendBtn');
     btn.disabled = true;
     const old = btn.textContent;
     btn.textContent = '보내는 중…';
@@ -1724,7 +1729,7 @@ CS.FEED_API = 'submissions';
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
             body: JSON.stringify({
-              link, resend: resend && first, seasonId: CONFIG.seasonId,
+              link, resend: resend && first, seasonId: CONFIG.seasonId, strict: !!opts.strict,
               subject: $('giftMailSubject').value.trim(),
               body: $('giftMailBody').value.trim()
             })
@@ -1735,7 +1740,7 @@ CS.FEED_API = 'submissions';
           // 함수가 시간 제한에 끊기면(502/504 등) 받은 사람은 기록돼 있으니 잠깐 쉬고 이어서 다시 부른다
           if (res.status !== 400 && res.status !== 401 && res.status !== 403 && retries < 5) {
             retries++;
-            msg($('giftSendMsg'), `보내는 중 — ${sent}명 보냄 · 연결이 끊겨 다시 이어 보냅니다(${retries}/5)…`, 'warn');
+            msg(out, `보내는 중 — ${sent}명 보냄 · 연결이 끊겨 다시 이어 보냅니다(${retries}/5)…`, 'warn');
             await new Promise((r) => setTimeout(r, 3000));
             first = false;
             continue;
@@ -1747,12 +1752,12 @@ CS.FEED_API = 'submissions';
         if (first) already = data.skippedAlready || 0;
         first = false;
         btn.textContent = `보내는 중… ${sent}/${total}`;
-        msg($('giftSendMsg'), `보내는 중 — ${sent}/${total}명 보냄${data.remaining ? `, ${data.remaining}명 남음` : ''}`, 'ok');
+        msg(out, `보내는 중 — ${sent}/${total}명 보냄${data.remaining ? `, ${data.remaining}명 남음` : ''}`, 'ok');
         if (!data.remaining || !data.sent) break; // 다 보냈거나, 이번에 한 명도 못 보냈으면(전부 실패 등) 멈춘다
       }
       // 그래도 남았으면 서버 예약 발송에 넘겨 끝까지 보내게 한다(받은 사람은 건너뜀)
       if (left) await handOffToSchedule(link);
-      msg($('giftSendMsg'),
+      msg(out,
         `${sent}명에게 보냈습니다.` +
         (already ? ` 이미 받은 ${already}명은 건너뛰었습니다.` : '') +
         (noEmail ? ` 이메일이 없는 ${noEmail}명은 못 보냈습니다.` : '') +
@@ -1762,12 +1767,70 @@ CS.FEED_API = 'submissions';
       await refresh();
     } catch (e) {
       const handed = await handOffToSchedule(link).catch(() => false);
-      msg($('giftSendMsg'), `${sent}명 보낸 뒤 멈췄습니다: ${esc(e.message)}`
+      msg(out, `${sent}명 보낸 뒤 멈췄습니다: ${esc(e.message)}`
         + (handed ? ' — 남은 분은 서버 예약 발송으로 넘겨 이어서 보냅니다.' : ''), handed ? 'warn' : 'bad');
     } finally {
       btn.disabled = false;
       btn.textContent = old;
     }
+  }
+
+  /* ── 🎁 정리본 오픈 (2026-11-25 커밍쏜 결정) ──
+   * 커밍쏜 맥이 녹화 4개로 정리본 초안을 노션(비공개)에 만들면 링크를 meta/app.giftPending 에 넘긴다(gift-pending 함수).
+   * 여기서는 그 링크를 미리 채우고, 받는 인원·메일 미리보기·변수 검사(js/giftCheck.js)를 보여 준다.
+   * 검사가 하나라도 걸리거나 인증 기간이 안 끝났으면 버튼을 막는다. 누르면 [지금 바로 보내기]와 같은 서버 발송(strict)으로
+   * 대상자에게만 메일이 간다 — 이미 받은 사람(giftSentAt)은 건너뛰고, 앱 공지·피드에는 아무것도 올리지 않는다. */
+  let giftPending = null;
+  function giftOpenState() {
+    const link = $('giftOpenLink').value.trim();
+    const subject = $('giftMailSubject').value.trim();
+    const body = $('giftMailBody').value.trim();
+    const r = CS.GiftCheck.check({ cfg: CONFIG, link, subject, body });
+    const { eligible } = giftCandidates();
+    const fresh = eligible.filter((x) => !x.stat.participant.giftSentAt && x.email);
+    const extra = giftExtraPending(false);
+    const blocks = r.problems.slice();
+    if (U.today() <= CONFIG.endDate) blocks.push(`인증 기간(~${CONFIG.endDate})이 끝나야 누락 횟수가 확정됩니다 — 그 뒤에 보낼 수 있어요.`);
+    if (!fresh.length && !extra.length) blocks.push('보낼 사람이 없습니다(모두 이미 받았거나 대상이 없습니다).');
+    return { link, subject, body, check: r, blocks, eligible, fresh, extra };
+  }
+  function paintGiftOpen() {
+    if (!CONFIG.giftMissLimit) return;
+    const p = giftPending && giftPending.seasonId === CONFIG.seasonId ? giftPending : null;
+    if (p && p.link && !$('giftOpenLink').value) $('giftOpenLink').value = p.link;
+    $('giftOpenPending').innerHTML = p
+      ? (p.status === 'sent'
+        ? `✅ 정리본 오픈 완료 ${esc(p.sentAt ? U.stampLabel(p.sentAt) : '')} · <a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.title || p.link)}</a>`
+        : `📝 대기 중 정리본 (${esc(p.at ? U.stampLabel(p.at) : '')} 자동 초안) · <a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.title || p.link)}</a> — 노션에서 검수한 뒤 아래 버튼을 누르세요.`)
+      : '대기 중 정리본이 아직 없습니다. 녹화 4개로 초안이 만들어지면 링크가 여기에 저절로 채워집니다(직접 붙여 넣어도 됩니다).';
+    const st = giftOpenState();
+    const noMail = st.eligible.filter((x) => !x.email && !x.stat.participant.giftSentAt).length;
+    $('giftOpenCount').innerHTML = `받는 사람 <strong>${st.fresh.length + st.extra.length}명</strong>`
+      + ` (대상 ${st.eligible.length}명 중 아직 안 받은 ${st.fresh.length}명${st.extra.length ? ` + 추가한 ${st.extra.length}명` : ''})`
+      + (noMail ? ` · <span class="warn-text">이메일 없는 ${noMail}명은 못 받습니다</span>` : '');
+    const v = st.check.vars;
+    $('giftOpenChecks').innerHTML = (st.blocks.length
+      ? st.blocks.map((b) => `<li class="bad-text">⛔ ${esc(b)}</li>`).join('')
+      : '<li class="ok-text">✅ 변수 검사 통과</li>')
+      + `<li class="muted">책 『${esc(v.책이름)}』${esc(v.을를)} · 다음 ${esc(v.다음월 || '-')} 『${esc(v.다음책 || '-')}』 · 소개 ${v.다음책소개 ? v.다음책소개.split('\n').length + '줄' : '없음'}</li>`;
+    const ex = st.fresh[0] || st.eligible[0];
+    const pv = CS.GiftCheck.preview({ cfg: CONFIG, link: st.link || '(정리본 링크)', subject: st.subject, body: st.body,
+      days: U.challengeDates().length, liveCount: (CONFIG.weeklyPrompts || []).length || 4 },
+    ex ? { name: ex.stat.participant.nickname, missed: ex.stat.missed } : null);
+    $('giftOpenPreview').textContent = `제목: ${pv.subject}\n\n${pv.body}`;
+    const btn = $('giftOpenBtn');
+    btn.disabled = !!st.blocks.length || (p && p.status === 'sent');
+    btn.textContent = p && p.status === 'sent' ? '🎁 정리본 오픈 완료' : `🎁 정리본 오픈 — ${st.fresh.length + st.extra.length}명에게 보내기`;
+  }
+  async function openGift() {
+    const st = giftOpenState();
+    if (st.blocks.length) { paintGiftOpen(); msg($('giftOpenMsg'), '검사에 걸린 것이 있어 보낼 수 없습니다.', 'bad'); return; }
+    await sendGiftMail({
+      strict: true, link: st.link, button: $('giftOpenBtn'), msgEl: $('giftOpenMsg'),
+      confirmText: `『${CONFIG.book.name}』 정리본을 ${st.fresh.length + st.extra.length}명에게 메일로 보낼까요?\n(이미 받은 분에게는 다시 가지 않습니다. 앱 공지에는 올리지 않습니다.)\n${st.link}`
+    });
+    giftPending = (await Store.getMeta({ fresh: true })).giftPending || giftPending;
+    paintGiftOpen();
   }
 
   function copyGiftList() {
@@ -2363,6 +2426,8 @@ CS.FEED_API = 'submissions';
     $('giftCopy').addEventListener('click', copyGiftList);
     $('giftCsv').addEventListener('click', exportGiftCsv);
     $('giftSendBtn').addEventListener('click', sendGiftMail);
+    $('giftOpenBtn').addEventListener('click', openGift);
+    ['giftOpenLink', 'giftMailSubject', 'giftMailBody'].forEach((id) => $(id).addEventListener('input', paintGiftOpen));
     $('giftExtraAdd').addEventListener('click', addGiftExtras);
     $('streakRecalc').addEventListener('click', () => recalcStreaks());
     $('giftScheduleBtn').addEventListener('click', scheduleGiftMail);

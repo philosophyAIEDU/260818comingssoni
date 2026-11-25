@@ -398,6 +398,24 @@
     <h2 style="margin-top:26px">🎁 선물 대상자 <span class="tag" id="giftCount"></span></h2>
     <p class="hint" id="giftHint"></p>
     <p id="giftProgress" style="margin:4px 0 10px"></p>
+    <!-- 🎁 정리본 오픈 — 맥이 만든 노션 초안 링크가 미리 채워진다. 검수 뒤 버튼 하나로 대상자에게만 메일(앱 공지·피드에는 안 올림) -->
+    <div id="giftOpenBox" class="gift-open">
+      <h3 style="margin-top:0">🎁 정리본 오픈</h3>
+      <p class="hint" id="giftOpenPending"></p>
+      <div class="field">
+        <label for="giftOpenLink">정리본 노션 링크</label>
+        <input type="url" id="giftOpenLink" placeholder="https://www.notion.so/…">
+      </div>
+      <p id="giftOpenCount" style="margin:4px 0"></p>
+      <ul id="giftOpenChecks" style="margin:6px 0 8px;padding-left:18px"></ul>
+      <details class="help"><summary>메일 미리보기 (한 사람 예시)</summary>
+        <pre id="giftOpenPreview" style="white-space:pre-wrap;font:inherit;margin:8px 0"></pre>
+      </details>
+      <div class="actions">
+        <button class="primary" id="giftOpenBtn" type="button" disabled>🎁 정리본 오픈</button>
+      </div>
+      <div id="giftOpenMsg"></div>
+    </div>
     <div class="actions" style="margin-bottom:10px">
       <button class="secondary" id="giftCopy" type="button">이름·이메일 복사</button>
       <button class="secondary" id="giftCsv" type="button">CSV 내려받기</button>
@@ -670,6 +688,7 @@
 <script src="js/streaks.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/mailTemplates.js"></script>
+<script src="js/giftCheck.js"></script>
 <script src="js/feed-client.js"></script>
 <script src="js/store-firebase.js"></script>
 <script src="js/store.js"></script>

@@ -21,7 +21,8 @@
     "test:day-rollover": "node test/day-rollover.test.js",
     "test:mobile-scroll": "node test/mobile-scroll.test.js",
     "test:feed": "node test/feed-snapshot.test.js && node test/feed-client.test.js && node test/feed-api.test.js && node test/admin-feed.test.js && node test/mail-reads.test.js",
-    "test:roster-auto": "node test/roster-auto.test.js && node test/roster-import-fill.test.js"
+    "test:roster-auto": "node test/roster-auto.test.js && node test/roster-import-fill.test.js",
+    "test:gift": "node test/gift-check.test.js && node test/gift-open.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.5.0",
