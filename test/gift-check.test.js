@@ -38,6 +38,7 @@ t('링크 비면 막음', !r.ok && /비어/.test(r.problems.join()));
 r = ok(s3, { link: 'https://bit.ly/abc' });
 t('노션이 아닌 링크 막음', !r.ok && /노션/.test(r.problems.join()));
 t('notion.site 주소는 통과', ok(s3, { link: 'https://capable-hook-3dd.notion.site/abc-123' }).ok);
+t('app.notion.com 주소도 통과', ok(s3, { link: 'https://app.notion.com/p/423f15a6c51c819f9a50f3c86b2e7599' }).ok);
 r = ok(s3, { body: s3.giftMail.body + '\n{{다음책}}' });
 t('남은 {{다음책}} 막음', !r.ok && /\{\{다음책\}\}/.test(r.problems.join()));
 t('{{이름}}·{{정리본링크}}는 남아도 됨', s3.giftMail.body.includes('{{이름}}') && ok(s3).ok);

@@ -2,7 +2,7 @@
  *
  * 메일 문안은 tools/templates/정리본메일*.txt 고정 틀 + 책마다 바뀌는 변수 몇 개다(2026-11-25 커밍쏜 결정).
  * 보내기 전에 그 변수가 이 시즌·다음 시즌 설정과 맞는지 본다. 하나라도 틀리면 버튼을 막고 이유를 보여 준다.
- *   ① 정리본 링크 — 노션 주소(https://…notion.so/… 또는 …notion.site/…)
+ *   ① 정리본 링크 — 노션 주소(https://…notion.so/… 또는 …notion.site/… · app.notion.com/…)
  *   ② 남은 {{…}} — 보낼 때 사람마다 채우는 칸({{이름}} 등) 말고는 남아 있으면 안 된다
  *   ③ 책 이름 — 제목·본문의 『』가 이 시즌 책
  *   ④ 을/를 — 『책』 뒤 조사가 받침에 맞는지
@@ -15,7 +15,7 @@ window.CS = window.CS || {};
 CS.GiftCheck = (function () {
   // 보낼 때 사람마다 채워지는 칸(_lib/giftMail.js 의 vars) — 문안에 남아 있어도 된다
   const RUNTIME_VARS = ['이름', '정리본링크', '누락횟수', '책이름', '일수', '라이브횟수', '앱주소'];
-  const NOTION_URL = /^https:\/\/([\w-]+\.)?notion\.(so|site)\/\S+$/;
+  const NOTION_URL = /^https:\/\/([\w-]+\.)?notion\.(so|site|com)\/\S+$/;
 
   function josaEulReul(word) {
     const c = String(word || '').trim().slice(-1).charCodeAt(0);
