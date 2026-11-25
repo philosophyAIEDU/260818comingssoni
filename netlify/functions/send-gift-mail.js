@@ -15,7 +15,7 @@
  * 응답(JSON): { sent, skippedAlready, skippedNoEmail, remaining, failed, failures, eligible }
  */
 const { CONFIG, withSeason } = require('./_lib/appLogic');
-const { runGiftMail } = require('./_lib/giftMail');
+const { runGiftMail, metaDoc } = require('./_lib/giftMail');
 const { requireAdmin, json } = require('./_lib/adminAuth');
 
 exports.handler = async (event) => {
@@ -31,12 +31,26 @@ exports.handler = async (event) => {
   const link = String(payload.link || '').trim();
   if (!/^https?:\/\//.test(link)) return json(400, { error: '정리본 링크(https://…)를 입력해 주세요.' });
 
+  // 🎁 정리본 오픈(strict) — 노션 링크·책 이름·을/를·다음 달·다음 책·소개 줄을 서버에서도 한 번 더 검사한다(js/giftCheck.js)
+  if (payload.strict) {
+    const chk = global.CS.GiftCheck.check({ cfg: target, link, subject: payload.subject || '', body: payload.body || '' });
+    if (!chk.ok) return json(400, { error: '메일 변수 검사에 걸렸습니다: ' + chk.problems.join(' / '), problems: chk.problems });
+    if (payload.resend) return json(400, { error: '정리본 오픈은 이미 받은 분에게 다시 보내지 않습니다.' });
+  }
   // 운영진 화면이 보고 있던 시즌으로 계산한다(다음 시즌이 켜진 뒤 ?season=s2로 지난 시즌을 보낼 때도 맞게)
   const seasonId = global.CS.seasonById(payload.seasonId) ? payload.seasonId : CONFIG.seasonId;
   // 실행 시간 제한(약 10초) 안에 끝나도록 6초어치만(연결 4개로 동시에) 보내고 남은 인원(remaining)을 돌려준다 —
   // 운영진 화면이 remaining이 0이 될 때까지 다시 부른다(이미 받은 사람은 건너뛴다)
-  const result = await withSeason(seasonId, () => runGiftMail({
-    link, subject: payload.subject, body: payload.body, resend: !!payload.resend, by: auth.email, budgetMs: 6000
-  }));
+  const result = await withSeason(seasonId, async () => {
+    const r = await runGiftMail({
+      link, subject: payload.subject, body: payload.body, resend: !!payload.resend, by: auth.email, budgetMs: 6000
+    });
+    // 정리본 오픈으로 다 보냈으면 대기 중 정리본을 '보냄'으로 — 맥이 같은 시즌 링크를 다시 넘겨도 덮지 않는다(gift-pending)
+    if (payload.strict && !r.remaining) {
+      const cur = ((await metaDoc().get()).data() || {}).giftPending || {};
+      await metaDoc().set({ giftPending: Object.assign({}, cur, { seasonId, link, status: 'sent', sentAt: global.CS.U.nowStamp(), sentBy: auth.email }) }, { merge: true });
+    }
+    return r;
+  });
   return json(200, result);
 };

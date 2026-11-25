@@ -58,6 +58,11 @@ exports.handler = async () => {
           await ref.set({ giftSchedule: Object.assign({}, sch, r.remaining
             ? { status: 'scheduled', sentSoFar, remaining: r.remaining, lastBatchAt: U.nowStamp() }
             : { status: 'sent', doneAt: U.nowStamp(), sent: sentSoFar, sentSoFar, remaining: 0, eligible: r.eligible, failed: r.failed }) }, { merge: true });
+          // 정리본 오픈에서 넘겨받아 끝까지 보냈으면 대기 중 정리본도 '보냄'으로(같은 링크일 때만)
+          if (!r.remaining) {
+            const gp = ((await ref.get()).data() || {}).giftPending;
+            if (gp && gp.link === sch.link && gp.status !== 'sent') await ref.set({ giftPending: Object.assign({}, gp, { status: 'sent', sentAt: U.nowStamp(), sentBy: '예약 발송' }) }, { merge: true });
+          }
           console.log(`[send-gift-scheduled] ${cfg.seasonId} 대상 ${r.eligible}명 + 추가 ${r.extras || 0}명 중 ${r.sent}건 발송, 실패 ${r.failed}건`);
           results.push(Object.assign({ season: cfg.seasonId }, r));
         } catch (err) {

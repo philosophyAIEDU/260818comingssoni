@@ -17,6 +17,7 @@ if (!global.window) global.window = global;
 require('../../../js/config.js');
 require('../../../js/utils.js');
 require('../../../js/mailTemplates.js');
+require('../../../js/giftCheck.js');
 
 const { CONFIG, U, MailTemplates, collectionName } = global.CS;
 

@@ -41,6 +41,9 @@ CS.COMMON = {
   // 🚪 이번 기수 명단 자동 입력(roster-import) — 래피드 결제 서버가 시작일 06:00에 보낸다.
   // 토큰은 그 서버(Vercel 환경 변수 ROSTER_IMPORT_TOKEN)에만 있고, 여기엔 SHA-256만 둔다.
   rosterImportSha256: ['d23920c2bfc5964b38e326891c55570e8916f89ee80d913306f80e5efe539bff'],
+  // 🎁 대기 중 정리본(gift-pending) — 커밍쏜 맥의 정리본 자동 초안이 노션 링크를 넘긴다.
+  // 토큰은 그 맥(~/.config/personalmakers/reading-gift-token)에만 있고, 여기엔 SHA-256만 둔다.
+  giftPendingSha256: ['b136a25489bdeb9d6b8dba8a312c9357feea99e550bb0c99741f2e75a3ba0816'],
   // 💬 시즌 시작일 단톡방 초대 문자(send-season-invite) 문안 — 링크는 시즌마다 kakaoInvite.url
   inviteSms: {
     subject: '[퍼메스 독서] 단톡방 입장 안내',
